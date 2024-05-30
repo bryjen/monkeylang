@@ -1,0 +1,22 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "MonkeyInterpreter", "MonkeyInterpreter\MonkeyInterpreter.fsproj", "{B93BCE15-3A75-48BA-BEE9-B057758791DD}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "MonkeyInterpreter.Test", "MonkeyInterpreter.Test\MonkeyInterpreter.Test.fsproj", "{D19F53FF-E1B4-4417-838E-2C1E0B7E4D01}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{B93BCE15-3A75-48BA-BEE9-B057758791DD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B93BCE15-3A75-48BA-BEE9-B057758791DD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B93BCE15-3A75-48BA-BEE9-B057758791DD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B93BCE15-3A75-48BA-BEE9-B057758791DD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D19F53FF-E1B4-4417-838E-2C1E0B7E4D01}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D19F53FF-E1B4-4417-838E-2C1E0B7E4D01}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D19F53FF-E1B4-4417-838E-2C1E0B7E4D01}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D19F53FF-E1B4-4417-838E-2C1E0B7E4D01}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
