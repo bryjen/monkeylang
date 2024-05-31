@@ -21,7 +21,7 @@ type Lexer(input: string) =
     member this.Position with get() = position
     member this.ReadPosition with get() = position + 1
     member this.CurrentChar with get() =
-        if this.ReadPosition > this.Input.Length then
+        if position >= this.Input.Length then
             '\u0000' // null character
         else
             characters[position]
@@ -29,6 +29,12 @@ type Lexer(input: string) =
             
     member this.NextChar() : unit =
         position <- position + 1
+        
+    member this.PeekNextChar() : char =
+        if this.ReadPosition >= this.Input.Length then
+            '\u0000' // null character
+        else
+            characters[this.ReadPosition]
         
     member this.NextToken() : Token =
         
@@ -68,56 +74,41 @@ type Lexer(input: string) =
             this.NextChar()
             
     member private this.TryParseAsOperatorOrDelimiter() : Token =
-        if this.CurrentChar = '=' || this.CurrentChar = '!' then
-            let previousChar = this.CurrentChar
-            this.NextChar()
-            
-            match this.CurrentChar with
-            | '=' ->
-                this.NextChar()
-                { Type = if previousChar = '=' then EQ else NOT_EQ
-                  Literal = $"{previousChar}=" }
-            | _ ->
-                { Type = if previousChar = '=' then ASSIGN else BANG 
-                  Literal = previousChar.ToString() }
-                
+        if this.CurrentChar = '=' && this.PeekNextChar() = '=' then
+            position <- position + 2
+            { Type = EQ; Literal = "==" }
+        elif this.CurrentChar = '!' && this.PeekNextChar() = '=' then
+            position <- position + 2
+            { Type = NOT_EQ; Literal = "!=" }
         else
-            let literal = $"{this.CurrentChar}" 
-            let token =
+            let tokenType = 
                 match this.CurrentChar with
                 // Operators
-                | '+' ->
-                    { Type = PLUS; Literal = literal } 
-                | '-' ->
-                    { Type = MINUS; Literal = literal }
-                | '*' ->
-                    { Type = ASTERISK; Literal = literal } 
-                | '/' ->
-                    { Type = SLASH; Literal = literal } 
-                | '<' ->
-                    { Type = LT; Literal = literal } 
-                | '>' ->
-                    { Type = GT; Literal = literal }
+                | '=' -> ASSIGN 
+                | '+' -> PLUS
+                | '-' -> MINUS
+                | '!' -> BANG 
+                | '*' -> ASTERISK
+                | '/' -> SLASH
+                | '<' -> LT
+                | '>' -> GT
                     
                 // Delimiters
-                | ',' ->
-                    { Type = COMMA; Literal = literal } 
-                | ';' ->
-                    { Type = SEMICOLON; Literal = literal } 
-                | '(' ->
-                    { Type = LPAREN; Literal = literal } 
-                | ')' ->
-                    { Type = RPAREN; Literal = literal } 
-                | '{' ->
-                    { Type = LBRACE; Literal = literal } 
-                | '}' ->
-                    { Type = RBRACE; Literal = literal }
+                | ',' -> COMMA
+                | ';' -> SEMICOLON
+                | '(' -> LPAREN
+                | ')' -> RPAREN
+                | '{' -> LBRACE
+                | '}' -> RBRACE
                     
                 // Other
-                | '\u0000' ->
-                    { Type = EOF; Literal = "" }
-                | _ ->
-                    { Type = ILLEGAL; Literal = literal }
-            
+                | '\u0000' -> EOF
+                | _ -> ILLEGAL
+                
+            let literal =
+                match this.CurrentChar with
+                | c when c = '\u0000' -> ""
+                | c -> c.ToString()
+                
             this.NextChar()
-            token
+            { Type = tokenType; Literal = literal }
