@@ -1,4 +1,8 @@
-﻿module Program = 
+﻿open System
+open MonkeyInterpreter
+
+module Program = 
 
     [<EntryPoint>]
-    let main _ = 0
+    let main _ =
+        Repl.startRepl Console.In Console.Out

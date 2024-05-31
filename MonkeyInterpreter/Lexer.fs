@@ -1,4 +1,4 @@
-namespace MonkeyInterpreter.Lexer
+namespace MonkeyInterpreter
 
 open MonkeyInterpreter.Token
 
