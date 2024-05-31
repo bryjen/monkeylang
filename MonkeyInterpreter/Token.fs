@@ -6,70 +6,59 @@ open Microsoft.FSharp.Reflection
 type TokenType =
     | ILLEGAL
     | EOF
-    | IDENT 
-    | INT
+    
+    // Identifiers + literals
+    | IDENT // add, foobar, x, ... 
+    | INT // 10, 12, ...
+    
+    // Operators 
     | ASSIGN
     | PLUS
+    | MINUS
+    | BANG
+    | ASTERISK
+    | SLASH
+    | EQ
+    | NOT_EQ
+    | LT
+    | GT
+    
+    // Delimiters
     | COMMA
     | SEMICOLON
     | LPAREN
     | RPAREN
     | LBRACE
     | RBRACE
+    
+    // Keywords
     | FUNCTION
     | LET
+    | TRUE
+    | FALSE
+    | IF
+    | ELSE
+    | RETURN
+    
     
     /// Returns the name of the 'TokenType' case as coded
     static member ToCaseString tokenType =
         match FSharpValue.GetUnionFields(tokenType, typeof<TokenType>) with
         | case, _ -> case.Name
-    
-    static member ToString tokenType =
-        match tokenType with
-        | ILLEGAL -> "ILLEGAL" 
-        | EOF -> "EOF" 
-        | IDENT -> "IDENT" 
-        | INT -> "INT" 
-        | ASSIGN -> "=" 
-        | PLUS -> "+" 
-        | COMMA -> "," 
-        | SEMICOLON -> ";" 
-        | LPAREN ->  "("
-        | RPAREN ->  ")"
-        | LBRACE ->  "{"
-        | RBRACE ->  "}"
-        | FUNCTION ->  "FUNCTION"
-        | LET -> "LET"
-        
-    static member FromString tokenAsString =
-        match tokenAsString with
-        | "ILLEGAL" -> ILLEGAL 
-        | "EOF" -> EOF 
-        | "INDENT" -> IDENT 
-        | "INT" -> INT 
-        | "=" -> ASSIGN 
-        | "+" -> PLUS 
-        | "," -> COMMA 
-        | ";" -> SEMICOLON 
-        | "(" -> LPAREN
-        | ")" -> RPAREN
-        | "{" -> LBRACE
-        | "}" -> RBRACE
-        | "FUNCTION" -> FUNCTION 
-        | "LET" -> LET
-        | _ -> raise (ArgumentException($"The token \"{tokenAsString}\" is not a valid token."))
      
      
 module Keywords =
-    let keywordToTokenTypeDict = dict [
-        "fn", FUNCTION
-        "let", LET
-    ]
     
     let lookupIdent (ident: string) =
-        match keywordToTokenTypeDict.TryGetValue ident with
-        | (true, tokenType) -> tokenType
-        | _ -> IDENT 
+        match ident with
+        | "fn" -> FUNCTION
+        | "let" -> LET
+        | "true" -> TRUE 
+        | "false" -> FALSE
+        | "if" -> IF
+        | "else" -> ELSE
+        | "return" -> RETURN
+        | _ -> IDENT
     
         
 type Token =
