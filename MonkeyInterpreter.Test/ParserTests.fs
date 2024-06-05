@@ -10,15 +10,11 @@ open MonkeyInterpreter
 
 [<AutoOpen>]
 module private ParserHelpers =
-    
     let assertNumberOfStatements expectedStatements program =
         match program.Statements.Length with
         | len when len = expectedStatements -> Ok ()
         | len -> Error $"Error with 'program.Statements', expected {expectedStatements} statements, got {len}"
-
-[<TestFixture>]
-type ParserTests() =
-    
+        
     let testLetStatement (statement: Statement) (testCase: int * string) =
         result {
             let testCount = fst testCase 
@@ -58,22 +54,19 @@ type ParserTests() =
                    |> List.map (fun pair -> testLetStatement (fst pair) (snd pair))
                    |> processResultsList
         }
-        
+        |> function
+            | Ok _ -> Assert.Pass()
+            | Error errorMsg -> Assert.Fail(errorMsg)
 
+
+[<TestFixture>]
+type ParserTests() =
     [<Test>]
     member this.``Test let statements 1``() =
         let testInput = """let x = 5;
 let y = 10;
 let foobar = 838383
 """
-
-        let expectedIdentifiers = [
-            "x"
-            "y"
-            "foobar"
-        ] 
-
+        let expectedIdentifiers = [ "x"; "y"; "foobar" ]
+        
         testExpectedIdentifiers testInput expectedIdentifiers
-        |> function
-            | Ok _ -> Assert.Pass()
-            | Error errorMsg -> Assert.Fail(errorMsg)

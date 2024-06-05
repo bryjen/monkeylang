@@ -21,8 +21,7 @@ module private LexerLog =
         
 [<AutoOpen>]
 module private LexerHelpers = 
-    
-    let assertTokenTypeIsExpectedTokenType (testCount: int) (expectedTokenType: TokenType) (actualTokenType: TokenType) =
+    let private assertTokenTypeIsExpectedTokenType (testCount: int) (expectedTokenType: TokenType) (actualTokenType: TokenType) =
         if actualTokenType = expectedTokenType then
             Ok ()
         else
@@ -30,44 +29,43 @@ module private LexerHelpers =
             let actualTokenTypeStr = TokenType.ToCaseString actualTokenType 
             Error $"[test #{testCount}] Expected token type '{expectedTokenTypeStr}', but found '{actualTokenTypeStr}'"
             
-    let assertLiteralIsExpectedLiteral (testCount: int) (expectedLiteral: string) (actualLiteral: string) =
+    let private assertLiteralIsExpectedLiteral (testCount: int) (expectedLiteral: string) (actualLiteral: string) =
         if expectedLiteral = actualLiteral then
             Ok ()
         else
             Error $"[test #{testCount}] Expected literal '{expectedLiteral}', but found '{actualLiteral}'"
             
-
-
-[<TestFixture>]
-type LexerTests() =
+    let processTestCase (lexer: Lexer) (testCase: int * TokenType * string) = 
+        result {
+            let testCount, expectedTokenType, expectedLiteral = testCase
+            
+            let token = lexer.NextToken()
+            LexerLog.addTokenToLog token
+            
+            do! assertTokenTypeIsExpectedTokenType testCount expectedTokenType token.Type
+            do! assertLiteralIsExpectedLiteral testCount expectedLiteral token.Literal
+        }
             
     let testLexer testInput (testCases: (TokenType * string) list) =
         let lexer = Lexer(testInput)
         
-        // Actual testing
         let testResult = 
             testCases
             |> TuplePrepender.AddCountsToTuples
-            |> List.map (fun testCase ->
-                result {
-                    let testCount, expectedTokenType, expectedLiteral = testCase
-                    
-                    let token = lexer.NextToken()
-                    LexerLog.addTokenToLog token
-                    
-                    do! assertTokenTypeIsExpectedTokenType testCount expectedTokenType token.Type
-                    do! assertLiteralIsExpectedLiteral testCount expectedLiteral token.Literal
-                    return () 
-                })
+            |> List.map (processTestCase lexer) 
             |> processResultsList
             
         // Clean-up, post logs, etc. before passing/failing
         printfn $"Log:\n{LexerLog.log}"
         
-        // Return test result
         testResult
-        
-    
+        |> function
+            | Ok _ ->Assert.Pass()
+            | Error errorMsg -> Assert.Fail(errorMsg)
+
+
+[<TestFixture>]
+type LexerTests() =
     [<Test>]
     member this.``Test next token 1``() =
         let testInput = "=+(){},;"
@@ -85,9 +83,6 @@ type LexerTests() =
         ]
         
         testLexer testInput testCases
-        |> function
-            | Ok _ ->Assert.Pass()
-            | Error errorMsg -> Assert.Fail(errorMsg)
             
     [<Test>]
     member this.``Test next token 2``() =
@@ -141,9 +136,6 @@ let result = add(five, ten);"""
         ]
         
         testLexer testInput testCases
-        |> function
-            | Ok _ ->Assert.Pass()
-            | Error errorMsg -> Assert.Fail(errorMsg)
             
     // Compared to tests 1 & 2, this test case has the following tokens:
     // ==, !, !=, -, /, *, <, >
@@ -250,6 +242,3 @@ if (5 < 10) {
         ]
         
         testLexer testInput testCases
-        |> function
-            | Ok _ ->Assert.Pass()
-            | Error errorMsg -> Assert.Fail(errorMsg)
