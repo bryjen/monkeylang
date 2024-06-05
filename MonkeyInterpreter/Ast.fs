@@ -8,7 +8,7 @@ module Ast =
     
     ///
     type Identifier =
-        { TokenType: TokenType // 'TokenType.IDENT' token
+        { Token: Token // 'TokenType.IDENT' token
           Value: string }
         
         member this.TokenLiteral() = this.Value
@@ -18,7 +18,7 @@ module Ast =
                 let errorMsg = $"Expected token type of \"IDENT\", but received \"{TokenType.ToCaseString token.Type}\""
                 raise (ArgumentException(errorMsg))
             else
-                { TokenType = TokenType.IDENT; Value = token.Literal }
+                { Token = token; Value = token.Literal }
             
 
     ///
@@ -35,6 +35,10 @@ module Ast =
     ///
     and Statement =
         | LetStatement of LetStatement
+    with
+        override this.ToString() =
+            match this with
+            | LetStatement letStatement -> letStatement.ToString() 
         
         member this.TokenLiteral() =
             match this with
@@ -47,6 +51,10 @@ module Ast =
     ///
     and Expression =
         | Something
+    with
+        override this.ToString() =
+            // TODO: Update when expression actually does something
+            "EXPRESSION"
         
         member this.TokenLiteral() =
             match this with
@@ -61,11 +69,14 @@ module Ast =
          { Token: Token // 'TokenType.LET' token 
            Name: Identifier 
            Value: Expression }
+    with
+        override this.ToString() =
+            $"\"let {this.Name.Value} = {this.Value}\""
         
-         member this.TokenLiteral() = this.Token.Literal
+        member this.TokenLiteral() = this.Token.Literal
             
-         member this.StatementNode() =
-             failwith "todo"
+        member this.StatementNode() =
+            failwith "todo"
         
             
     ///
