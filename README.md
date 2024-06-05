@@ -14,4 +14,4 @@
 ## Why F#?
 While Thorsten Ball's  of the  [original implementation](https://interpreterbook.com/) of the interpreter is in Go, I find F# a much more interesting language to build programs in. 
 
-I also believe that it is a great learning experience, for me, translating procedural Go code into idiomatically (or as idiomatic as possible) functional F# code.  
+I also believe that it is a great learning experience, for me, translating procedural Go code into functionally idiomatic F# code.  
