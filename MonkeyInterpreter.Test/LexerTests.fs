@@ -1,10 +1,12 @@
 namespace MonkeyInterpreter.Test
 
+open MonkeyInterpreter.Helpers
+open NUnit.Framework
+
 open FsToolkit.ErrorHandling
 
 open MonkeyInterpreter
 open MonkeyInterpreter.Token
-open NUnit.Framework
 
 
 module private LexerLog =
@@ -18,17 +20,7 @@ module private LexerLog =
         
         
 [<AutoOpen>]
-module private Helpers = 
-    let addNumbersToTestCase testCases =
-        let mutable testCount = 0
-        
-        let addTestCountToTuple (tokenType, literal) =
-            testCount <- testCount + 1
-            (testCount, tokenType, literal)
-            
-        testCases
-        |> List.map addTestCountToTuple
-        
+module private LexerHelpers = 
     
     let assertTokenTypeIsExpectedTokenType (testCount: int) (expectedTokenType: TokenType) (actualTokenType: TokenType) =
         if actualTokenType = expectedTokenType then
@@ -44,24 +36,18 @@ module private Helpers =
         else
             Error $"[test #{testCount}] Expected literal '{expectedLiteral}', but found '{actualLiteral}'"
             
-    /// If any 'Result' DU is 'ERROR', return 'ERROR + error message', returns OK otherwise
-    let processResultsList (resultsList: Result<unit, string> list) : Result<unit, string> =
-        result {
-            for testResult in resultsList do
-                do! testResult
-            return ()
-        }
 
 
 [<TestFixture>]
 type LexerTests() =
             
-    let testLexer testInput testCases =
+    let testLexer testInput (testCases: (TokenType * string) list) =
         let lexer = Lexer(testInput)
         
         // Actual testing
         let testResult = 
-            addNumbersToTestCase testCases
+            testCases
+            |> TuplePrepender.AddCountsToTuples
             |> List.map (fun testCase ->
                 result {
                     let testCount, expectedTokenType, expectedLiteral = testCase

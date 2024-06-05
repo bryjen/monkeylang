@@ -6,8 +6,11 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <Compile Include="Helpers\Tuple.fs" />
         <Compile Include="Token.fs" />
         <Compile Include="Lexer.fs" />
+        <Compile Include="Ast.fs" />
+        <Compile Include="Parser.fs" />
         <Compile Include="Repl.fs" />
         <Compile Include="Program.fs"/>
     </ItemGroup>
