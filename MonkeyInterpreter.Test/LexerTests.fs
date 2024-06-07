@@ -35,24 +35,26 @@ module private LexerHelpers =
         else
             Error $"[test #{testCount}] Expected literal '{expectedLiteral}', but found '{actualLiteral}'"
             
-    let processTestCase (lexer: Lexer) (testCase: int * TokenType * string) = 
+    let processTestCase (testCase: Token * (int * TokenType * string)) = 
         result {
-            let testCount, expectedTokenType, expectedLiteral = testCase
+            let actualToken, testInformation = testCase
+            let testCount, expectedTokenType, expectedLiteral = testInformation 
             
-            let token = lexer.NextToken()
-            LexerLog.addTokenToLog token
+            LexerLog.addTokenToLog actualToken
             
-            do! assertTokenTypeIsExpectedTokenType testCount expectedTokenType token.Type
-            do! assertLiteralIsExpectedLiteral testCount expectedLiteral token.Literal
+            do! assertTokenTypeIsExpectedTokenType testCount expectedTokenType actualToken.Type
+            do! assertLiteralIsExpectedLiteral testCount expectedLiteral actualToken.Literal
         }
             
     let testLexer testInput (testCases: (TokenType * string) list) =
-        let lexer = Lexer(testInput)
+        let tokens = Lexer.parseIntoTokens testInput
+        let testCasesWithCounts = TuplePrepender.AddCountsToTuples testCases
         
-        let testResult = 
-            testCases
-            |> TuplePrepender.AddCountsToTuples
-            |> List.map (processTestCase lexer) 
+        let testCasesWithCountsAndTokens = List.zip tokens testCasesWithCounts
+        
+        let testResult =
+            testCasesWithCountsAndTokens
+            |> List.map processTestCase
             |> processResultsList
             
         // Clean-up, post logs, etc. before passing/failing

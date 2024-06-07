@@ -1,24 +1,33 @@
 namespace MonkeyInterpreter
 
+open System.Collections.Generic
 open FsToolkit.ErrorHandling
 
 open MonkeyInterpreter.Token
         
 
-type Parser(lexer: Lexer) =
+type Parser(input: string) =
     
-    let mutable currentToken: Token = lexer.NextToken()
+    let defaultToken = { Type = TokenType.EOF; Literal = "" } 
     
-    let mutable peekNextToken: Token = lexer.NextToken()
+    let mutable currentToken: Token = defaultToken 
     
-    member this.Lexer = lexer
+    let mutable peekNextToken: Token = defaultToken 
     
+    let tokenQueue =
+        let queue = Queue<Token>()
+        List.iter queue.Enqueue (Lexer.parseIntoTokens input)
+        queue
+        
     
     member this.NextToken() =
         currentToken <- peekNextToken
-        peekNextToken <- lexer.NextToken()
+        peekNextToken <- if tokenQueue.Count > 0 then tokenQueue.Dequeue() else defaultToken
         
     member this.ParseProgram() : Program =
+        currentToken <- tokenQueue.Dequeue()
+        peekNextToken <- tokenQueue.Dequeue() 
+        
         let rec parseProgramStatements statementsList =
             match currentToken.Type with
             | TokenType.EOF ->

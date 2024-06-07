@@ -51,8 +51,7 @@ module private ParserHelpers =
     
     let testExpectedIdentifiers testInput (testCases: string list) = 
         result {
-            let lexer = Lexer(testInput)
-            let parser = Parser(lexer)
+            let parser = Parser(testInput)
             let program = parser.ParseProgram()
             
             do! assertNumberOfStatements 3 program
