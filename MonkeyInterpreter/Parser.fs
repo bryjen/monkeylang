@@ -1,92 +1,102 @@
 namespace MonkeyInterpreter
 
-open System.Collections.Generic
+open System
 open FsToolkit.ErrorHandling
 
 open MonkeyInterpreter.Token
-        
 
-type Parser(input: string) =
-    
-    let defaultToken = { Type = TokenType.EOF; Literal = "" } 
-    
-    let mutable currentToken: Token = defaultToken 
-    
-    let mutable peekNextToken: Token = defaultToken 
-    
-    let tokenQueue =
-        let queue = Queue<Token>()
-        List.iter queue.Enqueue (Lexer.parseIntoTokens input)
-        queue
+
+[<AutoOpen>]
+module private ParserHelpers =
+    let peekTokenInArray (tokens: Token array) (index: int) : Token =
+        match index with
+        | i when  i < 0 || i >= tokens.Length ->
+            let errorMsg = $"Attempted to access index \"{i}\" from an array with inclusive bounds [0, {tokens.Length}]"
+            raise (IndexOutOfRangeException(errorMsg))
+        | i ->
+            tokens[i]
+            
+    let rec continueUntilSemiColon (tokens: Token array) (currentIndex: int) : int =
+        let token = peekTokenInArray tokens currentIndex
+        match token.Type with
+        | TokenType.SEMICOLON | TokenType.EOF ->
+            currentIndex
+        | _ ->
+            continueUntilSemiColon tokens (currentIndex + 1)
+            
+    let tryParseIdentifier (tokens: Token array) (index: int) : Result<Identifier, int> =
+        let token = peekTokenInArray tokens index
+        match token.Type with
+        | TokenType.IDENT ->
+            Ok { Token = token; Value = token.Literal }
+        | _ ->
+            Error index 
         
+    let tryParseAssign (tokens: Token array) (index: int) : Result<Token, int> =
+        let token = peekTokenInArray tokens index
+        match token.Type with
+        | TokenType.ASSIGN -> Ok token 
+        | _ -> Error index 
+            
+        
+module Parser =
     
-    member this.NextToken() =
-        currentToken <- peekNextToken
-        peekNextToken <- if tokenQueue.Count > 0 then tokenQueue.Dequeue() else defaultToken
+    type private ParserInfo =
+        { Tokens: Token array 
+          PeekToken: int -> Token }
+    
+    let rec parseProgram (input: string) : Program =
+        let tokens = input |> Lexer.parseIntoTokens |> List.toArray 
+        let peekToken = peekTokenInArray tokens
+        let parserInfo = { Tokens = tokens; PeekToken = peekToken }
         
-    member this.ParseProgram() : Program =
-        currentToken <- tokenQueue.Dequeue()
-        peekNextToken <- tokenQueue.Dequeue() 
-        
-        let rec parseProgramStatements statementsList =
-            match currentToken.Type with
-            | TokenType.EOF ->
+        let rec parseProgramStatements currentIndex statementsList : Statement list =
+            match peekToken currentIndex with
+            | token when token.Type = TokenType.EOF ->
                 List.rev statementsList
-            | _ -> 
-                match this.ParseStatement() with
-                | None ->
-                    parseProgramStatements statementsList 
+            | _ ->
+                let newIndex, statementOption = tryParseStatement parserInfo currentIndex
+                match statementOption with
                 | Some statement ->
-                    parseProgramStatements (statement :: statementsList)
-                    
-        { Statements = parseProgramStatements [] }
+                    parseProgramStatements newIndex (statement :: statementsList)
+                | None ->
+                    parseProgramStatements newIndex statementsList 
+            
+        { Statements = parseProgramStatements 0 [] }
         
-    member this.ParseStatement() : Statement option =
+    and private tryParseStatement (parserInfo: ParserInfo) (currentIndex: int) : int * Statement Option =
+        let currentToken = parserInfo.PeekToken currentIndex
+        
         match currentToken.Type with
         | TokenType.LET ->
-            Option.map Statement.LetStatement (this.ParseLetStatement())
+            let newIndex, letStatementOption = tryParseLetStatement parserInfo currentIndex
+            let asStatementOption = Option.map Statement.LetStatement letStatementOption
+            newIndex, asStatementOption
         | _ ->
-            this.NextToken()
-            None
+            currentIndex + 1, None
             
-    member private this.ContinueUntilSemiColon() =
-        let rec continueUntilSemiColonCore () =
-            match currentToken.Type with
-            | TokenType.SEMICOLON | TokenType.EOF ->
-                ()
-            | _ ->
-                this.NextToken()
-                continueUntilSemiColonCore ()
-                
-        continueUntilSemiColonCore ()
-           
-    member this.ParseLetStatement() : LetStatement option =
-        option {
-            let token = currentToken
+    and private tryParseLetStatement (parserInfo: ParserInfo) (currentIndex: int) : int * LetStatement option =
+        // Result CE returns new index + let statement if ok, only returns new index if error 
+        result {
+            let tokens = parserInfo.Tokens
+            let letStatementToken = parserInfo.PeekToken currentIndex
             
-            let! literal = peekNextToken.Type
-                           |> function
-                               | TokenType.IDENT ->
-                                   let identifier: Identifier = { Token = peekNextToken; Value = peekNextToken.Literal }
-                                   Some identifier
-                               | _ ->
-                                   None
-                           
-            this.NextToken()
+            let currentIndex = currentIndex + 1
+            let! identifier = tryParseIdentifier tokens currentIndex
             
-            do! peekNextToken.Type
-                |> function
-                   | TokenType.ASSIGN -> Some ()
-                   | _ -> None
-                   
-            this.NextToken()
+            let currentIndex = currentIndex + 1
+            let! _ = tryParseAssign tokens currentIndex
+            
+            let currentIndex = continueUntilSemiColon parserInfo.Tokens currentIndex
             
             // TODO: We're skipping parsing the expression for now
-            let placeholderExpression: StringLiteral = { Token = token; Value = "" }
+            let placeholderExpression: StringLiteral = { Token = letStatementToken; Value = "" }
+            let letStatement: LetStatement = { Token = letStatementToken; Name = identifier; Value = Expression.StringLiteral placeholderExpression }
             
-            this.ContinueUntilSemiColon()
-            
-            return { Token = token
-                     Name = literal
-                     Value = Expression.StringLiteral placeholderExpression }
+            return currentIndex, letStatement 
         }
+        |> function
+            | Ok (newIndex, letStatementOption) ->
+                newIndex, Some letStatementOption
+            | Error newIndex ->
+                newIndex, None

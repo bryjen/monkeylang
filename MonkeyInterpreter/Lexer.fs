@@ -18,32 +18,38 @@ module private LexerHelpers =
             characters[i]
         
 module Lexer =
+    
+    type LexerInfo =
+        { Characters: char array
+          PeekChar: int -> char }
+    
     let rec parseIntoTokens (input: string) : Token list =
         let characters = input.ToCharArray()
         let peekChar = peekCharInArray characters
-       
-        /// Parses the next token.
-        /// Returns a tuple containing the new current index and the parsed token.
-        let rec parseToken (currentIndex: int) : int * Token =
-            let currentIndex = skipWhiteSpaceCharacters currentIndex
+        let lexerInfo = { Characters = characters; PeekChar = peekChar }
+        
+        let rec parseAllTokens currentIndex listOfTokens : Token list =
+            let newIndex, token = parseToken lexerInfo currentIndex
+            let newListOfTokens = (token :: listOfTokens)
             
-            let readIdentifier = readCharacterSequence isLetter 
-            let readNumber = readCharacterSequence isDigit 
-            
-            match (peekChar currentIndex) with
-            | c when isLetter c ->
-                let newIndex, literal = readIdentifier currentIndex
-                newIndex, { Type = Keywords.lookupIdent literal; Literal = literal }
-            | c when isDigit c ->
-                let newIndex, numberLiteral = readNumber currentIndex 
-                newIndex, { Type = TokenType.INT; Literal = numberLiteral }
+            match token.Type with
+            | TokenType.EOF ->
+                List.rev newListOfTokens
             | _ ->
-                let newIndex, token = tryParseAsOperatorOrDelimiter currentIndex
-                newIndex, token
-                
+                parseAllTokens newIndex newListOfTokens
+         
+        parseAllTokens 0 []
+        
+        
+    /// Parses the next token.
+    /// Returns a tuple containing the new current index and the parsed token.
+    and private parseToken (lexerInfo: LexerInfo) (currentIndex: int) : int * Token =
+        let characters = lexerInfo.Characters
+        let peekChar = lexerInfo.PeekChar
+        
         /// Increments the index until the current index is not a whitespace character
         // TODO: Decompile to IL and see if you need a helper rec function for TCO
-        and skipWhiteSpaceCharacters currentIndex : int =
+        let rec skipWhiteSpaceCharacters currentIndex : int =
             match (peekChar currentIndex) with
             | c when c = ' ' || c = '\t' || c = '\n' || c = '\r' ->
                 skipWhiteSpaceCharacters (currentIndex + 1)
@@ -104,14 +110,20 @@ module Lexer =
                     
                 currentIndex + 1, { Type = tokenType; Literal = literal }
                 
-        let rec parseAllTokens currentIndex listOfTokens : Token list =
-            let newIndex, token = parseToken currentIndex
-            let newListOfTokens = (token :: listOfTokens)
+                
+        let currentIndex = skipWhiteSpaceCharacters currentIndex
+        
+        let readIdentifier = readCharacterSequence isLetter 
+        let readNumber = readCharacterSequence isDigit 
+        
+        match (lexerInfo.PeekChar currentIndex) with
+        | c when isLetter c ->
+            let newIndex, literal = readIdentifier currentIndex
+            newIndex, { Type = Keywords.lookupIdent literal; Literal = literal }
+        | c when isDigit c ->
+            let newIndex, numberLiteral = readNumber currentIndex 
+            newIndex, { Type = TokenType.INT; Literal = numberLiteral }
+        | _ ->
+            let newIndex, token = tryParseAsOperatorOrDelimiter currentIndex
+            newIndex, token
             
-            match token.Type with
-            | TokenType.EOF ->
-                List.rev newListOfTokens
-            | _ ->
-                parseAllTokens newIndex newListOfTokens
-         
-        parseAllTokens 0 []
