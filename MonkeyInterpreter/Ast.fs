@@ -66,6 +66,18 @@ with
             callExpression.Token.Literal
         | IndexExpression indexExpression -> 
             indexExpression.Token.Literal
+        | IntegerLiteral integerLiteral ->
+            integerLiteral.Token.Literal
+        | FunctionLiteral functionLiteral ->
+            functionLiteral.Token.Literal
+        | StringLiteral stringLiteral ->
+            stringLiteral.Token.Literal
+        | ArrayLiteral arrayLiteral ->
+            arrayLiteral.Token.Literal
+        | HashLiteral hashLiteral ->
+            hashLiteral.Token.Literal
+        | MacroLiteral macroLiteral ->
+            macroLiteral.Token.Literal
     
     
 ///
