@@ -31,7 +31,7 @@ type Parser(lexer: Lexer) =
                     parseProgramStatements (statement :: statementsList)
                     
         { Statements = parseProgramStatements [] }
-                    
+        
     member this.ParseStatement() : Statement option =
         match currentToken.Type with
         | TokenType.LET ->
@@ -57,8 +57,11 @@ type Parser(lexer: Lexer) =
             
             let! literal = peekNextToken.Type
                            |> function
-                               | TokenType.IDENT -> Some { Token = peekNextToken; Value = peekNextToken.Literal }
-                               | _ -> None
+                               | TokenType.IDENT ->
+                                   let identifier: Identifier = { Token = peekNextToken; Value = peekNextToken.Literal }
+                                   Some identifier
+                               | _ ->
+                                   None
                            
             this.NextToken()
             
@@ -70,8 +73,11 @@ type Parser(lexer: Lexer) =
             this.NextToken()
             
             // TODO: We're skipping parsing the expression for now
-            let expression = Expression.Something
+            let placeholderExpression: StringLiteral = { Token = token; Value = "" }
             
             this.ContinueUntilSemiColon()
-            return { Token = token; Name = literal; Value = expression }
+            
+            return { Token = token
+                     Name = literal
+                     Value = Expression.StringLiteral placeholderExpression }
         }

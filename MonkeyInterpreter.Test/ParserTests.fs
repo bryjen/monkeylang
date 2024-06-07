@@ -21,7 +21,7 @@ module private ParserHelpers =
                 | Error errorMessage -> errorMessage 
             printfn $"[Test #{testCount}] Raw statement: {statement}; Expected name: {expectedName}; Status: {evaluationMessage}"
             
-    let assertNumberOfStatements expectedStatements program =
+    let assertNumberOfStatements expectedStatements (program: Program) =
         match program.Statements.Length with
         | len when len = expectedStatements -> Ok ()
         | len -> Error $"Error with 'program.Statements', expected {expectedStatements} statements, got {len}"
@@ -31,7 +31,7 @@ module private ParserHelpers =
             let testCount = fst testCase 
             let expectedName = snd testCase 
             
-            do! match statement.TokenLiteral() with
+            do! match statement.GetTokenLiteral() with
                 | literal when literal = "let" -> Ok () 
                 | literal -> Error $"[test #{testCount}] statement.TokenLiteral() returned \"{literal}\", expected \"let\""
                 
