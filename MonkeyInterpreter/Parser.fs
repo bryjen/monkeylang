@@ -4,15 +4,25 @@ open System
 open FsToolkit.ErrorHandling
 
 open MonkeyInterpreter.Token
-open MonkeyInterpreter.Helpers.Numbers
 
 
 [<AutoOpen>]
 module private ParserHelpers =
-    let transformErrorTypeToOptional (result: Result<'a, 'b>) : Result<'a, 'b option> =
-        match result with
-        | Ok resultValue -> Ok resultValue 
-        | Error errorValue -> Error (Some errorValue) 
+    
+    type ParseResult<'a> =
+        | Some of 'a
+        | None
+        | ErrorMsg of string
+    with
+        static member Map 
+            (binder: 'someInput -> 'someOutput)
+            (input: ParseResult<'someInput>)
+            : ParseResult<'someOutput> =
+            match input with
+            | Some x -> Some (binder x) 
+            | None -> None 
+            | ErrorMsg errorMsg -> ErrorMsg errorMsg
+            
     
     let peekTokenInArray (tokens: Token array) (index: int) : Token =
         match index with
@@ -61,46 +71,46 @@ module Parser =
         let peekToken = peekTokenInArray tokens
         
         let rec parseProgramStatements parserInfo statementsList currentIndex : Program =
-            match peekToken currentIndex with
-            | token when token.Type = TokenType.EOF ->
+            let token = peekToken currentIndex
+            if token.Type = TokenType.EOF then
                 { Statements = List.rev statementsList
                   Errors = List.rev parserInfo.Errors }
-            | _ ->
-                let newIndex, statementResult = tryParseStatement parserInfo currentIndex
-                match statementResult with
-                | Ok statement ->
+            else
+                let newIndex, parseResult = tryParseStatement parserInfo currentIndex
+                match parseResult with
+                | Some statement -> 
                     parseProgramStatements parserInfo (statement :: statementsList) newIndex
-                | Error errorMsgOption ->
-                    // In case of parsing error, go to token following the next semi colon 
-                    let newIndex = continueUntilSemiColon parserInfo.Tokens currentIndex
-                    let newParserInfo = appendErrorMessageToParserInfo parserInfo errorMsgOption 
+                | None -> 
+                    parseProgramStatements parserInfo statementsList newIndex
+                | ErrorMsg errorMsg -> 
+                    let newIndex = continueUntilSemiColon parserInfo.Tokens currentIndex // In case of parsing error, go to token following the next semicolon
+                    let newParserInfo = { parserInfo with Errors = errorMsg :: parserInfo.Errors }
                     parseProgramStatements newParserInfo statementsList (newIndex + 1)
-                    
-        and appendErrorMessageToParserInfo parserInfo errorMsgOption : ParserInfo =
-            match errorMsgOption with
-            | Some errorMsg ->
-                { parserInfo with Errors = errorMsg :: parserInfo.Errors }
-            | None ->
-                parserInfo
-            
             
         let parserInfo = { Tokens = tokens; Errors = []; PeekToken = peekToken }
         parseProgramStatements parserInfo [] 0
         
-    and private tryParseStatement (parserInfo: ParserInfo) (currentIndex: int) : int * Result<Statement, string option> =
+    and private tryParseStatement
+        (parserInfo: ParserInfo)
+        (currentIndex: int)
+        : int * ParseResult<Statement> =
+            
         let currentToken = parserInfo.PeekToken currentIndex
-        
         match currentToken.Type with
         | TokenType.LET ->
             let newIndex, letStatementResult = tryParseLetStatement parserInfo currentIndex
-            let asStatementResult = Result.map Statement.LetStatement letStatementResult
-            newIndex, transformErrorTypeToOptional asStatementResult
+            let asStatementResult = ParseResult.Map<LetStatement, Statement> Statement.LetStatement letStatementResult
+            newIndex, asStatementResult
         | TokenType.SEMICOLON ->
-            currentIndex + 1, Error None
+            currentIndex + 1, None
         | _ ->
-            currentIndex + 1, Error (Some "Don't recognize token")
+            currentIndex + 1, ErrorMsg "Don't recognize token"
             
-    and private tryParseLetStatement (parserInfo: ParserInfo) (currentIndex: int) : int * Result<LetStatement, string> =
+    and private tryParseLetStatement
+        (parserInfo: ParserInfo)
+        (currentIndex: int)
+        : int * ParseResult<LetStatement> =
+            
         // Result CE returns new index + let statement if ok, only returns new index if error 
         result {
             let tokens = parserInfo.Tokens
@@ -122,6 +132,6 @@ module Parser =
         }
         |> function
             | Ok (newIndex, letStatement) ->
-                newIndex, Ok letStatement
+                newIndex, Some letStatement
             | Error (newIndex, errorMsg) ->
-                newIndex, Error errorMsg 
+                newIndex, ErrorMsg errorMsg 
