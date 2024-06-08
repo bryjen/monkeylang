@@ -21,10 +21,16 @@ module private ParserHelpers =
                 | Error errorMessage -> errorMessage 
             printfn $"[Test #{testCount}] Raw statement: {statement}; Expected name: {expectedName}; Status: {evaluationMessage}"
             
-    let assertNumberOfStatements expectedStatements (program: Program) =
+    let assertNumberOfStatements numberOfExpectedStatements (program: Program) =
         match program.Statements.Length with
-        | len when len = expectedStatements -> Ok ()
-        | len -> Error $"Error with 'program.Statements', expected {expectedStatements} statements, got {len}"
+        | len when len = numberOfExpectedStatements -> ()
+        | len -> Assert.Fail($"Error with 'program.Statements', expected {numberOfExpectedStatements} statements, got {len}")
+        
+    let assertNumberOfErrors numberOfExpectedErrors (program: Program) =
+        match program.Errors.Length with
+        | len when len = numberOfExpectedErrors -> ()
+        | len -> Assert.Fail($"Error with 'program.Errors', expected {numberOfExpectedErrors} errors, got {len}")
+        
         
     let testLetStatement (statement: Statement) (testCase: int * string) =
         result {
@@ -49,11 +55,11 @@ module private ParserHelpers =
                 | identName -> Error $"[test #{testCount}] statement.Name returned \"{identName}\", expected \"{expectedName}\""
         }
     
-    let testExpectedIdentifiers testInput (testCases: string list) = 
+    let testExpectedIdentifiers (assertions: (Program -> unit) list) (testCases: string list) testInput = 
         result {
-            let program = Parser.parseProgram testInput 
+            let program = Parser.parseProgram testInput
             
-            do! assertNumberOfStatements 3 program
+            List.iter (fun assertion -> assertion program) assertions 
             
             let statementAndTestCasePairs =
                 testCases
@@ -87,4 +93,23 @@ let foobar = 838383;
 """
         let expectedIdentifiers = [ "x"; "y"; "foobar" ]
         
-        testExpectedIdentifiers testInput expectedIdentifiers
+        let assertions = [
+            assertNumberOfStatements 3
+            assertNumberOfErrors 0
+        ]
+        
+        testExpectedIdentifiers assertions expectedIdentifiers testInput
+        
+    [<Test>]
+    member this.``Test errors 1``() =
+        let testInput = """let x 5;
+let = 10;
+let 838383;
+"""
+
+        let assertions = [
+            assertNumberOfErrors 3
+        ]
+        
+        let program = Parser.parseProgram testInput
+        List.iter (fun assertion -> assertion program) assertions 

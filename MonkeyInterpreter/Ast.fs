@@ -15,7 +15,8 @@ with
     
 ///
 type Program =
-    { Statements: Statement list }
+    { Statements: Statement list
+      Errors: string list }
 with
     member this.TokenLiteral() =
         match this.Statements with
