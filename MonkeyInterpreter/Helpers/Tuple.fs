@@ -1,6 +1,11 @@
 [<AutoOpen>]
 module MonkeyInterpreter.Helpers.Tuple
 
+
+/// Returns the third element in a tuple.
+let trd (_, _, c) = c
+
+
 (*
 Notes:
 Unlike what some LLMs may say, it is not possible to create a TYPE SAFE generic function that turns a "n" sized tuple 

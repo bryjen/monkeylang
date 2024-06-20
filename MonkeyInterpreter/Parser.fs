@@ -101,6 +101,10 @@ module Parser =
             let newIndex, letStatementResult = tryParseLetStatement parserInfo currentIndex
             let asStatementResult = ParseResult.Map<LetStatement, Statement> Statement.LetStatement letStatementResult
             newIndex, asStatementResult
+        | TokenType.RETURN ->
+            let newIndex, letStatementResult = tryParseReturnStatement parserInfo currentIndex
+            let asStatementResult = ParseResult.Map<ReturnStatement, Statement> Statement.ReturnStatement letStatementResult
+            newIndex, asStatementResult
         | TokenType.SEMICOLON ->
             currentIndex + 1, None
         | _ ->
@@ -111,22 +115,22 @@ module Parser =
         (currentIndex: int)
         : int * ParseResult<LetStatement> =
             
-        // Result CE returns new index + let statement if ok, only returns new index if error 
         result {
-            let tokens = parserInfo.Tokens
             let letStatementToken = parserInfo.PeekToken currentIndex
             
             let currentIndex = currentIndex + 1
-            let! identifier = parseExpectedIdentifier tokens currentIndex
+            let! identifier = parseExpectedIdentifier parserInfo.Tokens currentIndex
             
             let currentIndex = currentIndex + 1
-            let! _ = parseExpectedAssignmentOperator tokens currentIndex
+            let! _ = parseExpectedAssignmentOperator parserInfo.Tokens currentIndex
             
             let currentIndex = continueUntilSemiColon parserInfo.Tokens currentIndex
             
             // TODO: We're skipping parsing the expression for now
             let placeholderExpression: StringLiteral = { Token = letStatementToken; Value = "" }
-            let letStatement: LetStatement = { Token = letStatementToken; Name = identifier; Value = Expression.StringLiteral placeholderExpression }
+            let letStatement: LetStatement = { Token = letStatementToken
+                                               Name = identifier
+                                               Value = Expression.StringLiteral placeholderExpression }
             
             return currentIndex + 1, letStatement 
         }
@@ -134,4 +138,27 @@ module Parser =
             | Ok (newIndex, letStatement) ->
                 newIndex, Some letStatement
             | Error (newIndex, errorMsg) ->
-                newIndex, ErrorMsg errorMsg 
+                newIndex, ErrorMsg errorMsg
+                
+    and private tryParseReturnStatement
+        (parserInfo: ParserInfo)
+        (currentIndex: int)
+        : int * ParseResult<ReturnStatement> =
+            
+        result {
+            let returnStatementToken = parserInfo.PeekToken currentIndex
+            
+            let currentIndex = continueUntilSemiColon parserInfo.Tokens currentIndex
+            
+            // TODO: We're skipping parsing the expression for now
+            let placeholderExpression: StringLiteral = { Token = returnStatementToken; Value = "" }
+            let returnStatement: ReturnStatement = { Token = returnStatementToken
+                                                     ReturnValue = Expression.StringLiteral placeholderExpression }
+            
+            return currentIndex + 1, returnStatement 
+        }
+        |> function
+            | Ok (newIndex, returnStatement) ->
+                newIndex, Some returnStatement
+            | Error (newIndex, errorMsg) ->
+                newIndex, ErrorMsg errorMsg

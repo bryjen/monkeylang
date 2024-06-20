@@ -1,6 +1,8 @@
 namespace MonkeyInterpreter.Test
 
+open FsToolkit.ErrorHandling.Operator.Result
 open MonkeyInterpreter.Helpers
+open MonkeyInterpreter.Token
 open NUnit.Framework
 
 open FsToolkit.ErrorHandling
@@ -55,12 +57,8 @@ module private ParserHelpers =
                 | identName -> Error $"[test #{testCount}] statement.Name returned \"{identName}\", expected \"{expectedName}\""
         }
     
-    let testExpectedIdentifiers (assertions: (Program -> unit) list) (testCases: string list) testInput = 
+    let testExpectedIdentifiers (program: Program) (testCases: string list) = 
         result {
-            let program = Parser.parseProgram testInput
-            
-            List.iter (fun assertion -> assertion program) assertions 
-            
             let statementAndTestCasePairs =
                 testCases
                 |> addCountsToList
@@ -81,12 +79,28 @@ module private ParserHelpers =
         |> function
             | Ok _ -> Assert.Pass()
             | Error errorMsg -> Assert.Fail(errorMsg)
+            
+    let testEachStatement (program: Program) (predicates: (Statement -> Result<unit, string>) list) =
+        result {
+            let statementAndPredicateTuples = List.zip program.Statements predicates
+            
+            let counts = List.init program.Statements.Length (fun i -> i + 1)
+            
+            return statementAndPredicateTuples
+                |> List.map (fun tuple -> (snd tuple) (fst tuple))
+                |> List.zip counts
+                |> List.map (fun tuple -> Result.mapError (fun errorMsg -> $"[Test #{fst tuple}] {errorMsg}") (snd tuple))
+                |> processResultsList
+        }
+        |> function
+            | Ok _ -> Assert.Pass()
+            | Error errorMsg -> Assert.Fail(errorMsg)
 
 
 [<TestFixture>]
 type ParserTests() =
     [<Test>]
-    member this.``Test let statements 1``() =
+    member this.``Test 'let' statements 1``() =
         let testInput = """let x = 5;
 let y = 10;
 let foobar = 838383;
@@ -98,7 +112,48 @@ let foobar = 838383;
             assertNumberOfErrors 0
         ]
         
-        testExpectedIdentifiers assertions expectedIdentifiers testInput
+        let program = Parser.parseProgram testInput
+        List.iter (fun assertion -> assertion program) assertions 
+        testExpectedIdentifiers program expectedIdentifiers
+        
+        
+    [<Test>]
+    member this.``Test 'return' statements 1``() =
+        let testInput = """return 5;
+return 10;
+return 993322;
+"""
+
+        let predicate (statement: Statement) =
+            match statement with
+            | ReturnStatement returnStatement ->
+                result {
+                    let tokenTypeAsStr = TokenType.ToCaseString returnStatement.Token.Type
+                    let! _ = if returnStatement.Token.Type = TokenType.RETURN
+                             then Ok ()
+                             else Error $"Expected 'ReturnStatement' token type to be 'RETURN', got '{tokenTypeAsStr}'"
+                             
+                    let! _ = if statement.GetTokenLiteral() = "return" 
+                             then Ok ()
+                             else Error $"Expected literal to be 'return', got '{statement.GetTokenLiteral()}'"
+                             
+                    return! Ok ()
+                }
+            | _ ->
+                Error $"'statement' was not a 'ReturnStatement' type, got {statement.GetType()}"
+                
+        let assertions = [
+            assertNumberOfStatements 3
+            assertNumberOfErrors 0
+        ]
+        
+        let predicates = [ predicate; predicate; predicate ]
+        
+        let program = Parser.parseProgram testInput
+        List.iter (fun assertion -> assertion program) assertions 
+        testEachStatement program predicates 
+        
+        
         
     [<Test>]
     member this.``Test errors 1``() =
