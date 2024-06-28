@@ -12,6 +12,9 @@ type Identifier =
 with
     member this.TokenLiteral() = this.Value
     
+    /// <inheritdoc/>
+    override this.ToString() = $"{this.Value}"
+    
     
 ///
 type Program =
@@ -54,6 +57,7 @@ and Expression =
     | ArrayLiteral of ArrayLiteral
     | HashLiteral of HashLiteral
     | MacroLiteral of MacroLiteral
+    | Identifier of Identifier
 with
     member this.GetTokenLiteral() =
         match this with
@@ -79,6 +83,36 @@ with
             hashLiteral.Token.Literal
         | MacroLiteral macroLiteral ->
             macroLiteral.Token.Literal
+        | Identifier identifier ->
+            identifier.Token.Literal
+            
+    /// <inheritdoc/>
+    override this.ToString() =
+        match this with
+        | PrefixExpression prefixExpression ->
+            prefixExpression.ToString()
+        | InfixExpression infixExpression -> 
+            infixExpression.ToString()
+        | IfExpression ifExpression -> 
+            ifExpression.ToString()
+        | CallExpression callExpression -> 
+            callExpression.ToString()
+        | IndexExpression indexExpression -> 
+            indexExpression.ToString()
+        | IntegerLiteral integerLiteral ->
+            integerLiteral.ToString()
+        | FunctionLiteral functionLiteral ->
+            functionLiteral.ToString()
+        | StringLiteral stringLiteral ->
+            stringLiteral.ToString()
+        | ArrayLiteral arrayLiteral ->
+            arrayLiteral.ToString()
+        | HashLiteral hashLiteral ->
+            hashLiteral.ToString()
+        | MacroLiteral macroLiteral ->
+            macroLiteral.ToString()
+        | Identifier identifier ->
+            identifier.ToString()
     
     
 ///
@@ -98,6 +132,18 @@ with
             expressionStatement.Token.Literal
         | BlockStatement blockStatement ->
             blockStatement.Token.Literal
+            
+    /// <inheritdoc/>
+    override this.ToString() =
+        match this with
+        | LetStatement letStatement ->
+            letStatement.ToString() 
+        | ReturnStatement returnStatement ->
+            returnStatement.ToString() 
+        | ExpressionStatement expressionStatement ->
+            expressionStatement.ToString() 
+        | BlockStatement blockStatement ->
+            blockStatement.ToString() 
 
 
 // 'General' Expression ands
@@ -185,20 +231,25 @@ and LetStatement =
        Value: Expression }
 with
     /// <inheritdoc/>
-    override this.ToString() =
-        $"\"let {this.Name.Value} = {this.Value}\""
+    override this.ToString() = $"{this.Token.Literal} {this.Name.Value} = {this.Value};"
         
 
 ///
 and ReturnStatement =
     { Token: Token // 'Token and.RETURN' token
       ReturnValue: Expression }
-    
-
+with
+    /// <inheritdoc/>
+    override this.ToString() = $"\"{this.Token.Literal} {this.ReturnValue};\""
+        
+        
 ///
 and ExpressionStatement =
     { Token: Token // The first token of the expression
       Expression: Expression }
+with
+    /// <inheritdoc/>
+    override this.ToString() = $"\"{this.Expression}\""
     
     
 ///

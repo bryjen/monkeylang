@@ -10,6 +10,7 @@
 
     <ItemGroup>
         <Compile Include="Helpers.fs" />
+        <Compile Include="AstTests.fs" />
         <Compile Include="LexerTests.fs" />
         <Compile Include="ParserTests.fs" />
         <Compile Include="Program.fs"/>

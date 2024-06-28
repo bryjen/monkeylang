@@ -1,6 +1,6 @@
 namespace MonkeyInterpreter.Test
 
-open FsToolkit.ErrorHandling.Operator.Result
+open System
 open MonkeyInterpreter.Helpers
 open MonkeyInterpreter.Token
 open NUnit.Framework
@@ -57,6 +57,8 @@ module private ParserHelpers =
                 | identName -> Error $"[test #{testCount}] statement.Name returned \"{identName}\", expected \"{expectedName}\""
         }
     
+    [<Obsolete("See if you can find a way to integrate this same functionality using 'testEachStatement'
+               (more generic & composable)")>]
     let testExpectedIdentifiers (program: Program) (testCases: string list) = 
         result {
             let statementAndTestCasePairs =
@@ -153,8 +155,6 @@ return 993322;
         List.iter (fun assertion -> assertion program) assertions 
         testEachStatement program predicates 
         
-        
-        
     [<Test>]
     member this.``Test errors 1``() =
         let testInput = """let x 5;
@@ -168,3 +168,7 @@ let 838383;
         
         let program = Parser.parseProgram testInput
         List.iter (fun assertion -> assertion program) assertions 
+
+    [<Test>]
+    member this.``Test identifier expressions 1``() =
+        ()

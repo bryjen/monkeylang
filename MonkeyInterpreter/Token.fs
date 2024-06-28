@@ -1,6 +1,5 @@
 namespace MonkeyInterpreter.Token
 
-open System
 open Microsoft.FSharp.Reflection
 
 type TokenType =
