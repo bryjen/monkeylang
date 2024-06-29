@@ -164,6 +164,11 @@ and PrefixExpression =
     { Token: Token // the prefix token, ex. '!'
       Operator: string
       Right: Expression }
+with
+    member this.GetTokenLiteral() = this.Token.Literal
+    
+    /// <inheritdoc/>
+    override this.ToString() = $"({this.Operator}{this.Right.ToString()})" 
     
     
 ///
@@ -201,6 +206,11 @@ and IndexExpression =
 and IntegerLiteral =
     { Token: Token
       Value: int64 }
+with
+    member this.GetTokenLiteral() = this.Token.Literal
+    
+    /// <inheritdoc/>
+    override this.ToString() = $"{this.GetTokenLiteral()}" 
     
     
 ///

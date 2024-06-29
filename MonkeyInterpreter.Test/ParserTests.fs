@@ -101,6 +101,25 @@ module private ParserHelpers =
 
 [<TestFixture>]
 type ParserTests() =
+    
+    let testIntegerLiteral (expr: Expression) (expectedValue: int64) =
+        result {
+            let! integerLiteral =
+                match expr with
+                | IntegerLiteral integerLiteral -> Ok integerLiteral
+                | expr -> Error $"exp not \"IntegerLiteral\", got \"{expr.GetType()}\""
+                
+            do! if integerLiteral.Value = expectedValue
+                then Ok ()
+                else Error $"integerLiteral.Value not \"{expectedValue}\", got \"{integerLiteral.Value}\""
+                
+            let asStringLiteral = $"{expectedValue}"
+            do! if integerLiteral.GetTokenLiteral() = asStringLiteral 
+                then Ok ()
+                else Error $"integerLiteral.Token.Literal not \"{asStringLiteral}\", got \"{integerLiteral.GetTokenLiteral()}\""
+        }
+        
+        
     [<Test>]
     member this.``Test 'let' statements 1``() =
         let testInput = """let x = 5;
@@ -155,6 +174,7 @@ return 993322;
         List.iter (fun assertion -> assertion program) assertions 
         testEachStatement program predicates 
         
+        
     [<Test>]
     member this.``Test errors 1``() =
         let testInput = """let x 5;
@@ -169,6 +189,7 @@ let 838383;
         let program = Parser.parseProgram testInput
         List.iter (fun assertion -> assertion program) assertions 
 
+    
     [<Test>]
     member this.``Test identifier expressions 1``() =
         result {
@@ -202,6 +223,7 @@ let 838383;
         |> function
             | Ok _ -> Assert.Pass()
             | Error errorMsg -> Assert.Fail(errorMsg)
+            
             
     [<Test>]
     member this.``Test integer literal expressions 1``() =
@@ -237,3 +259,44 @@ let 838383;
         |> function
             | Ok _ -> Assert.Pass()
             | Error errorMsg -> Assert.Fail(errorMsg)
+            
+            
+    [<Test>]
+    member this.``Test parsing prefix expressions 1``() =
+        let prefixTests = [
+            ("!5", "!", 5)
+            ("-15", "-", 15)
+        ]
+        
+        for test in prefixTests do
+            result {
+                let testInput, expectedOperator, expectedValue = test
+                let program = Parser.parseProgram testInput
+                
+                let! statement =
+                    match program.Statements with
+                    | head :: _ -> Ok head
+                    | _ -> Error $"Program has not enough statements. Expected 1, got {program.Statements.Length}"
+                    
+                let! expressionStatement =
+                    match statement with
+                    | ExpressionStatement expStat -> Ok expStat
+                    | _ -> Error $"program.Statements[0] is not a \"ExpressionStatement\", got \"${statement}\""
+                    
+                let! prefixExpression =
+                    match expressionStatement.Expression with
+                    | PrefixExpression prefixExpr -> Ok prefixExpr 
+                    | expr -> Error $"exp not \"PrefixExpression\", got \"{expr}\""
+                    
+                do! if prefixExpression.Operator = expectedOperator
+                    then Ok ()
+                    else Error $"prefixExpression.Operator not \"{expectedOperator}\", got \"{prefixExpression.Operator}\""
+                    
+                do! testIntegerLiteral prefixExpression.Right expectedValue
+            }
+            |> function
+                | Ok _ -> () 
+                | Error errorMsg -> Assert.Fail(errorMsg)
+            
+        Assert.Pass()
+            
