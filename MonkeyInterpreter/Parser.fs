@@ -6,7 +6,7 @@ open FsToolkit.ErrorHandling
 open MonkeyInterpreter.Token
 
 
-type Precedence =
+type private Precedence =
     | LOWEST = 1
     | EQUALS = 2
     | LESSGREATER = 3
@@ -14,25 +14,27 @@ type Precedence =
     | PRODUCT = 5
     | PREFIX = 6
     | CALL = 7
+    
 
+type private ParseResult<'a> =
+    | Some of 'a
+    | None
+    | ErrorMsg of string
+    
+    
+module private ParseResult =
+    let map 
+        (binder: 'someInput -> 'someOutput)
+        (input: ParseResult<'someInput>)
+        : ParseResult<'someOutput> =
+        match input with
+        | Some x -> Some (binder x) 
+        | None -> None 
+        | ErrorMsg errorMsg -> ErrorMsg errorMsg
+        
+        
 [<AutoOpen>]
 module private ParserHelpers =
-    
-    type ParseResult<'a> =
-        | Some of 'a
-        | None
-        | ErrorMsg of string
-    with
-        static member Map 
-            (binder: 'someInput -> 'someOutput)
-            (input: ParseResult<'someInput>)
-            : ParseResult<'someOutput> =
-            match input with
-            | Some x -> Some (binder x) 
-            | None -> None 
-            | ErrorMsg errorMsg -> ErrorMsg errorMsg
-            
-    
     let peekTokenInArray (tokens: Token array) (index: int) : Token =
         match index with
         | i when  i < 0 || i >= tokens.Length ->
@@ -107,29 +109,33 @@ module Parser =
         let currentToken = parserInfo.PeekToken currentIndex
         match currentToken.Type with
         | TokenType.LET ->
-            let newIndex, letStatementResult = tryParseLetStatement parserInfo currentIndex
-            let asStatementResult = ParseResult.Map<LetStatement, Statement> Statement.LetStatement letStatementResult
-            newIndex, asStatementResult
+            let newIndex, letStatement = tryParseLetStatement parserInfo currentIndex
+            newIndex, ParseResult.map Statement.LetStatement letStatement
         | TokenType.RETURN ->
-            let newIndex, letStatementResult = tryParseReturnStatement parserInfo currentIndex
-            let asStatementResult = ParseResult.Map<ReturnStatement, Statement> Statement.ReturnStatement letStatementResult
-            newIndex, asStatementResult
+            let newIndex, returnStatement = tryParseReturnStatement parserInfo currentIndex
+            newIndex, ParseResult.map Statement.ReturnStatement returnStatement
         | TokenType.SEMICOLON ->
             currentIndex + 1, None
         | _ ->
-            currentIndex + 1, ErrorMsg "Don't recognize token"
+            let newIndex, expressionStatement = tryParseExpressionStatement parserInfo currentIndex
+            newIndex, ParseResult.map Statement.ExpressionStatement expressionStatement
             
     and private tryParseExpression
         (parserInfo: ParserInfo)
         (currentIndex: int)
+        (precedence: Precedence)
         : int * ParseResult<Expression> =
-        currentIndex, None
             
-    and private tryParseLetStatement
-        (parserInfo: ParserInfo)
-        (currentIndex: int)
-        : int * ParseResult<LetStatement> =
+        let currentToken = parserInfo.PeekToken currentIndex
+        let parseFuncOption = Map.tryFind currentToken.Type prefixParseFunctionsMap
+        
+        match parseFuncOption with
+        | Option.Some parseFunc ->
+            parseFunc parserInfo currentIndex 
+        | Option.None ->
+            currentIndex + 1, None
             
+    and private tryParseLetStatement parserInfo currentIndex =
         result {
             let letStatementToken = parserInfo.PeekToken currentIndex
             
@@ -151,15 +157,11 @@ module Parser =
         }
         |> function
             | Ok (newIndex, letStatement) ->
-                newIndex, Some letStatement
+                newIndex, Some letStatement 
             | Error (newIndex, errorMsg) ->
                 newIndex, ErrorMsg errorMsg
                 
-    and private tryParseReturnStatement
-        (parserInfo: ParserInfo)
-        (currentIndex: int)
-        : int * ParseResult<ReturnStatement> =
-            
+    and private tryParseReturnStatement parserInfo currentIndex =
         result {
             let returnStatementToken = parserInfo.PeekToken currentIndex
             
@@ -174,6 +176,30 @@ module Parser =
         }
         |> function
             | Ok (newIndex, returnStatement) ->
-                newIndex, Some returnStatement
+                newIndex, Some returnStatement 
             | Error (newIndex, errorMsg) ->
                 newIndex, ErrorMsg errorMsg
+                
+    and private tryParseExpressionStatement
+        (parserInfo: ParserInfo)
+        (currentIndex: int)
+        : int * ParseResult<ExpressionStatement> =
+            
+        let currentToken = parserInfo.PeekToken currentIndex
+        let newIndex, expressionParseResults = tryParseExpression parserInfo currentIndex Precedence.LOWEST
+        newIndex, ParseResult.map (fun expr -> { Token = currentToken; Expression = expr } ) expressionParseResults
+                
+    and private tryParseIdentifierAsExpression parserInfo currentIndex =
+        let currentToken = parserInfo.PeekToken currentIndex 
+        currentIndex + 1, Some (Expression.Identifier { Token = currentToken; Value = currentToken.Literal }) 
+        
+    and private prefixParseFunctionsMap = Map.ofList [
+        (TokenType.IDENT, tryParseIdentifierAsExpression)
+    ]
+    
+    (*
+    and private infixParseFunctionsMap = Map.ofList [
+        (TokenType.IDENT, tryParseIdentifier)
+    ]
+    *)
+    

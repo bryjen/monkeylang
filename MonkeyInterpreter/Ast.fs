@@ -133,6 +133,18 @@ with
         | BlockStatement blockStatement ->
             blockStatement.Token.Literal
             
+    static member internal FromUnionCases(instance: obj): Statement =
+        match instance with
+        | :? LetStatement as letStatement ->
+            Statement.LetStatement letStatement 
+        | :? ReturnStatement as returnStatement ->
+            Statement.ReturnStatement returnStatement 
+        | :? ExpressionStatement as expressionStatement ->
+            Statement.ExpressionStatement expressionStatement 
+        | :? BlockStatement as blockStatement ->
+            Statement.BlockStatement blockStatement
+        | _ -> failwith $"Expected a \"Statement\" DU case type, got \"{instance.GetType()}\""
+            
     /// <inheritdoc/>
     override this.ToString() =
         match this with

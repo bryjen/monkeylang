@@ -171,4 +171,34 @@ let 838383;
 
     [<Test>]
     member this.``Test identifier expressions 1``() =
-        ()
+        result {
+            let testInput = "foobar;"
+            let program = Parser.parseProgram testInput
+            
+            let! statement =
+                match program.Statements with
+                | head :: _ -> Ok head
+                | _ -> Error $"Program has not enough statements. Expected 1, got {program.Statements.Length}"
+
+            let! expressionStatement =
+                match statement with
+                | ExpressionStatement expStat -> Ok expStat
+                | _ -> Error $"program.Statements[0] is not a \"ExpressionStatement\", got \"${statement}\""
+                
+            let! identifier =
+                match expressionStatement.Expression with
+                | Identifier ident -> Ok ident
+                | expr -> Error $"exp not \"Identifier\", got \"{expr}\""
+                
+            let expectedIdentValue = "foobar"
+            do! if identifier.Value = expectedIdentValue
+                then Ok ()
+                else Error $"ident.Value not \"{expectedIdentValue}\", got \"{identifier.Value}\""
+                
+            do! if identifier.TokenLiteral() = expectedIdentValue
+                then Ok ()
+                else Error $"ident.TokenLiteral() not \"{expectedIdentValue}\", got \"{identifier.Value}\""
+        }
+        |> function
+            | Ok _ -> Assert.Pass()
+            | Error errorMsg -> Assert.Fail(errorMsg)
