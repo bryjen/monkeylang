@@ -4,16 +4,6 @@ open System
 open FsToolkit.ErrorHandling
 
 open MonkeyInterpreter.Token
-
-
-type private Precedence =
-    | LOWEST = 1
-    | EQUALS = 2
-    | LESSGREATER = 3
-    | SUM = 4
-    | PRODUCT = 5
-    | PREFIX = 6
-    | CALL = 7
     
 
 type private ParseResult<'a> =
@@ -31,6 +21,22 @@ module private ParseResult =
         | Some x -> Some (binder x) 
         | None -> None 
         | ErrorMsg errorMsg -> ErrorMsg errorMsg
+        
+        
+type private Precedence =
+    | LOWEST = 1
+    | EQUALS = 2
+    | LESSGREATER = 3
+    | SUM = 4
+    | PRODUCT = 5
+    | PREFIX = 6
+    | CALL = 7
+        
+
+type private ParserInfo =
+    { Tokens: Token array
+      Errors: string list
+      PeekToken: int -> Token }
         
         
 [<AutoOpen>]
@@ -67,16 +73,31 @@ module private ParserHelpers =
             Ok token 
         | _ ->
             let errorMsg = $"Expected an assignment operator \"=\" at index \"{index}\", got a \"{TokenType.ToCaseString token.Type}\"."
-            Error (index, errorMsg) 
+            Error (index, errorMsg)
+          
+            
+[<AutoOpen>] 
+module private PrattParsing =
+    let tryParseIdentifier parserInfo currentIndex : int * ParseResult<Expression> =
+        let currentToken = parserInfo.PeekToken currentIndex 
+        currentIndex + 1, Some (Expression.Identifier { Token = currentToken; Value = currentToken.Literal })
+        
+    let tryParseIntegerLiteral parserInfo currentIndex : int * ParseResult<Expression> =
+        let currentToken = parserInfo.PeekToken currentIndex
+        
+        match Int64.TryParse(currentToken.Literal) with
+        | true, result ->
+            currentIndex + 1, Some (Expression.IntegerLiteral { Token = currentToken; Value = result })
+        | false, _ ->
+            currentIndex + 1, ErrorMsg $"Could not parse \"{currentToken.Literal}\" as an Int64"
+            
+    let prefixParseFunctionsMap = Map.ofList [
+        (TokenType.IDENT, tryParseIdentifier)
+        (TokenType.INT, tryParseIntegerLiteral)
+    ]
             
         
 module Parser =
-    
-    type private ParserInfo =
-        { Tokens: Token array
-          Errors: string list
-          PeekToken: int -> Token }
-    
     let rec parseProgram (input: string) : Program =
         let tokens = input |> Lexer.parseIntoTokens |> List.toArray 
         let peekToken = peekTokenInArray tokens
@@ -188,18 +209,3 @@ module Parser =
         let currentToken = parserInfo.PeekToken currentIndex
         let newIndex, expressionParseResults = tryParseExpression parserInfo currentIndex Precedence.LOWEST
         newIndex, ParseResult.map (fun expr -> { Token = currentToken; Expression = expr } ) expressionParseResults
-                
-    and private tryParseIdentifierAsExpression parserInfo currentIndex =
-        let currentToken = parserInfo.PeekToken currentIndex 
-        currentIndex + 1, Some (Expression.Identifier { Token = currentToken; Value = currentToken.Literal }) 
-        
-    and private prefixParseFunctionsMap = Map.ofList [
-        (TokenType.IDENT, tryParseIdentifierAsExpression)
-    ]
-    
-    (*
-    and private infixParseFunctionsMap = Map.ofList [
-        (TokenType.IDENT, tryParseIdentifier)
-    ]
-    *)
-    

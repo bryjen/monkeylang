@@ -10,7 +10,7 @@ type Identifier =
     { Token: Token // 'Token and.IDENT' token
       Value: string }
 with
-    member this.TokenLiteral() = this.Value
+    member this.GetTokenLiteral() = this.Value
     
     /// <inheritdoc/>
     override this.ToString() = $"{this.Value}"
@@ -21,7 +21,7 @@ type Program =
     { Statements: Statement list
       Errors: string list }
 with
-    member this.TokenLiteral() =
+    member this.GetTokenLiteral() =
         match this.Statements with
         | firstStatement :: _ -> firstStatement.GetTokenLiteral()
         | [] -> ""
@@ -38,7 +38,7 @@ and Node =
     | Statement of Statement 
     | Expression of Expression
 with
-    member this.TokenLiteral() =
+    member this.GetTokenLiteral() =
         match this with
         | Statement statement -> statement.GetTokenLiteral() 
         | Expression expression -> expression.GetTokenLiteral()

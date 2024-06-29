@@ -52,7 +52,7 @@ module private ParserHelpers =
                 | identName when identName = expectedName -> Ok () 
                 | identName -> Error $"[test #{testCount}] statement.Name.Value returned \"{identName}\", expected \"{expectedName}\""
                 
-            do! match letStatement.Name.TokenLiteral() with
+            do! match letStatement.Name.GetTokenLiteral() with
                 | identName when identName = expectedName -> Ok () 
                 | identName -> Error $"[test #{testCount}] statement.Name returned \"{identName}\", expected \"{expectedName}\""
         }
@@ -195,9 +195,44 @@ let 838383;
                 then Ok ()
                 else Error $"ident.Value not \"{expectedIdentValue}\", got \"{identifier.Value}\""
                 
-            do! if identifier.TokenLiteral() = expectedIdentValue
+            do! if identifier.GetTokenLiteral() = expectedIdentValue
                 then Ok ()
-                else Error $"ident.TokenLiteral() not \"{expectedIdentValue}\", got \"{identifier.Value}\""
+                else Error $"ident.GetTokenLiteral() not \"{expectedIdentValue}\", got \"{identifier.Value}\""
+        }
+        |> function
+            | Ok _ -> Assert.Pass()
+            | Error errorMsg -> Assert.Fail(errorMsg)
+            
+    [<Test>]
+    member this.``Test integer literal expressions 1``() =
+        result {
+            let testInput = "5;"
+            let program = Parser.parseProgram testInput
+            
+            let! statement =
+                match program.Statements with
+                | head :: _ -> Ok head
+                | _ -> Error $"Program has not enough statements. Expected 1, got {program.Statements.Length}"
+
+            let! expressionStatement =
+                match statement with
+                | ExpressionStatement expStat -> Ok expStat
+                | _ -> Error $"program.Statements[0] is not a \"ExpressionStatement\", got \"${statement}\""
+                
+            let! integerLiteral =
+                match expressionStatement.Expression with
+                | IntegerLiteral ident -> Ok ident
+                | expr -> Error $"exp not \"IntegerLiteral\", got \"{expr}\""
+                
+            let expectedValue = 5 
+            do! if integerLiteral.Value = expectedValue
+                then Ok ()
+                else Error $"integerLiteral.Value not \"{expectedValue}\", got \"{integerLiteral.Value}\""
+                
+            let tokenLiteral = integerLiteral.Token.Literal
+            do! if tokenLiteral = $"{expectedValue}" 
+                then Ok ()
+                else Error $"ident.TokenLiteral() not \"{expectedValue}\", got \"{tokenLiteral}\""
         }
         |> function
             | Ok _ -> Assert.Pass()
