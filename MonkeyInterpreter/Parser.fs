@@ -5,13 +5,22 @@ open FsToolkit.ErrorHandling
 
 open MonkeyInterpreter.Token
     
-
+/// Record type containing parser information. 
+type private ParserInfo =
+    { Tokens: Token array
+      Errors: string list
+      PeekToken: int -> Token }
+    
+    
+/// Modification of the builtin 'Result' type to include a 'None' union case. A value of 'Some' indicates a successful
+/// parse, 'ErrorMsg' indicates an error in parsing, 'None' indicates that no error has occurred and that it has skipped
+/// a token (for ex. semicolons).
 type private ParseResult<'a> =
     | Some of 'a
     | None
     | ErrorMsg of string
     
-    
+
 module private ParseResult =
     let map 
         (binder: 'someInput -> 'someOutput)
@@ -21,6 +30,41 @@ module private ParseResult =
         | Some x -> Some (binder x) 
         | None -> None 
         | ErrorMsg errorMsg -> ErrorMsg errorMsg
+        
+        
+///
+type private Precedence =
+    | LOWEST = 1
+    | EQUALS = 2
+    | LESSGREATER = 3
+    | SUM = 4
+    | PRODUCT = 5
+    | PREFIX = 6
+    | CALL = 7
+    
+    
+///
+module private Precedence =     
+    let tokenTypeToPrecedenceMap = Map.ofList [
+        (TokenType.EQ, Precedence.EQUALS)
+        (TokenType.NOT_EQ, Precedence.EQUALS)
+        (TokenType.LT, Precedence.LESSGREATER)
+        (TokenType.GT, Precedence.LESSGREATER)
+        (TokenType.PLUS, Precedence.SUM)
+        (TokenType.MINUS, Precedence.SUM)
+        (TokenType.SLASH, Precedence.PRODUCT)
+        (TokenType.ASTERISK, Precedence.PRODUCT)
+    ]
+    
+    let peekPrecedence parserInfo currentIndex : Precedence =
+        let currentToken = parserInfo.PeekToken currentIndex
+        let precedenceOption = Map.tryFind currentToken.Type tokenTypeToPrecedenceMap 
+        
+        match precedenceOption with
+        | Option.Some precedence ->
+            precedence
+        | Option.None ->
+            Precedence.LOWEST 
         
         
 [<AutoOpen>]
@@ -61,24 +105,6 @@ module private ParserHelpers =
         
         
 module Parser =
-    
-    ///
-    type private Precedence =
-        | LOWEST = 1
-        | EQUALS = 2
-        | LESSGREATER = 3
-        | SUM = 4
-        | PRODUCT = 5
-        | PREFIX = 6
-        | CALL = 7
-            
-
-    ///
-    type private ParserInfo =
-        { Tokens: Token array
-          Errors: string list
-          PeekToken: int -> Token }
-        
     let rec parseProgram (input: string) : Program =
         let tokens = input |> Lexer.parseIntoTokens |> List.toArray 
         let peekToken = peekTokenInArray tokens
@@ -132,10 +158,32 @@ module Parser =
         let parseFuncOption = Map.tryFind currentToken.Type prefixParseFunctionsMap
         
         match parseFuncOption with
-        | Option.Some parseFunc ->
-            parseFunc parserInfo currentIndex 
+        | Option.Some prefixParseFunc ->
+            let newIndex, prefixExprParseResult = prefixParseFunc parserInfo currentIndex
+            
+            match prefixExprParseResult with
+            | Some prefixExpr -> someHelper parserInfo newIndex precedence prefixExpr
+            | _ -> newIndex, prefixExprParseResult
         | Option.None ->
             currentIndex + 1, ErrorMsg $"No prefix parse function for \"{currentToken.Type}\" found."
+            
+    and private someHelper parserInfo currentIndex precedence leftExpr =
+        let currentToken = parserInfo.PeekToken currentIndex
+        let peekPrecedence = Precedence.peekPrecedence parserInfo currentIndex
+        if currentToken.Type <> TokenType.SEMICOLON && precedence < peekPrecedence then
+            let infixParseFuncOption = Map.tryFind currentToken.Type infixParseFunctionsMap 
+            
+            match infixParseFuncOption with
+            | Option.Some infixParseFunc ->
+                let newIndex, infixExprParseResult = infixParseFunc parserInfo currentIndex leftExpr
+                match infixExprParseResult with
+                | ErrorMsg errorMsg -> newIndex, ErrorMsg errorMsg
+                | Some expr -> someHelper parserInfo newIndex peekPrecedence expr
+                | None -> failwith "idk if this is supposed to happen"
+            | Option.None ->
+                currentIndex + 1, ErrorMsg $"No infix parse function for \"{currentToken.Type}\" found."
+        else
+            currentIndex, Some leftExpr
             
     and private tryParseLetStatement parserInfo currentIndex =
         result {
@@ -215,11 +263,40 @@ module Parser =
             |> ParseResult.map (fun rightExpr -> { Token = currentToken; Operator = currentToken.Literal; Right = rightExpr })
             |> ParseResult.map Expression.PrefixExpression
             
-        newIndex, prefixExpr 
+        newIndex, prefixExpr
             
     and private prefixParseFunctionsMap = Map.ofList [
         (TokenType.IDENT, tryParseIdentifier)
         (TokenType.INT, tryParseIntegerLiteral)
         (TokenType.BANG, tryParsePrefixExpression)
         (TokenType.MINUS, tryParsePrefixExpression)
+    ]
+    
+    
+    and private tryParseInfixExpression
+        (parserInfo: ParserInfo)
+        (currentIndex: int)
+        (left: Expression)
+        : int * ParseResult<Expression> =
+            
+        let currentToken = parserInfo.PeekToken currentIndex
+        let precedence = Precedence.peekPrecedence parserInfo currentIndex
+        let newIndex, rightExprParseResult = tryParseExpression parserInfo (currentIndex + 1) precedence
+       
+        let infixExpr =  
+            rightExprParseResult
+            |> ParseResult.map (fun rightExpr -> { Token = currentToken; Operator = currentToken.Literal; Left = left; Right = rightExpr })
+            |> ParseResult.map Expression.InfixExpression
+        
+        newIndex, infixExpr 
+    
+    and private infixParseFunctionsMap = Map.ofList [
+        (TokenType.PLUS, tryParseInfixExpression)
+        (TokenType.MINUS, tryParseInfixExpression)
+        (TokenType.SLASH, tryParseInfixExpression)
+        (TokenType.ASTERISK, tryParseInfixExpression)
+        (TokenType.EQ, tryParseInfixExpression)
+        (TokenType.NOT_EQ, tryParseInfixExpression)
+        (TokenType.LT, tryParseInfixExpression)
+        (TokenType.GT, tryParseInfixExpression)
     ]

@@ -300,3 +300,75 @@ let 838383;
             
         Assert.Pass()
             
+            
+    [<Test>]
+    member this.``Test parsing infix expressions 1``() =
+        let infixTests = [
+            // (statement, left expr, operator, right expr)
+            ("5 + 5;", 5, "+", 5)
+            ("5 - 5;", 5, "-", 5)
+            ("5 * 5;", 5, "*", 5)
+            ("5 / 5;", 5, "/", 5)
+            ("5 > 5;", 5, ">", 5)
+            ("5 < 5;", 5, "<", 5)
+            ("5 == 5;", 5, "==", 5)
+            ("5 != 5;", 5, "!=", 5)
+        ]
+        
+        for test in infixTests do
+            let testInput, expectedLeftValue, expectedOperator, expectedRightValue = test 
+            let program = Parser.parseProgram testInput
+            
+            result {
+                let! statement =
+                    match program.Statements with
+                    | head :: _ -> Ok head
+                    | _ -> Error $"Program has not enough statements. Expected 1, got {program.Statements.Length}"
+                    
+                let! expressionStatement =
+                    match statement with
+                    | ExpressionStatement expStat -> Ok expStat
+                    | _ -> Error $"program.Statements[0] is not a \"ExpressionStatement\", got \"${statement}\""
+                    
+                let! infixExpression =
+                    match expressionStatement.Expression with
+                    | InfixExpression infixExpr -> Ok infixExpr 
+                    | expr -> Error $"exp not \"InfixExpression\", got \"{expr.GetType()}\""
+                    
+                do! testIntegerLiteral infixExpression.Left expectedLeftValue 
+                do! testIntegerLiteral infixExpression.Right expectedRightValue
+                
+                do! if infixExpression.Operator = expectedOperator
+                    then Ok ()
+                    else Error $"prefixExpression.Operator not \"{expectedOperator}\", got \"{infixExpression.Operator}\""
+            }
+            |> function
+                | Ok _ -> () 
+                | Error errorMsg -> Assert.Fail($"[For test \"{testInput}\"] {errorMsg}")
+
+
+    [<Test>]
+    member this.``Test operator precedence parsing``() =
+        let testCases = [
+            // input into parser, expected parser output
+            ("-a * b", "((-a) * b)")
+            ("!-a", "(!(-a))")
+            ("a + b + c", "((a + b) + c)")
+            ("a + b - c", "((a + b) - c)")
+            ("a * b * c", "((a * b) * c)")
+            ("a * b / c", "((a * b) / c)")
+            ("a + b / c", "(a + (b / c))")
+            ("a + b * c + d / e - f", "(((a + (b * c)) + (d / e)) - f)")
+            ("3 + 4; -5 * 5", "(3 + 4)((-5) * 5)")
+            ("5 > 4 == 3 < 4", "((5 > 4) == (3 < 4))")
+            ("5 < 4 != 3 > 4", "((5 < 4) != (3 > 4))")
+            ("3 + 4 * 5 == 3 * 1 + 4 * 5", "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))")
+        ]
+        
+        for testCase in testCases do
+            let inputString, expectedRepresentationString = testCase
+            let program = Parser.parseProgram inputString
+            
+            let programAsStr = program.ToString()
+            if programAsStr <> expectedRepresentationString then
+                Assert.Fail($"Expected \"{expectedRepresentationString}\", but got \"{programAsStr}\"")

@@ -177,6 +177,11 @@ and InfixExpression =
       Left: Expression
       Operator: string
       Right: Expression }
+with
+    member this.GetTokenLiteral() = this.Token.Literal
+    
+    /// <inheritdoc/>
+    override this.ToString() = $"({this.Left.ToString()} {this.Operator} {this.Right.ToString()})" 
 
 
 ///
@@ -262,7 +267,7 @@ and ReturnStatement =
       ReturnValue: Expression }
 with
     /// <inheritdoc/>
-    override this.ToString() = $"\"{this.Token.Literal} {this.ReturnValue};\""
+    override this.ToString() = $"{this.Token.Literal} {this.ReturnValue};"
         
         
 ///
@@ -271,7 +276,7 @@ and ExpressionStatement =
       Expression: Expression }
 with
     /// <inheritdoc/>
-    override this.ToString() = $"\"{this.Expression}\""
+    override this.ToString() = $"{this.Expression}"
     
     
 ///
