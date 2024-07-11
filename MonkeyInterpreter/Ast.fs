@@ -2,6 +2,7 @@ namespace MonkeyInterpreter
 
 open System.Collections.Generic
 
+open System.Diagnostics
 open MonkeyInterpreter.Token
 
     
@@ -14,6 +15,10 @@ with
     
     /// <inheritdoc/>
     override this.ToString() = $"{this.Value}"
+    
+#if DEBUG
+    static member internal Default = { Token = { Literal = ""; Type = EOF }; Value = "" }
+#endif
     
     
 ///

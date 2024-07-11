@@ -1,4 +1,4 @@
-namespace MonkeyInterpreter.Helpers
+namespace MonkeyInterpreter.Helpers.Queue
 
 open System
 open System.Diagnostics
@@ -21,7 +21,7 @@ and QueueDebugView<'a>(queue: Queue<'a>) =
     member this.DequeueList = List.toArray queue.DequeueList
     
 
-module rec Queue =
+module Queue =
     let empty = { EnqueueList = []
                   DequeueList = [] }
     
@@ -49,6 +49,11 @@ module rec Queue =
             | head :: tail ->
                 let newQueue = { EnqueueList = []; DequeueList = tail }
                 newQueue, Some head
+                
+    let resultDequeue (defaultValue: 'b) queue  : 'a Queue * Result<'a, 'b> =
+        match (dequeue queue) with
+        | newQueue, Some value -> newQueue, Ok value
+        | newQueue, None -> newQueue, Error defaultValue
             
     let peek queue : 'a option =
         match queue.DequeueList with
@@ -59,3 +64,8 @@ module rec Queue =
             match List.rev queue.EnqueueList with
             | [] -> None
             | head :: _ -> Some head
+            
+    let removeTop queue: 'a Queue =
+        let newQueue, _ = dequeue queue
+        newQueue
+        
