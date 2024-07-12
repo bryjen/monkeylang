@@ -2,7 +2,6 @@ namespace MonkeyInterpreter.Test
 
 open System
 open MonkeyInterpreter.Helpers
-open MonkeyInterpreter.Token
 open NUnit.Framework
 
 open FsToolkit.ErrorHandling

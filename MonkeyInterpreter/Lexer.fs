@@ -1,7 +1,5 @@
 namespace MonkeyInterpreter
 
-open MonkeyInterpreter.Token
-
 [<AutoOpen>]
 module private LexerHelpers = 
     let isLetter (c: char) =

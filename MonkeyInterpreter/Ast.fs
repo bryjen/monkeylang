@@ -1,9 +1,8 @@
-namespace MonkeyInterpreter
+namespace rec MonkeyInterpreter
 
 open System.Collections.Generic
-
 open System.Diagnostics
-open MonkeyInterpreter.Token
+
 
     
 ///
@@ -39,7 +38,7 @@ with
         
         
 ///
-and Node =
+type Node =
     | Statement of Statement 
     | Expression of Expression
 with
@@ -48,9 +47,9 @@ with
         | Statement statement -> statement.GetTokenLiteral() 
         | Expression expression -> expression.GetTokenLiteral()
         
-
 ///
-and Expression =
+[<DebuggerDisplay("{ToString()}")>] 
+type Expression =
     | PrefixExpression of PrefixExpression 
     | InfixExpression of InfixExpression 
     | IfExpression of IfExpression 
@@ -121,7 +120,8 @@ with
     
     
 ///
-and Statement =
+[<DebuggerDisplay("{ToString()}")>] 
+type Statement =
     | LetStatement of LetStatement
     | ReturnStatement of ReturnStatement
     | ExpressionStatement of ExpressionStatement
@@ -165,7 +165,7 @@ with
 
 // 'General' Expression ands
 ///
-and PrefixExpression =
+type PrefixExpression =
     { Token: Token // the prefix token, ex. '!'
       Operator: string
       Right: Expression }
@@ -177,7 +177,7 @@ with
     
     
 ///
-and InfixExpression =
+type InfixExpression =
     { Token: Token // the operator token, ex. '+'
       Left: Expression
       Operator: string
@@ -190,7 +190,7 @@ with
 
 
 ///
-and IfExpression =
+type IfExpression =
     { Token: Token
       Condition: Expression
       Consequence: BlockStatement
@@ -198,14 +198,14 @@ and IfExpression =
     
     
 ///
-and CallExpression =
+type CallExpression =
     { Token: Token
       Function: Expression
       Arguments: Expression list }
 
 
 ///
-and IndexExpression =
+type IndexExpression =
     { Token: Token
       Left: Expression
       Index: Expression }
@@ -213,7 +213,7 @@ and IndexExpression =
     
 // Literal Expressions
 ///
-and IntegerLiteral =
+type IntegerLiteral =
     { Token: Token
       Value: int64 }
 with
@@ -224,32 +224,32 @@ with
     
     
 ///
-and FunctionLiteral =
+type FunctionLiteral =
     { Token: Token
       Parameters: Identifier list
       Body: BlockStatement }
     
     
 ///
-and StringLiteral =
+type StringLiteral =
     { Token: Token
       Value: string }
     
     
 ///
-and ArrayLiteral =
+type ArrayLiteral =
     { Token: Token
       Elements: Expression list }
     
     
 ///
-and HashLiteral =
+type HashLiteral =
     { Token: Token
       Pairs: Dictionary<Expression, Expression> }
     
     
 ///
-and MacroLiteral =
+type MacroLiteral =
     { Token: Token
       Parameters: Identifier list
       Body: BlockStatement }
@@ -257,7 +257,7 @@ and MacroLiteral =
     
 // Statement ands
 ///
-and LetStatement =
+type LetStatement =
      { Token: Token // 'Token and.LET' token 
        Name: Identifier 
        Value: Expression }
@@ -267,7 +267,7 @@ with
         
 
 ///
-and ReturnStatement =
+type ReturnStatement =
     { Token: Token // 'Token and.RETURN' token
       ReturnValue: Expression }
 with
@@ -276,7 +276,7 @@ with
         
         
 ///
-and ExpressionStatement =
+type ExpressionStatement =
     { Token: Token // The first token of the expression
       Expression: Expression }
 with
@@ -285,6 +285,6 @@ with
     
     
 ///
-and BlockStatement =
+type BlockStatement =
     { Token: Token
       Statements: Statement list }

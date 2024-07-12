@@ -6,7 +6,6 @@ open NUnit.Framework
 open FsToolkit.ErrorHandling
 
 open MonkeyInterpreter
-open MonkeyInterpreter.Token
 
 
 module private LexerLog =

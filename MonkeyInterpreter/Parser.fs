@@ -5,7 +5,6 @@ open FsToolkit.ErrorHandling
 
 open Microsoft.FSharp.Core
 open MonkeyInterpreter.Helpers.Queue
-open MonkeyInterpreter.Token
     
 
 type private ParserState =
@@ -106,6 +105,7 @@ module private ParserHelpers =
             | _ -> consumeQueueUntilSemicolon (Queue.removeTop tokensQueue)
         
         
+        
 module rec Parser =
     
     let rec parseProgram (input: string) : Program =
@@ -148,8 +148,6 @@ module rec Parser =
             Ok (newTokensQueue, None)
         | _ ->
             tryParseExpressionStatement tokensQueue |> transform
-                
-    
             
     and private tryParseExpression tokensQueue precedence
         : Result<Token Queue * Expression, Token Queue * string> =
@@ -164,7 +162,6 @@ module rec Parser =
             return! tryParseExpressionHelper newTokensQueue precedence leftExpression
         }
         
-    // TODO: Find if there is a better name for this function
     and private tryParseExpressionHelper tokensQueue precedence leftExpr
         : Result<Token Queue * Expression, Token Queue * string> =
         result {
@@ -173,18 +170,20 @@ module rec Parser =
             let peekPrecedence = Precedence.peekPrecedence tokensQueue
             
             if peekToken.Type <> TokenType.SEMICOLON && precedence < peekPrecedence then
-                let infixParseFuncResult = Map.tryFind peekToken.Type infixParseFunctionsMap
-                                           |> ofOption $"No prefix infix function for \"{peekToken.Type}\" found."
+                let noFuncErrMsg = $"No prefix infix function for \"{peekToken.Type}\" found."
+                let infixParseFuncResult = Map.tryFind peekToken.Type infixParseFunctionsMap |> ofOption noFuncErrMsg 
                 let! infixParseFunc = Result.mapError (fun erMsg -> (tokensQueue, erMsg)) infixParseFuncResult
+                
                 let! newTokensQueue, infixExpr = infixParseFunc tokensQueue leftExpr
-                return! tryParseExpressionHelper newTokensQueue peekPrecedence infixExpr
+                return! tryParseExpressionHelper newTokensQueue precedence infixExpr
+                // return! tryParseExpressionHelper newTokensQueue peekPrecedence infixExpr
+                // learn why above ^ does not work
             else
                 return tokensQueue, leftExpr
         }
         
         
     (* Parsing Statements *)
-   
     
     and private tryParseLetStatement (tokensQueue: Token Queue)
         : Result<Token Queue * Statement, Token Queue * string> =
