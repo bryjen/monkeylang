@@ -50,7 +50,7 @@ module Queue =
                 let newQueue = { EnqueueList = []; DequeueList = tail }
                 newQueue, Some head
                 
-    let resultDequeue (defaultValue: 'b) queue  : 'a Queue * Result<'a, 'b> =
+    let resultDequeue (defaultValue: 'b) queue : 'a Queue * Result<'a, 'b> =
         match (dequeue queue) with
         | newQueue, Some value -> newQueue, Ok value
         | newQueue, None -> newQueue, Error defaultValue

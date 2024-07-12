@@ -29,7 +29,7 @@ module private ParserState =
         (replaceQueue tokensQueue >> addError errorMsg) parserState
     
         
-///
+        
 type private Precedence =
     | LOWEST = 1
     | EQUALS = 2
@@ -39,8 +39,6 @@ type private Precedence =
     | PREFIX = 6
     | CALL = 7
     
-    
-///
 module private Precedence =     
     let tokenTypeToPrecedenceMap = Map.ofList [
         (TokenType.EQ, Precedence.EQUALS)
@@ -156,7 +154,7 @@ module rec Parser =
             
             let noFuncErrMsg = $"No prefix parse function for \"{peekToken.Type}\" found."
             let prefixParseFuncResult = Map.tryFind peekToken.Type prefixParseFunctionsMap |> ofOption noFuncErrMsg
-            let! prefixParseFunc = Result.mapError (fun erMsg -> (tokensQueue, erMsg)) prefixParseFuncResult
+            let! prefixParseFunc = Result.mapError (fun erMsg -> (consumeQueueUntilSemicolon tokensQueue, erMsg)) prefixParseFuncResult
             
             let! newTokensQueue, leftExpression = prefixParseFunc tokensQueue
             return! tryParseExpressionHelper newTokensQueue precedence leftExpression
@@ -172,7 +170,7 @@ module rec Parser =
             if peekToken.Type <> TokenType.SEMICOLON && precedence < peekPrecedence then
                 let noFuncErrMsg = $"No prefix infix function for \"{peekToken.Type}\" found."
                 let infixParseFuncResult = Map.tryFind peekToken.Type infixParseFunctionsMap |> ofOption noFuncErrMsg 
-                let! infixParseFunc = Result.mapError (fun erMsg -> (tokensQueue, erMsg)) infixParseFuncResult
+                let! infixParseFunc = Result.mapError (fun erMsg -> (consumeQueueUntilSemicolon tokensQueue, erMsg)) infixParseFuncResult
                 
                 let! newTokensQueue, infixExpr = infixParseFunc tokensQueue leftExpr
                 return! tryParseExpressionHelper newTokensQueue precedence infixExpr
@@ -234,7 +232,7 @@ module rec Parser =
         
     (* Pratt Parsing Stuff *)
     
-    and private tryParseIdentifier (tokensQueue: Token Queue)
+    let private tryParseIdentifier (tokensQueue: Token Queue)
         : Result<Token Queue * Expression, Token Queue * string> =
         result {
             let! newTokensQueue, dequeuedToken = dequeueToken "[tryParseIdentifier] Tokens queue empty." tokensQueue
@@ -242,7 +240,7 @@ module rec Parser =
             return newTokensQueue, expression
         }
         
-    and private tryParseIntegerLiteral (tokensQueue: Token Queue)
+    let private tryParseIntegerLiteral (tokensQueue: Token Queue)
         : Result<Token Queue * Expression, Token Queue * string> =
         result {
             let! newTokensQueue, dequeuedToken = dequeueToken "[tryParseIntegerLiteral] Tokens queue empty." tokensQueue
@@ -254,7 +252,7 @@ module rec Parser =
             return newTokensQueue, expression
         }
            
-    and private tryParsePrefixExpression (tokensQueue: Token Queue)
+    let private tryParsePrefixExpression (tokensQueue: Token Queue)
         : Result<Token Queue * Expression, Token Queue * string> =
         result {
             let! newTokensQueue, dequeuedToken = dequeueToken "[tryParsePrefixExpression] Tokens queue empty." tokensQueue
@@ -264,14 +262,34 @@ module rec Parser =
             return newTokensQueue, prefixExpr
         }
         
-    and private prefixParseFunctionsMap = Map.ofList [
+    let private tryParseBooleanLiteral (tokensQueue: Token Queue)
+        : Result<Token Queue * Expression, Token Queue * string> =
+        result {
+            let! newTokensQueue, dequeuedToken = dequeueToken "[tryParseBooleanLiteral] Tokens queue empty." tokensQueue
+            let! booleanValue =
+                match dequeuedToken.Type with
+                | TRUE -> Ok true
+                | FALSE -> Ok false
+                | _ ->
+                    let errorMsg = $"[tryParseBooleanLiteral] Expected a true/false token, got {TokenType.ToCaseString dequeuedToken.Type}"
+                    Error (newTokensQueue, errorMsg)
+                    
+            let booleanLiteral = Expression.BooleanLiteral { Token = dequeuedToken; Value = booleanValue }
+            return newTokensQueue, booleanLiteral
+        }
+        
+    
+        
+    let private prefixParseFunctionsMap = Map.ofList [
         (TokenType.IDENT, tryParseIdentifier)
         (TokenType.INT, tryParseIntegerLiteral)
         (TokenType.BANG, tryParsePrefixExpression)
         (TokenType.MINUS, tryParsePrefixExpression)
+        (TokenType.TRUE, tryParseBooleanLiteral)
+        (TokenType.FALSE, tryParseBooleanLiteral)
     ]
     
-    and private tryParseInfixExpression (tokensQueue: Token Queue) (leftExpr: Expression)
+    let private tryParseInfixExpression (tokensQueue: Token Queue) (leftExpr: Expression)
         : Result<Token Queue * Expression, Token Queue * string> =
         result {
             let precedence = Precedence.peekPrecedence tokensQueue
@@ -284,7 +302,7 @@ module rec Parser =
             return newTokensQueue, infixExpr
         }
            
-    and private infixParseFunctionsMap = Map.ofList [
+    let private infixParseFunctionsMap = Map.ofList [
         (TokenType.PLUS, tryParseInfixExpression)
         (TokenType.MINUS, tryParseInfixExpression)
         (TokenType.SLASH, tryParseInfixExpression)

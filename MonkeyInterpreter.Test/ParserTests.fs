@@ -98,15 +98,15 @@ module private ParserHelpers =
             | Error errorMsg -> Assert.Fail(errorMsg)
 
 
+
 [<TestFixture>]
 type ParserTests() =
-    
     let testIntegerLiteral (expr: Expression) (expectedValue: int64) =
         result {
             let! integerLiteral =
                 match expr with
                 | IntegerLiteral integerLiteral -> Ok integerLiteral
-                | expr -> Error $"exp not \"IntegerLiteral\", got \"{expr.GetType()}\""
+                | _ -> Error $"exp not \"IntegerLiteral\", got \"{expr.GetType()}\""
                 
             do! if integerLiteral.Value = expectedValue
                 then Ok ()
@@ -116,6 +116,62 @@ type ParserTests() =
             do! if integerLiteral.GetTokenLiteral() = asStringLiteral 
                 then Ok ()
                 else Error $"integerLiteral.Token.Literal not \"{asStringLiteral}\", got \"{integerLiteral.GetTokenLiteral()}\""
+        }
+        
+    let testIdentifier (expr: Expression) (expectedValue: string) =
+        result {
+            let! identifier =
+                match expr with
+                | Identifier identifier -> Ok identifier
+                | _ -> Error $"expr not \"Identifier\", got \"{expr.GetType()}\""
+                
+            do! if identifier.Value = expectedValue
+                then Ok ()
+                else Error $"identifier.Value not \"{expectedValue}\", got \"{identifier.Value}\""
+                
+            do! if identifier.GetTokenLiteral() = expectedValue 
+                then Ok ()
+                else Error $"identifier.GetTokenLiteral() not \"{expectedValue}\", got \"{identifier.GetTokenLiteral()}\""
+        }
+        
+    let testBooleanLiteral (expr: Expression) (expectedValue: bool) =
+        result {
+            let! booleanLiteral =
+                match expr with
+                | BooleanLiteral boolLiteral -> Ok boolLiteral
+                | _ -> Error $"expr not \"BooleanExpression\", got \"{expr.GetType()}\""
+                
+            do! if booleanLiteral.Value = expectedValue
+                then Ok ()
+                else Error $"booleanLiteral.Value not \"{expectedValue}\", got \"{booleanLiteral.Value}\""
+                
+            do! if booleanLiteral.GetTokenLiteral().ToLower() = $"{expectedValue}".ToLower() 
+                then Ok ()
+                else Error $"identifier.GetTokenLiteral() not \"{expectedValue}\", got \"{booleanLiteral.GetTokenLiteral()}\""
+        }
+        
+    let testLiteralExpression (expr: Expression) (expectedType: obj) =
+        match expectedType with
+        | :? int as value -> testIntegerLiteral expr (int64 value) 
+        | :? int64 as value -> testIntegerLiteral expr value
+        | :? string as value -> testIdentifier expr value
+        | :? bool as value -> testBooleanLiteral expr value
+        | _ -> Error $"Type of expr not handled, got type \"{expectedType.GetType()}\""
+        
+    let testInfixExpression (expr: Expression) (expectedLeft: obj) (expectedOperator: string) (expectedRight: obj) =
+        result {
+            let! infixExpression =
+                match expr with
+                | InfixExpression infixExpr -> Ok infixExpr
+                | _ -> Error $"expr not \"InfixExpression\", got \"{expr.GetType()}\""
+                
+            do! testLiteralExpression infixExpression.Left expectedLeft
+            
+            do! if infixExpression.Operator = expectedOperator 
+                then Ok ()
+                else Error $"identifier.Operator not \"{expectedOperator}\", got \"{infixExpression.Operator}\""
+            
+            do! testLiteralExpression infixExpression.Right expectedRight 
         }
         
         
@@ -266,7 +322,6 @@ let 838383;
             
             
     [<Test>]
-    [<Order(6)>]
     member this.``Test parsing prefix expressions 1``() =
         let prefixTests = [
             ("!5", "!", 5)
@@ -304,10 +359,50 @@ let 838383;
                 | Error errorMsg -> Assert.Fail(errorMsg)
             
         Assert.Pass()
+        
+        
+    [<Test>]
+    // Tests expressions with booleans
+    member this.``Test parsing prefix expressions 2``() =
+        let prefixTests = [
+            ("!true;", "!", true)
+            ("!false;", "!", false)
+        ]
+        
+        for test in prefixTests do
+            result {
+                let testInput, expectedOperator, expectedValue = test
+                let program = Parser.parseProgram testInput
+                
+                let! statement =
+                    match program.Statements with
+                    | head :: _ -> Ok head
+                    | _ -> Error $"Program has not enough statements. Expected 1, got {program.Statements.Length}"
+                    
+                let! expressionStatement =
+                    match statement with
+                    | ExpressionStatement expStat -> Ok expStat
+                    | _ -> Error $"program.Statements[0] is not a \"ExpressionStatement\", got \"${statement}\""
+                    
+                let! prefixExpression =
+                    match expressionStatement.Expression with
+                    | PrefixExpression prefixExpr -> Ok prefixExpr 
+                    | expr -> Error $"exp not \"PrefixExpression\", got \"{expr}\""
+                    
+                do! if prefixExpression.Operator = expectedOperator
+                    then Ok ()
+                    else Error $"prefixExpression.Operator not \"{expectedOperator}\", got \"{prefixExpression.Operator}\""
+                    
+                do! testBooleanLiteral prefixExpression.Right expectedValue
+            }
+            |> function
+                | Ok _ -> () 
+                | Error errorMsg -> Assert.Fail(errorMsg)
+            
+        Assert.Pass()
             
             
     [<Test>]
-    [<Order(7)>]
     member this.``Test parsing infix expressions 1``() =
         let infixTests = [
             // (statement, left expr, operator, right expr)
@@ -336,17 +431,49 @@ let 838383;
                     | ExpressionStatement expStat -> Ok expStat
                     | _ -> Error $"program.Statements[0] is not a \"ExpressionStatement\", got \"${statement}\""
                     
-                let! infixExpression =
+                let! _ =
                     match expressionStatement.Expression with
                     | InfixExpression infixExpr -> Ok infixExpr 
                     | expr -> Error $"exp not \"InfixExpression\", got \"{expr.GetType()}\""
                     
-                do! testIntegerLiteral infixExpression.Left expectedLeftValue 
-                do! testIntegerLiteral infixExpression.Right expectedRightValue
+                do! testInfixExpression expressionStatement.Expression expectedLeftValue expectedOperator expectedRightValue
+            }
+            |> function
+                | Ok _ -> () 
+                | Error errorMsg -> Assert.Fail($"[For test \"{testInput}\"] {errorMsg}")
                 
-                do! if infixExpression.Operator = expectedOperator
-                    then Ok ()
-                    else Error $"prefixExpression.Operator not \"{expectedOperator}\", got \"{infixExpression.Operator}\""
+                
+    [<Test>]
+    // Tests expressions with booleans
+    member this.``Test parsing infix expressions 2``() =
+        let infixTests = [
+            // (statement, left expr, operator, right expr)
+            ("true == true", true, "==", true)
+            ("true != false", true, "!=", false)
+            ("false == false", false, "==", false)
+        ]
+        
+        for test in infixTests do
+            let testInput, expectedLeftValue, expectedOperator, expectedRightValue = test 
+            let program = Parser.parseProgram testInput
+            
+            result {
+                let! statement =
+                    match program.Statements with
+                    | head :: _ -> Ok head
+                    | _ -> Error $"Program has not enough statements. Expected 1, got {program.Statements.Length}"
+                    
+                let! expressionStatement =
+                    match statement with
+                    | ExpressionStatement expStat -> Ok expStat
+                    | _ -> Error $"program.Statements[0] is not a \"ExpressionStatement\", got \"${statement}\""
+                    
+                let! _ =
+                    match expressionStatement.Expression with
+                    | InfixExpression infixExpr -> Ok infixExpr 
+                    | expr -> Error $"exp not \"InfixExpression\", got \"{expr.GetType()}\""
+                    
+                do! testInfixExpression expressionStatement.Expression expectedLeftValue expectedOperator expectedRightValue
             }
             |> function
                 | Ok _ -> () 
@@ -354,8 +481,7 @@ let 838383;
 
 
     [<Test>]
-    [<Order(8)>]
-    member this.``Test operator precedence parsing``() =
+    member this.``Test operator precedence parsing 1``() =
         let testCases = [
             // input into parser, expected parser output
             ("-a * b", "((-a) * b)")
@@ -373,6 +499,28 @@ let 838383;
             // ?
             ("3 + 4; -5 * 5", "(3 + 4)((-5) * 5)")
             *)
+        ]
+        
+        for testCase in testCases do
+            let inputString, expectedRepresentationString = testCase
+            let program = Parser.parseProgram inputString
+            
+            let programAsStr = program.ToString()
+            if programAsStr <> expectedRepresentationString then
+                Assert.Fail($"[Comparing strings] Expected \"{expectedRepresentationString}\", but got \"{programAsStr}\"")
+            else
+                ()
+                
+                
+    [<Test>]
+    // Tests expressions with booleans
+    member this.``Test operator precedence parsing 2``() =
+        let testCases = [
+            // input into parser, expected parser output
+            ("true", "true")
+            ("false", "false")
+            ("3 > 5 == false", "((3 > 5) == false)")
+            ("3 < 5 == true", "((3 < 5) == true)")
         ]
         
         for testCase in testCases do

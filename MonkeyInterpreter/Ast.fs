@@ -62,6 +62,7 @@ type Expression =
     | HashLiteral of HashLiteral
     | MacroLiteral of MacroLiteral
     | Identifier of Identifier
+    | BooleanLiteral of BooleanLiteral
 with
     member this.GetTokenLiteral() =
         match this with
@@ -89,6 +90,8 @@ with
             macroLiteral.Token.Literal
         | Identifier identifier ->
             identifier.Token.Literal
+        | BooleanLiteral booleanLiteral ->
+            booleanLiteral.Token.Literal
             
     /// <inheritdoc/>
     override this.ToString() =
@@ -117,6 +120,8 @@ with
             macroLiteral.ToString()
         | Identifier identifier ->
             identifier.ToString()
+        | BooleanLiteral booleanLiteral ->
+            booleanLiteral.ToString()
     
     
 ///
@@ -253,6 +258,17 @@ type MacroLiteral =
     { Token: Token
       Parameters: Identifier list
       Body: BlockStatement }
+    
+///
+type BooleanLiteral =
+    { Token: Token
+      Value: bool }
+with
+    member this.GetTokenLiteral() = this.Token.Literal
+    
+    /// <inheritdoc/>
+    override this.ToString() = $"{this.GetTokenLiteral()}" 
+    
     
     
 // Statement ands
