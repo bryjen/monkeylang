@@ -516,11 +516,30 @@ let 838383;
     // Tests expressions with booleans
     member this.``Test operator precedence parsing 2``() =
         let testCases = [
-            // input into parser, expected parser output
             ("true", "true")
             ("false", "false")
             ("3 > 5 == false", "((3 > 5) == false)")
             ("3 < 5 == true", "((3 < 5) == true)")
+        ]
+        
+        for testCase in testCases do
+            let inputString, expectedRepresentationString = testCase
+            let program = Parser.parseProgram inputString
+            
+            let programAsStr = program.ToString()
+            if programAsStr <> expectedRepresentationString then
+                Assert.Fail($"Expected \"{expectedRepresentationString}\", but got \"{programAsStr}\"")
+                
+                
+    [<Test>]
+    // Test expressions with parentheses
+    member this.``Test operator precedence parsing 3``() =
+        let testCases = [
+            ("1 + (2 + 3) + 4", "((1 + (2 + 3)) + 4)")
+            ("(5 + 5) * 2", "((5 + 5) * 2)")
+            ("2 / (5 + 5)", "(2 / (5 + 5))")
+            ("-(5 + 5)", "(-(5 + 5))")
+            ("!(true == true)", "(!(true == true))")
         ]
         
         for testCase in testCases do

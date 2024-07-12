@@ -278,7 +278,17 @@ module rec Parser =
             return newTokensQueue, booleanLiteral
         }
         
-    
+    let private tryParseGroupedExpression (tokensQueue: Token Queue)
+        : Result<Token Queue * Expression, Token Queue * string> =
+        result {
+            let newTokensQueue = Queue.removeTop tokensQueue  // consume the left paren
+            let! newTokensQueue, expr = tryParseExpression newTokensQueue Precedence.LOWEST
+            
+            do! assertExpectedTokenType consumeQueueUntilSemicolon TokenType.RPAREN newTokensQueue
+            
+            let newTokensQueue = Queue.removeTop newTokensQueue  // consume the right paren
+            return newTokensQueue, expr
+        }
         
     let private prefixParseFunctionsMap = Map.ofList [
         (TokenType.IDENT, tryParseIdentifier)
@@ -287,6 +297,7 @@ module rec Parser =
         (TokenType.MINUS, tryParsePrefixExpression)
         (TokenType.TRUE, tryParseBooleanLiteral)
         (TokenType.FALSE, tryParseBooleanLiteral)
+        (TokenType.LPAREN, tryParseGroupedExpression)
     ]
     
     let private tryParseInfixExpression (tokensQueue: Token Queue) (leftExpr: Expression)
