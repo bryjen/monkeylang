@@ -551,51 +551,7 @@ let 838383;
             if programAsStr <> expectedRepresentationString then
                 Assert.Fail($"Expected \"{expectedRepresentationString}\", but got \"{programAsStr}\"")
                 
-    [<Test>]
-    [<Ignore("Ignored until functionality implemented")>]
-    member this.``Test 'if' expression 1``() =
-        result {
-            let testInput = "if (x < y) { x }"
-            let program = Parser.parseProgram testInput
-            
-            let! statement =
-                match program.Statements with
-                | head :: _ -> Ok head
-                | _ -> Error $"Program has not enough statements. Expected 1, got {program.Statements.Length}"
                 
-            let! expressionStatement =
-                match statement with
-                | ExpressionStatement expStat -> Ok expStat
-                | _ -> Error $"program.Statements[0] is not a \"ExpressionStatement\", got \"${statement.GetType()}\""
-                
-            let! ifExpression =
-                match expressionStatement.Expression with
-                | IfExpression ifExpr -> Ok ifExpr
-                | _ -> Error $"program.Statements[0] is not a \"IfExpression\", got \"{expressionStatement.GetType()}\""
-                
-                
-            do! testInfixExpression ifExpression.Condition "x" "<" "y"
-            
-            do! match ifExpression.Consequence.Statements.Length with
-                | len when len = 1 -> Ok ()
-                | len -> Error $"ifExpression.Consequence.Statements.Length not 1, got {len}"
-                
-            let! consequenceExpressionStatement =
-                match ifExpression.Consequence.Statements.Head with
-                | ExpressionStatement exprStatement ->
-                    Ok exprStatement
-                | consequenceStatement ->
-                    Error $"ifExpression.Consequence.Statements.Head is not a \"ExpressionStatement\", got \"{consequenceStatement.GetType()}\""
-                    
-            do! testIdentifier consequenceExpressionStatement.Expression "x"
-            
-            do! match ifExpression.Alternative with
-                | Some _ -> Error "ifStatement was found to have an 'alternative/else' block, when it was not supsoed to"
-                | None -> Ok ()
-        }
-        |> ignore
-        
-        
     [<Test>]
     member this.``Test block statement parsing 1``() =
         let testInput = """let x = 5;
@@ -638,10 +594,55 @@ let y = 10;
         | Error (_, errors) ->
             let errorsString = String.concat "\n" errors
             Assert.Fail($"Parsing errors:\n\n{errorsString}")
+                
+                
+    [<Test>]
+    member this.``Test 'if' expression 1``() =
+        result {
+            let testInput = "if (x < y) { x }"
+            let program = Parser.parseProgram testInput
+            
+            let! statement =
+                match program.Statements with
+                | head :: _ -> Ok head
+                | _ -> Error $"Program has not enough statements. Expected 1, got {program.Statements.Length}"
+                
+            let! expressionStatement =
+                match statement with
+                | ExpressionStatement expStat -> Ok expStat
+                | _ -> Error $"program.Statements[0] is not a \"ExpressionStatement\", got \"${statement.GetType()}\""
+                
+            let! ifExpression =
+                match expressionStatement.Expression with
+                | IfExpression ifExpr -> Ok ifExpr
+                | _ -> Error $"program.Statements[0] is not a \"IfExpression\", got \"{expressionStatement.GetType()}\""
+                
+                
+            do! testInfixExpression ifExpression.Condition "x" "<" "y"
+            
+            do! match ifExpression.Consequence.Statements.Length with
+                | len when len = 1 -> Ok ()
+                | len -> Error $"ifExpression.Consequence.Statements.Length not 1, got {len}"
+                
+            let! consequenceExpressionStatement =
+                match ifExpression.Consequence.Statements.Head with
+                | ExpressionStatement exprStatement ->
+                    Ok exprStatement
+                | consequenceStatement ->
+                    Error $"ifExpression.Consequence.Statements.Head is not a \"ExpressionStatement\", got \"{consequenceStatement.GetType()}\""
+                    
+            do! testIdentifier consequenceExpressionStatement.Expression "x"
+            
+            do! match ifExpression.Alternative with
+                | Some _ -> Error "ifStatement was found to have an 'alternative/else' block, when it was not supsoed to"
+                | None -> Ok ()
+        }
+        |> function
+           | Ok _ -> Assert.Pass()
+           | Error errorMsg -> Assert.Fail(errorMsg)
         
         
     [<Test>]
-    [<Ignore("Ignored until functionality implemented")>]
     member this.``Test 'if' expression 2``() =
         result {
             let testInput = "if (x < y) { x } else { y }"
@@ -699,4 +700,6 @@ let y = 10;
                     
             do! testIdentifier alternativeExpressionStatement.Expression "y"
         }
-        |> ignore
+        |> function
+           | Ok _ -> Assert.Pass()
+           | Error errorMsg -> Assert.Fail(errorMsg)

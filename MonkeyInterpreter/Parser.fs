@@ -325,25 +325,56 @@ module rec Parser =
         }
         
     // TODO Finish
+    // Additional TODO: Clean up code + make the 'assertExpectedTokenType' do different things based on success/failure
     let rec internal tryParseIfExpression (tokensQueue: Token Queue)
         : Result<Token Queue * Expression, Token Queue * string list> =
         result {
             let dequeueErrorMsg = "[tryParseIfExpression] Tokens queue empty."
             let! newTokensQueue, ifStatementToken = dequeueToken dequeueErrorMsg tokensQueue |> Result.mapError boxErrorMsg
             
+            // Parsing the condition
             do! assertExpectedTokenType consumeQueueUntilSemicolon LPAREN newTokensQueue |> Result.mapError boxErrorMsg
             let newTokensQueue = Queue.removeTop newTokensQueue
             
             let! newTokensQueue, condition = tryParseExpression newTokensQueue Precedence.LOWEST
             
             do! assertExpectedTokenType consumeQueueUntilSemicolon RPAREN newTokensQueue |> Result.mapError boxErrorMsg
+            let newTokensQueue = Queue.removeTop newTokensQueue
             
-            return! Error (tokensQueue, [ "" ])
+            // Parsing the consequence
+            let stopCondition token = token.Type = RBRACE
+            do! assertExpectedTokenType consumeQueueUntilSemicolon LBRACE newTokensQueue |> Result.mapError boxErrorMsg
+            let newTokensQueue = Queue.removeTop newTokensQueue
+            
+            let! newTokensQueue, consequenceBlocksStatement = tryParseBlockStatement stopCondition newTokensQueue
+            
+            do! assertExpectedTokenType consumeQueueUntilSemicolon RBRACE newTokensQueue |> Result.mapError boxErrorMsg
+            let newTokensQueue = Queue.removeTop newTokensQueue
+            
+            // Parsing the alternative, if any
+            let! newTokensQueue, alternativeBlockStatementOption = tryParseAlternativeBlockStatement stopCondition newTokensQueue
+            let ifExpression = { Token = ifStatementToken; Condition = condition
+                                 Consequence = consequenceBlocksStatement; Alternative = alternativeBlockStatementOption } 
+            return newTokensQueue, Expression.IfExpression ifExpression 
         }
         
-    and internal tryParseElseBlockStatement (tokensQueue: Token Queue)
-        : Result<Token Queue * BlockStatement, Token Queue * string list> =
-        Error (tokensQueue, [])
+    and internal tryParseAlternativeBlockStatement stopCondition tokensQueue 
+        : Result<Token Queue * BlockStatement Option, Token Queue * string list> =
+        match (Queue.peek tokensQueue) with
+        | Some peekToken when peekToken.Type = ELSE ->
+            result {
+                let newTokensQueue = Queue.removeTop tokensQueue // to consume the 'else' token
+                
+                do! assertExpectedTokenType consumeQueueUntilSemicolon LBRACE newTokensQueue |> Result.mapError boxErrorMsg
+                let newTokensQueue = Queue.removeTop newTokensQueue 
+                
+                let! newTokensQueue, consequenceBlocksStatement = tryParseBlockStatement stopCondition newTokensQueue
+                
+                do! assertExpectedTokenType consumeQueueUntilSemicolon RBRACE newTokensQueue |> Result.mapError boxErrorMsg
+                let newTokensQueue = Queue.removeTop newTokensQueue
+                return newTokensQueue, Some consequenceBlocksStatement
+            }
+        | _ -> Ok (tokensQueue, None)
         
     let internal boxErrorMsg (tokensQueue, errorMsg) = tokensQueue, [ errorMsg ]
         
@@ -355,6 +386,7 @@ module rec Parser =
         (TokenType.TRUE, tryParseBooleanLiteral)
         (TokenType.FALSE, tryParseBooleanLiteral)
         (TokenType.LPAREN, tryParseGroupedExpression)
+        (TokenType.IF, tryParseIfExpression)
     ]
     
     let internal tryParseInfixExpression (tokensQueue: Token Queue) (leftExpr: Expression)
