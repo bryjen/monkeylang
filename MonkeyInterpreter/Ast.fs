@@ -199,7 +199,17 @@ type IfExpression =
     { Token: Token
       Condition: Expression
       Consequence: BlockStatement
-      Alternative: BlockStatement }
+      Alternative: BlockStatement Option }
+with
+    member this.GetTokenLiteral() = this.Token.Literal
+    
+    /// <inheritdoc/>
+    override this.ToString() =
+        let baseString = $"if {this.Condition.ToString()} {{ {this.Consequence.ToString()} }}"
+        
+        match this.Alternative with
+        | Some alternative -> baseString + $" else {{ {alternative.ToString()} }}" 
+        | None -> baseString 
     
     
 ///
@@ -304,3 +314,13 @@ with
 type BlockStatement =
     { Token: Token
       Statements: Statement list }
+with
+    /// <inheritdoc/>
+    override this.ToString() =
+        let statementToString statement =
+            match statement with
+            | ExpressionStatement exprStatement -> exprStatement.ToString() + ";"
+            | statement -> statement.ToString()
+            
+        let statementStrings = List.map statementToString this.Statements
+        String.concat " " statementStrings

@@ -3,9 +3,11 @@
     <PropertyGroup>
         <OutputType>Exe</OutputType>
         <TargetFramework>net8.0</TargetFramework>
+        <AssemblyName>MonkeyInterpreter</AssemblyName>
     </PropertyGroup>
 
     <ItemGroup>
+        <Compile Include="AssemblyInfo.fs" />
         <Compile Include="Helpers\Queue.fs" />
         <Compile Include="Helpers\Tuple.fs" />
         <Compile Include="Helpers\Numbers.fs" />

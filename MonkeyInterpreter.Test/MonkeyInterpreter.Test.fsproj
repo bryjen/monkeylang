@@ -2,10 +2,10 @@
 
     <PropertyGroup>
         <TargetFramework>net8.0</TargetFramework>
-
         <IsPackable>false</IsPackable>
         <GenerateProgramFile>false</GenerateProgramFile>
         <IsTestProject>true</IsTestProject>
+        <AssemblyName>MonkeyInterpreter.Test</AssemblyName>
     </PropertyGroup>
 
     <ItemGroup>

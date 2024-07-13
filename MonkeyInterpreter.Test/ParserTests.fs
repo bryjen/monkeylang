@@ -2,6 +2,7 @@ namespace MonkeyInterpreter.Test
 
 open System
 open MonkeyInterpreter.Helpers
+open MonkeyInterpreter.Helpers.Queue
 open NUnit.Framework
 
 open FsToolkit.ErrorHandling
@@ -549,3 +550,153 @@ let 838383;
             let programAsStr = program.ToString()
             if programAsStr <> expectedRepresentationString then
                 Assert.Fail($"Expected \"{expectedRepresentationString}\", but got \"{programAsStr}\"")
+                
+    [<Test>]
+    [<Ignore("Ignored until functionality implemented")>]
+    member this.``Test 'if' expression 1``() =
+        result {
+            let testInput = "if (x < y) { x }"
+            let program = Parser.parseProgram testInput
+            
+            let! statement =
+                match program.Statements with
+                | head :: _ -> Ok head
+                | _ -> Error $"Program has not enough statements. Expected 1, got {program.Statements.Length}"
+                
+            let! expressionStatement =
+                match statement with
+                | ExpressionStatement expStat -> Ok expStat
+                | _ -> Error $"program.Statements[0] is not a \"ExpressionStatement\", got \"${statement.GetType()}\""
+                
+            let! ifExpression =
+                match expressionStatement.Expression with
+                | IfExpression ifExpr -> Ok ifExpr
+                | _ -> Error $"program.Statements[0] is not a \"IfExpression\", got \"{expressionStatement.GetType()}\""
+                
+                
+            do! testInfixExpression ifExpression.Condition "x" "<" "y"
+            
+            do! match ifExpression.Consequence.Statements.Length with
+                | len when len = 1 -> Ok ()
+                | len -> Error $"ifExpression.Consequence.Statements.Length not 1, got {len}"
+                
+            let! consequenceExpressionStatement =
+                match ifExpression.Consequence.Statements.Head with
+                | ExpressionStatement exprStatement ->
+                    Ok exprStatement
+                | consequenceStatement ->
+                    Error $"ifExpression.Consequence.Statements.Head is not a \"ExpressionStatement\", got \"{consequenceStatement.GetType()}\""
+                    
+            do! testIdentifier consequenceExpressionStatement.Expression "x"
+            
+            do! match ifExpression.Alternative with
+                | Some _ -> Error "ifStatement was found to have an 'alternative/else' block, when it was not supsoed to"
+                | None -> Ok ()
+        }
+        |> ignore
+        
+        
+    [<Test>]
+    member this.``Test block statement parsing 1``() =
+        let testInput = """let x = 5;
+let y = 10;
+"""
+
+        let tokens = testInput |> Lexer.parseIntoTokens |> List.rev 
+        let tokensQueue = Queue.enqueueList Queue.empty tokens
+        
+        match (Parser.tryParseBlockStatement (fun _ -> false) tokensQueue) with
+        | Ok (_, blockStatement) ->
+            result {
+                do! match blockStatement.Statements.Length with
+                    | len when len = 2 -> Ok ()
+                    | len -> Error $"ifExpression.Consequence.Statements.Length not 2, got {len}"
+                    
+                // For first statement
+                let! firstLetStatement =
+                    match blockStatement.Statements.Head with
+                    | LetStatement letStatement -> Ok letStatement
+                    | statement -> Error $"First statement not \"LetStatement\", got \"{statement.GetType()}\""
+                    
+                do! match firstLetStatement.Name.Value with
+                    | name when name = "x" -> Ok ()
+                    | name -> Error $"[First statement] Expected a name \"x\", got \"{name}\""
+                    
+                // For second statement
+                let! secondLetStatement =
+                    match (List.item 1 blockStatement.Statements) with
+                    | LetStatement letStatement -> Ok letStatement
+                    | statement -> Error $"Second statement not \"LetStatement\", got \"{statement.GetType()}\""
+                    
+                do! match secondLetStatement.Name.Value with
+                    | name when name = "y" -> Ok ()
+                    | name -> Error $"[Second statement] Expected a name \"y\", got \"{name}\""
+            }
+            |> function
+               | Ok _ -> Assert.Pass() 
+               | Error errorMsg -> Assert.Fail(errorMsg) 
+        | Error (_, errors) ->
+            let errorsString = String.concat "\n" errors
+            Assert.Fail($"Parsing errors:\n\n{errorsString}")
+        
+        
+    [<Test>]
+    [<Ignore("Ignored until functionality implemented")>]
+    member this.``Test 'if' expression 2``() =
+        result {
+            let testInput = "if (x < y) { x } else { y }"
+            let program = Parser.parseProgram testInput
+            
+            let! statement =
+                match program.Statements with
+                | head :: _ -> Ok head
+                | _ -> Error $"Program has not enough statements. Expected 1, got {program.Statements.Length}"
+                
+            let! expressionStatement =
+                match statement with
+                | ExpressionStatement expStat -> Ok expStat
+                | _ -> Error $"program.Statements[0] is not a \"ExpressionStatement\", got \"${statement.GetType()}\""
+                
+            let! ifExpression =
+                match expressionStatement.Expression with
+                | IfExpression ifExpr -> Ok ifExpr
+                | _ -> Error $"program.Statements[0] is not a \"IfExpression\", got \"{expressionStatement.GetType()}\""
+                
+            do! testInfixExpression ifExpression.Condition "x" "<" "y"
+            
+            
+            // Testing consequence 
+            do! match ifExpression.Consequence.Statements.Length with
+                | len when len = 1 -> Ok ()
+                | len -> Error $"ifExpression.Consequence.Statements.Length not 1, got {len}"
+                
+            let! consequenceExpressionStatement =
+                match ifExpression.Consequence.Statements.Head with
+                | ExpressionStatement exprStatement ->
+                    Ok exprStatement
+                | consequenceStatement ->
+                    Error $"ifExpression.Consequence.Statements.Head is not a \"ExpressionStatement\", got \"{consequenceStatement.GetType()}\""
+                    
+            do! testIdentifier consequenceExpressionStatement.Expression "x"
+            
+            
+            // Testing alternative
+            let! alternativeBlockStatement = 
+                match ifExpression.Alternative with
+                | Some altBlockStatement -> Ok altBlockStatement
+                | None -> Error "ifStatement did not have an 'alternative/else' block, when it was supposed to"
+                
+            do! match alternativeBlockStatement.Statements.Length with
+                | len when len = 1 -> Ok ()
+                | len -> Error $"ifExpression.Alternative.Statements.Length not 1, got {len}"
+                
+            let! alternativeExpressionStatement =
+                match alternativeBlockStatement.Statements.Head with
+                | ExpressionStatement exprStatement ->
+                    Ok exprStatement
+                | alternativeStatement ->
+                    Error $"ifExpression.Alternative.Statements.Head is not a \"ExpressionStatement\", got \"{alternativeStatement.GetType()}\""
+                    
+            do! testIdentifier alternativeExpressionStatement.Expression "y"
+        }
+        |> ignore

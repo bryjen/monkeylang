@@ -7,10 +7,13 @@ open Microsoft.FSharp.Core
 open MonkeyInterpreter.Helpers.Queue
     
 
-type private ParserState =
+type internal ParserState =
     { TokensQueue: Token Queue
       Errors: string list
       Statements: Statement list }
+with
+    static member CreateEmpty tokensQueue =
+        { TokensQueue = tokensQueue; Errors = []; Statements = [] }
     
 module private ParserState =
     let addStatement (statement: Statement) (parserState: ParserState) =
@@ -30,7 +33,7 @@ module private ParserState =
     
         
         
-type private Precedence =
+type internal Precedence =
     | LOWEST = 1
     | EQUALS = 2
     | LESSGREATER = 3
@@ -108,69 +111,68 @@ module rec Parser =
     
     let rec parseProgram (input: string) : Program =
         let tokens = input |> Lexer.parseIntoTokens |> List.rev 
-        let tokensQueue = Queue.enqueueList Queue.empty tokens 
-        let initialParserState = { TokensQueue = tokensQueue; Errors = []; Statements = [] }
+        let tokensQueue = Queue.enqueueList Queue.empty tokens
         
-        let finalParserState = parseProgramHelper initialParserState
-        let program = { Statements = List.rev finalParserState.Statements; Errors = List.rev finalParserState.Errors }
+        let statements, errors = parseProgramHelper tokensQueue [] [] 
+        let program = { Statements = statements; Errors = errors }
         program
         
-    and private parseProgramHelper parserState : ParserState =
-        let peekTokenOption = Queue.peek parserState.TokensQueue
+    and internal parseProgramHelper tokensQueue statements errors =
+        let peekTokenOption = Queue.peek tokensQueue 
         match peekTokenOption with
         | Some peekToken when peekToken.Type <> TokenType.EOF ->
-            let updateParserState =  
-                match (tryParseStatement peekToken parserState.TokensQueue) with
-                | Ok (newTokensQueue, Some statement) -> // something was parsed
-                    ParserState.replaceQueueAndAddStatement newTokensQueue statement
-                | Ok (newTokensQueue, None) -> // nothing was parsed, no errors as well
-                    ParserState.replaceQueue newTokensQueue
-                | Error (newTokensQueue, errorMsg) -> // nothing was parsed, errors occurred
-                    ParserState.replaceQueueAndAddError newTokensQueue errorMsg
-               
-            parseProgramHelper (updateParserState parserState)
+            match (tryParseStatement peekToken tokensQueue) with
+            | Ok (newTokensQueue, Some newStatement) ->
+                parseProgramHelper newTokensQueue (newStatement :: statements) errors
+            | Ok (newTokensQueue, None) ->
+                parseProgramHelper newTokensQueue statements errors
+            | Error (newTokensQueue, newErrorMsgs) ->
+                parseProgramHelper newTokensQueue statements (errors @ newErrorMsgs) 
         | _ ->
-            parserState
+            List.rev statements, List.rev errors
             
-    and private tryParseStatement peekToken tokensQueue
-        : Result<Token Queue * Statement Option, Token Queue * string> =
-        let transform = Result.map (fun (tokQueue, statement) -> tokQueue, Some statement) 
+    and internal tryParseStatement peekToken tokensQueue
+        : Result<Token Queue * Statement Option, Token Queue * string list> =
+            
+        let encapsulateIntoCase (transform: 'a -> Statement) =
+            Result.map (fun (tokQueue, statement) -> tokQueue, Some (transform statement))
             
         match peekToken.Type with
         | LET ->
-            tryParseLetStatement tokensQueue |> transform
+            tokensQueue |> tryParseLetStatement |> encapsulateIntoCase Statement.LetStatement
         | RETURN ->
-            tryParseReturnStatement tokensQueue |> transform
+            tokensQueue |> tryParseReturnStatement |> encapsulateIntoCase Statement.ReturnStatement 
         | SEMICOLON | EOF ->
             let newTokensQueue = Queue.removeTop tokensQueue  // we know that there is at least one element
             Ok (newTokensQueue, None)
         | _ ->
-            tryParseExpressionStatement tokensQueue |> transform
+            tokensQueue |> tryParseExpressionStatement |> encapsulateIntoCase Statement.ExpressionStatement
             
-    and private tryParseExpression tokensQueue precedence
-        : Result<Token Queue * Expression, Token Queue * string> =
+    and internal tryParseExpression tokensQueue precedence
+        : Result<Token Queue * Expression, Token Queue * string list> =
         result {
-            let! peekToken = queuePeekToken "[tryParseExpression] Tokens queue empty." tokensQueue
+            let peekTokenResult = queuePeekToken "[tryParseExpression] Tokens queue empty." tokensQueue
+            let! peekToken = Result.mapError (fun (_, erMsg) -> (tokensQueue, [ erMsg ])) peekTokenResult
             
             let noFuncErrMsg = $"No prefix parse function for \"{peekToken.Type}\" found."
             let prefixParseFuncResult = Map.tryFind peekToken.Type prefixParseFunctionsMap |> ofOption noFuncErrMsg
-            let! prefixParseFunc = Result.mapError (fun erMsg -> (consumeQueueUntilSemicolon tokensQueue, erMsg)) prefixParseFuncResult
+            let! prefixParseFunc = Result.mapError (fun erMsg -> (consumeQueueUntilSemicolon tokensQueue, [ erMsg ])) prefixParseFuncResult
             
             let! newTokensQueue, leftExpression = prefixParseFunc tokensQueue
             return! tryParseExpressionHelper newTokensQueue precedence leftExpression
         }
         
-    and private tryParseExpressionHelper tokensQueue precedence leftExpr
-        : Result<Token Queue * Expression, Token Queue * string> =
+    and internal tryParseExpressionHelper tokensQueue precedence leftExpr
+        : Result<Token Queue * Expression, Token Queue * string list> =
         result {
             let peekTokenResult = Queue.peek tokensQueue |> ofOption "[tryParseExpressionHelper] Tokens queue empty."
-            let! peekToken = Result.mapError (fun erMsg -> (tokensQueue, erMsg)) peekTokenResult
+            let! peekToken = Result.mapError (fun erMsg -> (tokensQueue, [ erMsg ])) peekTokenResult
             let peekPrecedence = Precedence.peekPrecedence tokensQueue
             
             if peekToken.Type <> TokenType.SEMICOLON && precedence < peekPrecedence then
                 let noFuncErrMsg = $"No prefix infix function for \"{peekToken.Type}\" found."
                 let infixParseFuncResult = Map.tryFind peekToken.Type infixParseFunctionsMap |> ofOption noFuncErrMsg 
-                let! infixParseFunc = Result.mapError (fun erMsg -> (consumeQueueUntilSemicolon tokensQueue, erMsg)) infixParseFuncResult
+                let! infixParseFunc = Result.mapError (fun erMsg -> (consumeQueueUntilSemicolon tokensQueue, [ erMsg] )) infixParseFuncResult
                 
                 let! newTokensQueue, infixExpr = infixParseFunc tokensQueue leftExpr
                 return! tryParseExpressionHelper newTokensQueue precedence infixExpr
@@ -180,11 +182,10 @@ module rec Parser =
                 return tokensQueue, leftExpr
         }
         
-        
     (* Parsing Statements *)
     
-    and private tryParseLetStatement (tokensQueue: Token Queue)
-        : Result<Token Queue * Statement, Token Queue * string> =
+    let internal tryParseLetStatement (tokensQueue: Token Queue)
+        : Result<Token Queue * LetStatement, Token Queue * string list> =
         result {
             let dequeueErMsg = "[tryParseLetStatement] Tokens queue empty."
             let! newTokensQueue, letStatementToken = dequeueToken dequeueErMsg tokensQueue
@@ -200,12 +201,13 @@ module rec Parser =
             
             // TODO: We're skipping parsing the expression for now
             let placeholderExpression = Expression.StringLiteral { Token = letStatementToken; Value = "" }
-            let statement = Statement.LetStatement { Token = letStatementToken; Name = identifier; Value = placeholderExpression }
-            return newTokensQueue, statement
+            let letStatement = { Token = letStatementToken; Name = identifier; Value = placeholderExpression }
+            return newTokensQueue, letStatement
         }
+        |> Result.mapError boxErrorMsg
         
-    and private tryParseReturnStatement (tokensQueue: Token Queue)
-        : Result<Token Queue * Statement, Token Queue * string> =
+    let internal tryParseReturnStatement (tokensQueue: Token Queue)
+        : Result<Token Queue * ReturnStatement, Token Queue * string list> =
         result {
             let dequeueErMsg = "[tryParseReturnStatement] Tokens queue empty."
             let! newTokensQueue, returnStatementToken = dequeueToken dequeueErMsg tokensQueue
@@ -214,34 +216,62 @@ module rec Parser =
             
             // TODO: We're skipping parsing the expression for now
             let placeholderExpression = Expression.StringLiteral { Token = returnStatementToken; Value = "" }
-            let statement = Statement.ReturnStatement { Token = returnStatementToken; ReturnValue = placeholderExpression }
-            return newTokensQueue, statement
+            let returnStatement = { Token = returnStatementToken; ReturnValue = placeholderExpression }
+            return newTokensQueue, returnStatement
         }
+        |> Result.mapError boxErrorMsg
         
-    and private tryParseExpressionStatement (tokensQueue: Token Queue)
-        : Result<Token Queue * Statement, Token Queue * string> =
+    let internal tryParseExpressionStatement (tokensQueue: Token Queue)
+        : Result<Token Queue * ExpressionStatement, Token Queue * string list> =
         result {
             let peekTokenResult = Queue.peek tokensQueue |> ofOption "[tryParseExpressionStatement] Tokens queue empty."
-            let! peekToken = Result.mapError (fun erMsg -> (tokensQueue, erMsg)) peekTokenResult
+            let! peekToken = Result.mapError (fun erMsg -> (tokensQueue, [ erMsg ])) peekTokenResult
             
             let! newTokensQueue, expr = tryParseExpression tokensQueue Precedence.LOWEST
-            let statement = Statement.ExpressionStatement { Token = peekToken; Expression = expr }
-            return newTokensQueue, statement 
+            let expressionStatement = { Token = peekToken; Expression = expr }
+            return newTokensQueue, expressionStatement 
         }
         
+    // Note, for the sake of simplicity, assume a block statement has the following format:
+    // { ... statements ... }
+        
+    let internal tryParseBlockStatement (stopCondition: Token -> bool) (initialTokensQueue: Token Queue)
+        : Result<Token Queue * BlockStatement, Token Queue * string list> =
+        
+        let rec helper tokensQueue statements errors =
+            let peekTokenOption = Queue.peek tokensQueue
+            match peekTokenOption with
+            | Some peekToken when peekToken.Type <> EOF && stopCondition peekToken = false ->
+                match (tryParseStatement peekToken tokensQueue) with
+                | Ok (newTokensQueue, Some statement) -> helper newTokensQueue (statement :: statements) errors
+                | Ok (newTokensQueue, None) -> helper newTokensQueue statements errors
+                | Error (newTokensQueue, errorMsg) -> helper newTokensQueue statements (errorMsg @ errors)
+            | _ ->
+                if errors.Length = 0
+                then Ok (tokensQueue, statements)
+                else Error (tokensQueue, errors)
+                
+        result {
+            let peekTokenResult = Queue.peek initialTokensQueue |> ofOption "[tryParseBlockStatement] Tokens queue empty."
+            let! peekToken = Result.mapError (fun erMsg -> (initialTokensQueue, [ erMsg ])) peekTokenResult
+            
+            let! newTokensQueue, statements = helper initialTokensQueue [] []
+            return (newTokensQueue, { Token = peekToken; Statements = List.rev statements })
+        }
         
     (* Pratt Parsing Stuff *)
     
-    let private tryParseIdentifier (tokensQueue: Token Queue)
-        : Result<Token Queue * Expression, Token Queue * string> =
+    let internal tryParseIdentifier (tokensQueue: Token Queue)
+        : Result<Token Queue * Expression, Token Queue * string list> =
         result {
             let! newTokensQueue, dequeuedToken = dequeueToken "[tryParseIdentifier] Tokens queue empty." tokensQueue
             let expression = Expression.Identifier { Token = dequeuedToken; Value = dequeuedToken.Literal }
             return newTokensQueue, expression
         }
+        |> Result.mapError boxErrorMsg
         
-    let private tryParseIntegerLiteral (tokensQueue: Token Queue)
-        : Result<Token Queue * Expression, Token Queue * string> =
+    let internal tryParseIntegerLiteral (tokensQueue: Token Queue)
+        : Result<Token Queue * Expression, Token Queue * string list> =
         result {
             let! newTokensQueue, dequeuedToken = dequeueToken "[tryParseIntegerLiteral] Tokens queue empty." tokensQueue
             let expressionResult =
@@ -251,19 +281,21 @@ module rec Parser =
             let! expression = Result.mapError (fun erMsg -> (newTokensQueue, erMsg)) expressionResult
             return newTokensQueue, expression
         }
+        |> Result.mapError boxErrorMsg
            
-    let private tryParsePrefixExpression (tokensQueue: Token Queue)
-        : Result<Token Queue * Expression, Token Queue * string> =
+    let internal tryParsePrefixExpression (tokensQueue: Token Queue)
+        : Result<Token Queue * Expression, Token Queue * string list> =
         result {
             let! newTokensQueue, dequeuedToken = dequeueToken "[tryParsePrefixExpression] Tokens queue empty." tokensQueue
+                                                 |> Result.mapError boxErrorMsg
             let! newTokensQueue, rightExpr = tryParseExpression newTokensQueue Precedence.PREFIX
             
             let prefixExpr = Expression.PrefixExpression { Token = dequeuedToken; Operator = dequeuedToken.Literal; Right = rightExpr }
             return newTokensQueue, prefixExpr
         }
         
-    let private tryParseBooleanLiteral (tokensQueue: Token Queue)
-        : Result<Token Queue * Expression, Token Queue * string> =
+    let internal tryParseBooleanLiteral (tokensQueue: Token Queue)
+        : Result<Token Queue * Expression, Token Queue * string list> =
         result {
             let! newTokensQueue, dequeuedToken = dequeueToken "[tryParseBooleanLiteral] Tokens queue empty." tokensQueue
             let! booleanValue =
@@ -277,20 +309,45 @@ module rec Parser =
             let booleanLiteral = Expression.BooleanLiteral { Token = dequeuedToken; Value = booleanValue }
             return newTokensQueue, booleanLiteral
         }
+        |> Result.mapError boxErrorMsg
         
-    let private tryParseGroupedExpression (tokensQueue: Token Queue)
-        : Result<Token Queue * Expression, Token Queue * string> =
+    let internal tryParseGroupedExpression (tokensQueue: Token Queue)
+        : Result<Token Queue * Expression, Token Queue * string list> =
         result {
             let newTokensQueue = Queue.removeTop tokensQueue  // consume the left paren
             let! newTokensQueue, expr = tryParseExpression newTokensQueue Precedence.LOWEST
             
             do! assertExpectedTokenType consumeQueueUntilSemicolon TokenType.RPAREN newTokensQueue
+                |> Result.mapError boxErrorMsg
             
             let newTokensQueue = Queue.removeTop newTokensQueue  // consume the right paren
             return newTokensQueue, expr
         }
         
-    let private prefixParseFunctionsMap = Map.ofList [
+    // TODO Finish
+    let rec internal tryParseIfExpression (tokensQueue: Token Queue)
+        : Result<Token Queue * Expression, Token Queue * string list> =
+        result {
+            let dequeueErrorMsg = "[tryParseIfExpression] Tokens queue empty."
+            let! newTokensQueue, ifStatementToken = dequeueToken dequeueErrorMsg tokensQueue |> Result.mapError boxErrorMsg
+            
+            do! assertExpectedTokenType consumeQueueUntilSemicolon LPAREN newTokensQueue |> Result.mapError boxErrorMsg
+            let newTokensQueue = Queue.removeTop newTokensQueue
+            
+            let! newTokensQueue, condition = tryParseExpression newTokensQueue Precedence.LOWEST
+            
+            do! assertExpectedTokenType consumeQueueUntilSemicolon RPAREN newTokensQueue |> Result.mapError boxErrorMsg
+            
+            return! Error (tokensQueue, [ "" ])
+        }
+        
+    and internal tryParseElseBlockStatement (tokensQueue: Token Queue)
+        : Result<Token Queue * BlockStatement, Token Queue * string list> =
+        Error (tokensQueue, [])
+        
+    let internal boxErrorMsg (tokensQueue, errorMsg) = tokensQueue, [ errorMsg ]
+        
+    let internal prefixParseFunctionsMap = Map.ofList [
         (TokenType.IDENT, tryParseIdentifier)
         (TokenType.INT, tryParseIntegerLiteral)
         (TokenType.BANG, tryParsePrefixExpression)
@@ -300,12 +357,13 @@ module rec Parser =
         (TokenType.LPAREN, tryParseGroupedExpression)
     ]
     
-    let private tryParseInfixExpression (tokensQueue: Token Queue) (leftExpr: Expression)
-        : Result<Token Queue * Expression, Token Queue * string> =
+    let internal tryParseInfixExpression (tokensQueue: Token Queue) (leftExpr: Expression)
+        : Result<Token Queue * Expression, Token Queue * string list> =
         result {
             let precedence = Precedence.peekPrecedence tokensQueue
             
             let! newTokensQueue, dequeuedToken = dequeueToken "[tryParseInfixExpression] Tokens queue empty." tokensQueue
+                                                 |> Result.mapError boxErrorMsg
             let! newTokensQueue, rightExpr = tryParseExpression newTokensQueue precedence
             
             let infixExpr = Expression.InfixExpression { Token = dequeuedToken; Operator = dequeuedToken.Literal
@@ -313,7 +371,7 @@ module rec Parser =
             return newTokensQueue, infixExpr
         }
            
-    let private infixParseFunctionsMap = Map.ofList [
+    let internal infixParseFunctionsMap = Map.ofList [
         (TokenType.PLUS, tryParseInfixExpression)
         (TokenType.MINUS, tryParseInfixExpression)
         (TokenType.SLASH, tryParseInfixExpression)
