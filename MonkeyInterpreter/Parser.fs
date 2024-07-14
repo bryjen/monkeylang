@@ -14,23 +14,7 @@ type internal ParserState =
 with
     static member CreateEmpty tokensQueue =
         { TokensQueue = tokensQueue; Errors = []; Statements = [] }
-    
-module private ParserState =
-    let addStatement (statement: Statement) (parserState: ParserState) =
-        { parserState with Statements = statement :: parserState.Statements }
         
-    let addError (errorMsg: string) (parserState: ParserState) =
-        { parserState with Errors = errorMsg :: parserState.Errors }
-        
-    let replaceQueue (tokensQueue: Token Queue) (parserState: ParserState) =
-        { parserState with TokensQueue = tokensQueue }
-        
-    let replaceQueueAndAddStatement (tokensQueue: Token Queue) (statement: Statement) (parserState: ParserState) =
-        (replaceQueue tokensQueue >> addStatement statement) parserState
-        
-    let replaceQueueAndAddError (tokensQueue: Token Queue) (errorMsg: string) (parserState: ParserState) =
-        (replaceQueue tokensQueue >> addError errorMsg) parserState
-    
         
         
 type internal Precedence =
@@ -64,8 +48,11 @@ module private Precedence =
            | None -> Precedence.LOWEST
         
         
+        
 [<AutoOpen>]
 module private ParserHelpers =
+    let internal boxErrorMsg (tokensQueue, errorMsg) = tokensQueue, [ errorMsg ]
+    
     let ofOption (defaultValue: 'b) (input: 'a Option) : Result<'a, 'b> =
         match input with
         | Some value -> Ok value 
@@ -75,40 +62,36 @@ module private ParserHelpers =
         match (Queue.peek tokensQueue) with
         | Some peekToken -> Ok peekToken 
         | None -> Error (tokensQueue, errorMsg)
+        |> Result.mapError boxErrorMsg
     
     let dequeueToken (errorMsg: string) (tokensQueue: Token Queue) =
         let newTokensQueue, dequeuedTokenResult = Queue.resultDequeue errorMsg tokensQueue
         dequeuedTokenResult
         |> Result.map (fun token -> (newTokensQueue, token))
         |> Result.mapError (fun erMsg -> (newTokensQueue, erMsg))
+        |> Result.mapError boxErrorMsg
         
-    let assertExpectedTokenType
-       (processQueue: Token Queue -> Token Queue)
-       (expectedTokenType: TokenType)
-       (tokensQueue: Token Queue) =
-        result {
-            let peekTokenResult = Queue.peek tokensQueue |> ofOption "[assertExpectedTokenType] Tokens queue empty."
-            let! peekToken = Result.mapError (fun erMsg -> (tokensQueue, erMsg)) peekTokenResult
-            return!
-                match peekToken.Type with
-                | tokenType when tokenType = expectedTokenType -> Ok ()
-                | tokenType ->
-                    let errorMsg = $"Expected a token type of \"{TokenType.ToCaseString expectedTokenType}\", got \"{TokenType.ToCaseString tokenType}\""
-                    Error (processQueue tokensQueue, errorMsg)
-        }
+    let isNextTokenOfType (expectedTokenType: TokenType) (tokensQueue: Token Queue) =
+        match Queue.peek tokensQueue with
+        | Some token when token.Type = expectedTokenType -> true
+        | _ -> false
         
-    let rec consumeQueueUntilSemicolon (tokensQueue: Token Queue) =
+    let getInvalidTokenTypeMsg (expectedTokenType: TokenType) (tokensQueue: Token Queue) =
+        match Queue.peek tokensQueue with
+        | Some token -> $"Expected a token type of \"{TokenType.ToCaseString expectedTokenType}\", got \"{TokenType.ToCaseString token.Type}\""
+        | _ -> $"Expected a token type of \"{TokenType.ToCaseString expectedTokenType}\", got nothing." 
+        
+    let rec consumeUntilSemicolon (tokensQueue: Token Queue) =
         match (Queue.peek tokensQueue) with
         | None -> tokensQueue 
         | Some token ->
             match token.Type with
             | tokenType when tokenType = SEMICOLON || tokenType = EOF -> tokensQueue
-            | _ -> consumeQueueUntilSemicolon (Queue.removeTop tokensQueue)
+            | _ -> consumeUntilSemicolon (Queue.removeTop tokensQueue)
         
         
         
 module rec Parser =
-    
     let rec parseProgram (input: string) : Program =
         let tokens = input |> Lexer.parseIntoTokens |> List.rev 
         let tokensQueue = Queue.enqueueList Queue.empty tokens
@@ -151,12 +134,11 @@ module rec Parser =
     and internal tryParseExpression tokensQueue precedence
         : Result<Token Queue * Expression, Token Queue * string list> =
         result {
-            let peekTokenResult = queuePeekToken "[tryParseExpression] Tokens queue empty." tokensQueue
-            let! peekToken = Result.mapError (fun (_, erMsg) -> (tokensQueue, [ erMsg ])) peekTokenResult
+            let! peekToken = queuePeekToken "[tryParseExpression] Tokens queue empty." tokensQueue
             
             let noFuncErrMsg = $"No prefix parse function for \"{peekToken.Type}\" found."
             let prefixParseFuncResult = Map.tryFind peekToken.Type prefixParseFunctionsMap |> ofOption noFuncErrMsg
-            let! prefixParseFunc = Result.mapError (fun erMsg -> (consumeQueueUntilSemicolon tokensQueue, [ erMsg ])) prefixParseFuncResult
+            let! prefixParseFunc = Result.mapError (fun erMsg -> (consumeUntilSemicolon tokensQueue, [ erMsg ])) prefixParseFuncResult
             
             let! newTokensQueue, leftExpression = prefixParseFunc tokensQueue
             return! tryParseExpressionHelper newTokensQueue precedence leftExpression
@@ -172,12 +154,10 @@ module rec Parser =
             if peekToken.Type <> TokenType.SEMICOLON && precedence < peekPrecedence then
                 let noFuncErrMsg = $"No prefix infix function for \"{peekToken.Type}\" found."
                 let infixParseFuncResult = Map.tryFind peekToken.Type infixParseFunctionsMap |> ofOption noFuncErrMsg 
-                let! infixParseFunc = Result.mapError (fun erMsg -> (consumeQueueUntilSemicolon tokensQueue, [ erMsg] )) infixParseFuncResult
+                let! infixParseFunc = Result.mapError (fun erMsg -> (consumeUntilSemicolon tokensQueue, [ erMsg] )) infixParseFuncResult
                 
                 let! newTokensQueue, infixExpr = infixParseFunc tokensQueue leftExpr
                 return! tryParseExpressionHelper newTokensQueue precedence infixExpr
-                // return! tryParseExpressionHelper newTokensQueue peekPrecedence infixExpr
-                // learn why above ^ does not work
             else
                 return tokensQueue, leftExpr
         }
@@ -190,21 +170,24 @@ module rec Parser =
             let dequeueErMsg = "[tryParseLetStatement] Tokens queue empty."
             let! newTokensQueue, letStatementToken = dequeueToken dequeueErMsg tokensQueue
             
-            do! assertExpectedTokenType consumeQueueUntilSemicolon TokenType.IDENT newTokensQueue 
+            do! if isNextTokenOfType IDENT newTokensQueue
+                then Ok()
+                else Error (consumeUntilSemicolon newTokensQueue, [ getInvalidTokenTypeMsg IDENT newTokensQueue ])
             let! newTokensQueue, identifierToken = dequeueToken dequeueErMsg newTokensQueue
             let identifier: Identifier = { Token = identifierToken; Value = identifierToken.Literal }
             
-            do! assertExpectedTokenType consumeQueueUntilSemicolon TokenType.ASSIGN newTokensQueue
+            do! if isNextTokenOfType ASSIGN newTokensQueue
+                then Ok()
+                else Error (consumeUntilSemicolon newTokensQueue, [ getInvalidTokenTypeMsg ASSIGN newTokensQueue ])
             let! newTokensQueue, _ = dequeueToken dequeueErMsg newTokensQueue
             
-            let newTokensQueue = consumeQueueUntilSemicolon newTokensQueue |> Queue.removeTop
+            let newTokensQueue = consumeUntilSemicolon newTokensQueue |> Queue.removeTop
             
             // TODO: We're skipping parsing the expression for now
             let placeholderExpression = Expression.StringLiteral { Token = letStatementToken; Value = "" }
             let letStatement = { Token = letStatementToken; Name = identifier; Value = placeholderExpression }
             return newTokensQueue, letStatement
         }
-        |> Result.mapError boxErrorMsg
         
     let internal tryParseReturnStatement (tokensQueue: Token Queue)
         : Result<Token Queue * ReturnStatement, Token Queue * string list> =
@@ -212,14 +195,13 @@ module rec Parser =
             let dequeueErMsg = "[tryParseReturnStatement] Tokens queue empty."
             let! newTokensQueue, returnStatementToken = dequeueToken dequeueErMsg tokensQueue
             
-            let newTokensQueue = consumeQueueUntilSemicolon newTokensQueue |> Queue.removeTop
+            let newTokensQueue = consumeUntilSemicolon newTokensQueue |> Queue.removeTop
             
             // TODO: We're skipping parsing the expression for now
             let placeholderExpression = Expression.StringLiteral { Token = returnStatementToken; Value = "" }
             let returnStatement = { Token = returnStatementToken; ReturnValue = placeholderExpression }
             return newTokensQueue, returnStatement
         }
-        |> Result.mapError boxErrorMsg
         
     let internal tryParseExpressionStatement (tokensQueue: Token Queue)
         : Result<Token Queue * ExpressionStatement, Token Queue * string list> =
@@ -268,26 +250,22 @@ module rec Parser =
             let expression = Expression.Identifier { Token = dequeuedToken; Value = dequeuedToken.Literal }
             return newTokensQueue, expression
         }
-        |> Result.mapError boxErrorMsg
         
     let internal tryParseIntegerLiteral (tokensQueue: Token Queue)
         : Result<Token Queue * Expression, Token Queue * string list> =
         result {
             let! newTokensQueue, dequeuedToken = dequeueToken "[tryParseIntegerLiteral] Tokens queue empty." tokensQueue
-            let expressionResult =
+            let! expression =
                 match Int64.TryParse(dequeuedToken.Literal) with
                 | true, result -> Ok (Expression.IntegerLiteral { Token = dequeuedToken; Value = result })
-                | false, _ -> Error $"Could not parse \"{dequeuedToken.Literal}\" as an Int64"
-            let! expression = Result.mapError (fun erMsg -> (newTokensQueue, erMsg)) expressionResult
+                | false, _ -> Error (newTokensQueue, [ $"Could not parse \"{dequeuedToken.Literal}\" as an Int64" ])
             return newTokensQueue, expression
         }
-        |> Result.mapError boxErrorMsg
            
     let internal tryParsePrefixExpression (tokensQueue: Token Queue)
         : Result<Token Queue * Expression, Token Queue * string list> =
         result {
             let! newTokensQueue, dequeuedToken = dequeueToken "[tryParsePrefixExpression] Tokens queue empty." tokensQueue
-                                                 |> Result.mapError boxErrorMsg
             let! newTokensQueue, rightExpr = tryParseExpression newTokensQueue Precedence.PREFIX
             
             let prefixExpr = Expression.PrefixExpression { Token = dequeuedToken; Operator = dequeuedToken.Literal; Right = rightExpr }
@@ -304,12 +282,11 @@ module rec Parser =
                 | FALSE -> Ok false
                 | _ ->
                     let errorMsg = $"[tryParseBooleanLiteral] Expected a true/false token, got {TokenType.ToCaseString dequeuedToken.Type}"
-                    Error (newTokensQueue, errorMsg)
+                    Error (newTokensQueue, [ errorMsg ])
                     
             let booleanLiteral = Expression.BooleanLiteral { Token = dequeuedToken; Value = booleanValue }
             return newTokensQueue, booleanLiteral
         }
-        |> Result.mapError boxErrorMsg
         
     let internal tryParseGroupedExpression (tokensQueue: Token Queue)
         : Result<Token Queue * Expression, Token Queue * string list> =
@@ -317,38 +294,45 @@ module rec Parser =
             let newTokensQueue = Queue.removeTop tokensQueue  // consume the left paren
             let! newTokensQueue, expr = tryParseExpression newTokensQueue Precedence.LOWEST
             
-            do! assertExpectedTokenType consumeQueueUntilSemicolon TokenType.RPAREN newTokensQueue
-                |> Result.mapError boxErrorMsg
+            do! if isNextTokenOfType RPAREN newTokensQueue
+                then Ok()
+                else Error (consumeUntilSemicolon newTokensQueue, [ getInvalidTokenTypeMsg RPAREN newTokensQueue ])
             
             let newTokensQueue = Queue.removeTop newTokensQueue  // consume the right paren
             return newTokensQueue, expr
         }
         
-    // TODO Finish
-    // Additional TODO: Clean up code + make the 'assertExpectedTokenType' do different things based on success/failure
     let rec internal tryParseIfExpression (tokensQueue: Token Queue)
         : Result<Token Queue * Expression, Token Queue * string list> =
         result {
             let dequeueErrorMsg = "[tryParseIfExpression] Tokens queue empty."
-            let! newTokensQueue, ifStatementToken = dequeueToken dequeueErrorMsg tokensQueue |> Result.mapError boxErrorMsg
+            let! newTokensQueue, ifStatementToken = dequeueToken dequeueErrorMsg tokensQueue
             
             // Parsing the condition
-            do! assertExpectedTokenType consumeQueueUntilSemicolon LPAREN newTokensQueue |> Result.mapError boxErrorMsg
+            do! if isNextTokenOfType LPAREN newTokensQueue
+                then Ok()
+                else Error (consumeUntilSemicolon newTokensQueue, [ getInvalidTokenTypeMsg LPAREN newTokensQueue ])
             let newTokensQueue = Queue.removeTop newTokensQueue
             
             let! newTokensQueue, condition = tryParseExpression newTokensQueue Precedence.LOWEST
             
-            do! assertExpectedTokenType consumeQueueUntilSemicolon RPAREN newTokensQueue |> Result.mapError boxErrorMsg
+            do! if isNextTokenOfType RPAREN newTokensQueue
+                then Ok()
+                else Error (consumeUntilSemicolon newTokensQueue, [ getInvalidTokenTypeMsg RPAREN newTokensQueue ])
             let newTokensQueue = Queue.removeTop newTokensQueue
             
             // Parsing the consequence
             let stopCondition token = token.Type = RBRACE
-            do! assertExpectedTokenType consumeQueueUntilSemicolon LBRACE newTokensQueue |> Result.mapError boxErrorMsg
+            do! if isNextTokenOfType LBRACE newTokensQueue
+                then Ok()
+                else Error (consumeUntilSemicolon newTokensQueue, [ getInvalidTokenTypeMsg LBRACE newTokensQueue ])
             let newTokensQueue = Queue.removeTop newTokensQueue
             
             let! newTokensQueue, consequenceBlocksStatement = tryParseBlockStatement stopCondition newTokensQueue
             
-            do! assertExpectedTokenType consumeQueueUntilSemicolon RBRACE newTokensQueue |> Result.mapError boxErrorMsg
+            do! if isNextTokenOfType RBRACE newTokensQueue
+                then Ok()
+                else Error (consumeUntilSemicolon newTokensQueue, [ getInvalidTokenTypeMsg RBRACE newTokensQueue ])
             let newTokensQueue = Queue.removeTop newTokensQueue
             
             // Parsing the alternative, if any
@@ -365,18 +349,21 @@ module rec Parser =
             result {
                 let newTokensQueue = Queue.removeTop tokensQueue // to consume the 'else' token
                 
-                do! assertExpectedTokenType consumeQueueUntilSemicolon LBRACE newTokensQueue |> Result.mapError boxErrorMsg
+                do! if isNextTokenOfType LBRACE newTokensQueue
+                    then Ok()
+                    else Error (consumeUntilSemicolon newTokensQueue, [ getInvalidTokenTypeMsg LBRACE newTokensQueue ])
                 let newTokensQueue = Queue.removeTop newTokensQueue 
                 
                 let! newTokensQueue, consequenceBlocksStatement = tryParseBlockStatement stopCondition newTokensQueue
                 
-                do! assertExpectedTokenType consumeQueueUntilSemicolon RBRACE newTokensQueue |> Result.mapError boxErrorMsg
+                do! if isNextTokenOfType RBRACE newTokensQueue
+                    then Ok()
+                    else Error (consumeUntilSemicolon newTokensQueue, [ getInvalidTokenTypeMsg RBRACE newTokensQueue ])
                 let newTokensQueue = Queue.removeTop newTokensQueue
                 return newTokensQueue, Some consequenceBlocksStatement
             }
         | _ -> Ok (tokensQueue, None)
         
-    let internal boxErrorMsg (tokensQueue, errorMsg) = tokensQueue, [ errorMsg ]
         
     let internal prefixParseFunctionsMap = Map.ofList [
         (TokenType.IDENT, tryParseIdentifier)
@@ -395,7 +382,6 @@ module rec Parser =
             let precedence = Precedence.peekPrecedence tokensQueue
             
             let! newTokensQueue, dequeuedToken = dequeueToken "[tryParseInfixExpression] Tokens queue empty." tokensQueue
-                                                 |> Result.mapError boxErrorMsg
             let! newTokensQueue, rightExpr = tryParseExpression newTokensQueue precedence
             
             let infixExpr = Expression.InfixExpression { Token = dequeuedToken; Operator = dequeuedToken.Literal

@@ -46,7 +46,6 @@ module Lexer =
         let peekChar = lexerInfo.PeekChar
         
         /// Increments the index until the current index is not a whitespace character
-        // TODO: Decompile to IL and see if you need a helper rec function for TCO
         let rec skipWhiteSpaceCharacters currentIndex : int =
             match (peekChar currentIndex) with
             | c when c = ' ' || c = '\t' || c = '\n' || c = '\r' ->
