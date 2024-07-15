@@ -28,14 +28,15 @@ type internal Precedence =
     
 module private Precedence =     
     let tokenTypeToPrecedenceMap = Map.ofList [
-        (TokenType.EQ, Precedence.EQUALS)
-        (TokenType.NOT_EQ, Precedence.EQUALS)
-        (TokenType.LT, Precedence.LESSGREATER)
-        (TokenType.GT, Precedence.LESSGREATER)
-        (TokenType.PLUS, Precedence.SUM)
-        (TokenType.MINUS, Precedence.SUM)
-        (TokenType.SLASH, Precedence.PRODUCT)
-        (TokenType.ASTERISK, Precedence.PRODUCT)
+        (EQ, Precedence.EQUALS)
+        (NOT_EQ, Precedence.EQUALS)
+        (LT, Precedence.LESSGREATER)
+        (GT, Precedence.LESSGREATER)
+        (PLUS, Precedence.SUM)
+        (MINUS, Precedence.SUM)
+        (SLASH, Precedence.PRODUCT)
+        (ASTERISK, Precedence.PRODUCT)
+        (LPAREN, Precedence.CALL)
     ]
     
     let peekPrecedence (tokensQueue: Token Queue) : Precedence =
@@ -443,8 +444,51 @@ module rec Parser =
                                                          Left = leftExpr; Right = rightExpr }
             return newTokensQueue, infixExpr
         }
+        
+    let rec internal tryParseCallExpression (tokensQueue: Token Queue) (leftExpr: Expression)
+        : Result<Token Queue * Expression, Token Queue * string list> =
+        result {
+            let boxErrorMsgAlt errorMsg = (tokensQueue, [ errorMsg ])
+            let! callExprFunc = validateLeftExpr leftExpr |> Result.mapError boxErrorMsgAlt
+            
+            let! newTokensQueue, dequeuedToken = dequeueToken "[tryParseCallExpression] Tokens queue empty." tokensQueue
+            
+            let! newTokensQueue, callArguments = tryParseCallArguments newTokensQueue []
+            let callExpression = { Token = dequeuedToken; Function = callExprFunc; Arguments = callArguments }
+            return (newTokensQueue, Expression.CallExpression callExpression)
+        }
+        
+    and private validateLeftExpr (leftExpr: Expression) =
+        match CallExpr.FromExpression leftExpr with
+        | Some callExpr -> Ok callExpr 
+        | None -> Error $"Left expr expected to be either \"Identifier\" or \"FunctionLiteral\", got {leftExpr.GetType()}"
+        
+    and private tryParseCallArguments (tokensQueue: Token Queue) (arguments: Expression list) =
+        let peekErrorMsg = "[tryParseCallArguments] Tokens queue empty."
+        
+        // after parsing the expression, the next valid tokens are COMMA or RPAREN
+        let assertNextTokenType (_tokensQueue, expression) =
+            match (queuePeekToken peekErrorMsg _tokensQueue) with
+            | Ok peekToken when peekToken.Type = COMMA -> Ok (Queue.removeTop _tokensQueue, expression)
+            | Ok peekToken when peekToken.Type = RPAREN -> Ok (_tokensQueue, expression)
+            | Ok peekToken -> Error (_tokensQueue, [ $"Expected token \"COMMA\" or \"RPAREN\" after expression, got {TokenType.ToCaseString peekToken.Type}" ])
+            | Error errorValue -> Error errorValue
+            
+        match (queuePeekToken peekErrorMsg tokensQueue) with
+        | Ok peekToken when peekToken.Type = RPAREN ->
+            Ok (Queue.removeTop tokensQueue, List.rev arguments)
+        | Ok _ ->
+            result {
+                let! newTokensQueue, expr = tryParseExpression tokensQueue Precedence.LOWEST |> Result.bind assertNextTokenType
+                let updatedArguments = expr :: arguments
+                return! tryParseCallArguments newTokensQueue updatedArguments
+            }
+        | Error err ->
+            Error err
            
     let internal infixParseFunctionsMap = Map.ofList [
+        (TokenType.LPAREN, tryParseCallExpression)
+        
         (TokenType.PLUS, tryParseInfixExpression)
         (TokenType.MINUS, tryParseInfixExpression)
         (TokenType.SLASH, tryParseInfixExpression)

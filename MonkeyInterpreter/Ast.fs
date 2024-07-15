@@ -210,20 +210,13 @@ with
         match this.Alternative with
         | Some alternative -> baseString + $" else {{ {alternative.ToString()} }}" 
         | None -> baseString 
-    
-    
-///
-type CallExpression =
-    { Token: Token
-      Function: Expression
-      Arguments: Expression list }
-
 
 ///
 type IndexExpression =
     { Token: Token
       Left: Expression
       Index: Expression }
+    
     
     
 // Literal Expressions
@@ -243,6 +236,51 @@ type FunctionLiteral =
     { Token: Token
       Parameters: Identifier list
       Body: BlockStatement }
+with
+    member this.GetTokenLiteral() = this.Token.Literal
+    
+    /// <inheritdoc/>
+    override this.ToString() =
+        let commaSeparatedParameters = String.concat ", " (this.Parameters |> List.map (_.Value)) 
+        $"{this.GetTokenLiteral()} ({commaSeparatedParameters}) {{ {this.Body.ToString()} }}" 
+    
+    
+///
+type CallExpression =
+    { Token: Token  // The '(' token
+      Function: CallExpr 
+      Arguments: Expression list }
+with
+    member this.GetTokenLiteral() = this.Token.Literal
+    
+    /// <inheritdoc/>
+    override this.ToString() =
+        let commaSeparatedArguments = String.concat ", " (this.Arguments |> List.map (_.ToString()))
+        $"{this.Function.ToString()}({commaSeparatedArguments})"
+        
+and CallExpr =
+    | Identifier of Identifier
+    | FunctionLiteral of FunctionLiteral
+with
+    static member FromExpression (expression: Expression) =
+        match expression with
+        | Expression.Identifier identifier -> Some (CallExpr.Identifier identifier)
+        | Expression.FunctionLiteral functionLiteral -> Some (CallExpr.FunctionLiteral functionLiteral)
+        | _ -> None
+        
+    static member ToExpression (callExpr: CallExpr) =
+        match callExpr with
+        | Identifier identifier -> Expression.Identifier identifier 
+        | FunctionLiteral functionLiteral -> Expression.FunctionLiteral functionLiteral 
+    
+    /// <inheritdoc/>
+    override this.ToString() =
+        match this with
+        | Identifier identifier -> identifier.ToString() 
+        | FunctionLiteral functionLiteral -> functionLiteral.ToString() 
+    
+    
+    
     
     
 ///

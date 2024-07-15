@@ -123,7 +123,7 @@ type ParserTests() =
         result {
             let! identifier =
                 match expr with
-                | Identifier identifier -> Ok identifier
+                | Expression.Identifier identifier -> Ok identifier
                 | _ -> Error $"expr not \"Identifier\", got \"{expr.GetType()}\""
                 
             do! if identifier.Value = expectedValue
@@ -268,7 +268,7 @@ let 838383;
                 
             let! identifier =
                 match expressionStatement.Expression with
-                | Identifier ident -> Ok ident
+                | Expression.Identifier ident -> Ok ident
                 | expr -> Error $"exp not \"Identifier\", got \"{expr}\""
                 
             let expectedIdentValue = "foobar"
@@ -553,6 +553,28 @@ let 838383;
                 
                 
     [<Test>]
+    // Test expressions with call expressions 
+    member this.``Test operator precedence parsing 4``() =
+        let testCases = [
+            ("a + add(b * c) + d",
+             "((a + add((b * c))) + d)")
+            
+            ("add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8))",
+             "add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)))")
+            
+            ("add(a + b + c * d / f + g)",
+             "add((((a + b) + ((c * d) / f)) + g))")
+        ]
+        
+        for testCase in testCases do
+            let inputString, expectedRepresentationString = testCase
+            let program = Parser.parseProgram inputString
+            
+            let programAsStr = program.ToString()
+            if programAsStr <> expectedRepresentationString then
+                Assert.Fail($"Expected \"{expectedRepresentationString}\", but got \"{programAsStr}\"")
+                
+    [<Test>]
     member this.``Test block statement parsing 1``() =
         let testInput = """let x = 5;
 let y = 10;
@@ -723,7 +745,7 @@ let y = 10;
                 
             let! functionLiteral =
                 match expressionStatement.Expression with
-                | FunctionLiteral funcLit -> Ok funcLit
+                | Expression.FunctionLiteral funcLit -> Ok funcLit
                 | expr -> Error $"expressionStatement.Expression is not a \"FunctionLiteral\", got \"${expr.GetType()}\""
                 
             do! match functionLiteral.Parameters.Length with
@@ -747,6 +769,7 @@ let y = 10;
         |> function
            | Ok _ -> Assert.Pass()
            | Error errorMsg -> Assert.Fail(errorMsg)
+           
            
     [<Test>]
     member this.``Test function parameters parsing 1``() =
@@ -776,7 +799,7 @@ let y = 10;
                     
                 let! functionLiteral =
                     match expressionStatement.Expression with
-                    | FunctionLiteral funcLit -> Ok funcLit
+                    | Expression.FunctionLiteral funcLit -> Ok funcLit
                     | expr -> Error $"expressionStatement.Expression is not a \"FunctionLiteral\", got \"${expr.GetType()}\""
                     
                 let parameters = functionLiteral.Parameters |> List.map (_.Value)
@@ -791,3 +814,39 @@ let y = 10;
             |> function
                | Ok _ -> Assert.Pass()
                | Error errorMsg -> Assert.Fail(errorMsg)
+               
+               
+    [<Test>]
+    member this.``Test call expression parsing 1``() =
+        result {
+            let testInput = "add(1, 2 * 3, 4 + 5);"
+            let program = Parser.parseProgram testInput
+            
+            let! statement =
+                match program.Statements with
+                | head :: _ -> Ok head
+                | _ -> Error $"Program has not enough statements. Expected 1, got {program.Statements.Length}"
+                
+            let! expressionStatement =
+                match statement with
+                | ExpressionStatement expStat -> Ok expStat
+                | _ -> Error $"program.Statements[0] is not a \"ExpressionStatement\", got \"${statement.GetType()}\""
+                
+            let! callExpression =
+                match expressionStatement.Expression with
+                | Expression.CallExpression callExpr -> Ok callExpr
+                | expr -> Error $"expressionStatement.Expression not \"CallExpression\", got \"{expr.GetType()}\""
+                
+            do! testIdentifier (CallExpr.ToExpression callExpression.Function) "add"
+            
+            do! if callExpression.Arguments.Length = 3
+                then Ok ()
+                else Error $"callExpression.Arguments.Length expected to be 3, got \"{callExpression.Arguments.Length}\""
+                
+            do! testLiteralExpression (List.item 0 callExpression.Arguments) 1
+            do! testInfixExpression (List.item 1 callExpression.Arguments) 2 "*" 3
+            do! testInfixExpression (List.item 2 callExpression.Arguments) 4 "+" 5
+        }
+        |> function
+           | Ok _ -> Assert.Pass()
+           | Error errorMsg -> Assert.Fail(errorMsg)
