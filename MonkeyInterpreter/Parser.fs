@@ -182,11 +182,10 @@ module rec Parser =
                 else Error (consumeUntilSemicolon newTokensQueue, [ getInvalidTokenTypeMsg ASSIGN newTokensQueue ])
             let! newTokensQueue, _ = dequeueToken dequeueErMsg newTokensQueue
             
+            let! newTokensQueue, expression = tryParseExpression newTokensQueue Precedence.LOWEST
             let newTokensQueue = consumeUntilSemicolon newTokensQueue |> Queue.removeTop
             
-            // TODO: We're skipping parsing the expression for now
-            let placeholderExpression = Expression.StringLiteral { Token = letStatementToken; Value = "" }
-            let letStatement = { Token = letStatementToken; Name = identifier; Value = placeholderExpression }
+            let letStatement = { Token = letStatementToken; Name = identifier; Value = expression }
             return newTokensQueue, letStatement
         }
         
@@ -196,11 +195,10 @@ module rec Parser =
             let dequeueErMsg = "[tryParseReturnStatement] Tokens queue empty."
             let! newTokensQueue, returnStatementToken = dequeueToken dequeueErMsg tokensQueue
             
+            let! newTokensQueue, expression = tryParseExpression newTokensQueue Precedence.LOWEST
             let newTokensQueue = consumeUntilSemicolon newTokensQueue |> Queue.removeTop
             
-            // TODO: We're skipping parsing the expression for now
-            let placeholderExpression = Expression.StringLiteral { Token = returnStatementToken; Value = "" }
-            let returnStatement = { Token = returnStatementToken; ReturnValue = placeholderExpression }
+            let returnStatement = { Token = returnStatementToken; ReturnValue = expression }
             return newTokensQueue, returnStatement
         }
         

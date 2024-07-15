@@ -178,7 +178,7 @@ type ParserTests() =
         
     [<Test>]
     [<Order(1)>]
-    member this.``Test 'let' statements 1``() =
+    member this.``Test 'let' statement parsing 1``() =
         let testInput = """let x = 5;
 let y = 10;
 let foobar = 838383;
@@ -196,8 +196,40 @@ let foobar = 838383;
         
         
     [<Test>]
+    // Tests whether the assigned expression is correct
+    member this.``Test 'let' statement parsing 2``() =
+        let testCases: (string * string * obj) list = [
+            ("let x = 5;", "x", 5)
+            ("let y = true;", "x", true)
+            ("let foobar = y;", "foobar", "y")
+        ]
+        
+        for testCase in testCases do
+            result {
+                let testInput, expectedIdentifier, expectedValue = testCase
+                let program = Parser.parseProgram testInput
+                
+                let! statement =
+                    match program.Statements with
+                    | head :: _ -> Ok head
+                    | _ -> Error $"Program has not enough statements. Expected 1, got {program.Statements.Length}"
+                    
+                let! letStatement =
+                    match statement with
+                    | LetStatement letStat -> Ok letStat
+                    | _ -> Error $"program.Statements[0] is not a \"LetStatement\", got \"${statement.GetType()}\""
+                    
+                do! testLetStatement statement (-1, expectedIdentifier)
+                do! testLiteralExpression letStatement.Value expectedValue
+            }
+            |> function
+               | Ok _ -> Assert.Pass()
+               | Error errorMsg -> Assert.Fail(errorMsg)
+               
+        
+    [<Test>]
     [<Order(2)>]
-    member this.``Test 'return' statements 1``() =
+    member this.``Test 'return' statement parsing 1``() =
         let testInput = """return 5;
 return 10;
 return 993322;
@@ -230,7 +262,38 @@ return 993322;
         
         let program = Parser.parseProgram testInput
         List.iter (fun assertion -> assertion program) assertions 
-        testEachStatement program predicates 
+        testEachStatement program predicates
+        
+        
+    [<Test>]
+    member this.``Test 'return' statement parsing 2``() =
+        let testCases: (string * obj) list = [
+            // test input, expected expression
+            ("return 5;", 5)
+            ("return true;", true)
+            ("return y;", "y")
+        ]
+        
+        for testCase in testCases do
+            result {
+                let testInput, expectedValue = testCase
+                let program = Parser.parseProgram testInput
+                
+                let! statement =
+                    match program.Statements with
+                    | head :: _ -> Ok head
+                    | _ -> Error $"Program has not enough statements. Expected 1, got {program.Statements.Length}"
+                    
+                let! returnStatement =
+                    match statement with
+                    | ReturnStatement retStat -> Ok retStat
+                    | _ -> Error $"program.Statements[0] is not a \"ReturnStatement\", got \"${statement.GetType()}\""
+                    
+                do! testLiteralExpression returnStatement.ReturnValue expectedValue
+            }
+            |> function
+               | Ok _ -> Assert.Pass()
+               | Error errorMsg -> Assert.Fail(errorMsg)
         
         
     [<Test>]
