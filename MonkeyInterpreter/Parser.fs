@@ -364,6 +364,60 @@ module rec Parser =
             }
         | _ -> Ok (tokensQueue, None)
         
+    let rec internal tryParseFunctionLiteral (tokensQueue: Token Queue)
+        : Result<Token Queue * Expression, Token Queue * string list> =
+        result {
+            let dequeueErrorMsg = "[tryParseFunctionLiteral] Tokens queue empty."
+            let! newTokensQueue, functionLiteralToken = dequeueToken dequeueErrorMsg tokensQueue
+            
+            do! if isNextTokenOfType LPAREN newTokensQueue
+                then Ok()
+                else Error (consumeUntilSemicolon newTokensQueue, [ getInvalidTokenTypeMsg LPAREN newTokensQueue ])
+            let newTokensQueue = Queue.removeTop newTokensQueue
+            let! newTokensQueue, identifiersList = tryParseFunctionParameters newTokensQueue [] // rparen consumed inside 'tryParseFunctionParameters'
+            
+            // parsing body
+            let stopCondition token = token.Type = RBRACE
+            do! if isNextTokenOfType LBRACE newTokensQueue
+                then Ok()
+                else Error (consumeUntilSemicolon newTokensQueue, [ getInvalidTokenTypeMsg LPAREN newTokensQueue ])
+            let newTokensQueue = Queue.removeTop newTokensQueue
+            
+            let! newTokensQueue, funcBlockStatement = tryParseBlockStatement stopCondition newTokensQueue
+            
+            do! if isNextTokenOfType RBRACE newTokensQueue
+                then Ok()
+                else Error (consumeUntilSemicolon newTokensQueue, [ getInvalidTokenTypeMsg RBRACE newTokensQueue ])
+            let newTokensQueue = Queue.removeTop newTokensQueue
+            
+            let functionLiteral: FunctionLiteral = { Token = functionLiteralToken; Parameters = identifiersList; Body = funcBlockStatement }
+            return (newTokensQueue, Expression.FunctionLiteral functionLiteral) 
+        }
+        
+    and tryParseFunctionParameters (tokensQueue: Token Queue) (identifiers: Identifier list)
+        : Result<Token Queue * Identifier list, Token Queue * string list> =
+        let dequeueErrorMsg = "[tryParseFunctionParameters] Tokens queue empty."
+        result {
+            let! newTokensQueue, dequeuedToken = dequeueToken dequeueErrorMsg tokensQueue
+            match dequeuedToken.Type with
+            | tokType when tokType = IDENT ->
+                let identifier: Identifier = { Token = dequeuedToken; Value = dequeuedToken.Literal }
+                let! newTokensQueue, dequeuedToken = dequeueToken dequeueErrorMsg newTokensQueue 
+                match dequeuedToken.Type with
+                | tokType when tokType = COMMA ->
+                    return! tryParseFunctionParameters newTokensQueue (identifier :: identifiers)
+                | tokType when tokType = RPAREN ->
+                    return! Ok (newTokensQueue, List.rev (identifier :: identifiers))
+                | _ ->
+                    let errorMsg = $"[tryParseFunctionParameters] Expected a semicolon or right paren, got {TokenType.ToCaseString dequeuedToken.Type}"
+                    return! Error (newTokensQueue, [ errorMsg ] )
+                    
+            | tokType when tokType = RPAREN ->  // rparen here means a func w no parameters
+                    return! Ok (newTokensQueue, [])
+                
+            | _ ->
+                return! Error (newTokensQueue, [ dequeueErrorMsg ] )
+        }
         
     let internal prefixParseFunctionsMap = Map.ofList [
         (TokenType.IDENT, tryParseIdentifier)
@@ -374,6 +428,7 @@ module rec Parser =
         (TokenType.FALSE, tryParseBooleanLiteral)
         (TokenType.LPAREN, tryParseGroupedExpression)
         (TokenType.IF, tryParseIfExpression)
+        (TokenType.FUNCTION, tryParseFunctionLiteral)
     ]
     
     let internal tryParseInfixExpression (tokensQueue: Token Queue) (leftExpr: Expression)

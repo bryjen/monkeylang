@@ -703,3 +703,91 @@ let y = 10;
         |> function
            | Ok _ -> Assert.Pass()
            | Error errorMsg -> Assert.Fail(errorMsg)
+           
+           
+    [<Test>]
+    member this.``Test function literal parsing 1``() =
+        result {
+            let testInput = "fn(x, y) { x + y; }"
+            let program = Parser.parseProgram testInput
+            
+            let! statement =
+                match program.Statements with
+                | head :: _ -> Ok head
+                | _ -> Error $"Program has not enough statements. Expected 1, got {program.Statements.Length}"
+                
+            let! expressionStatement =
+                match statement with
+                | ExpressionStatement expStat -> Ok expStat
+                | _ -> Error $"program.Statements[0] is not a \"ExpressionStatement\", got \"${statement.GetType()}\""
+                
+            let! functionLiteral =
+                match expressionStatement.Expression with
+                | FunctionLiteral funcLit -> Ok funcLit
+                | expr -> Error $"expressionStatement.Expression is not a \"FunctionLiteral\", got \"${expr.GetType()}\""
+                
+            do! match functionLiteral.Parameters.Length with
+                | len when len = 2 -> Ok ()
+                | len -> Error $"functionLiteral.Parameters.Length not 2, got {len}"
+                
+            do! testLiteralExpression (Expression.Identifier (List.item 0 functionLiteral.Parameters)) "x"
+            do! testLiteralExpression (Expression.Identifier (List.item 1 functionLiteral.Parameters)) "y"
+        
+            do! match functionLiteral.Body.Statements.Length with
+                | len when len = 1 -> Ok ()
+                | len -> Error $"functionLiteral.Body.Statements.Length not 1, got {len}"
+                
+            let! expressionStatement =
+                match functionLiteral.Body.Statements.Head with
+                | ExpressionStatement exprStatement -> Ok exprStatement
+                | statement -> Error $"functionLiteral.Body.Statements.Head is not an \"ExpressionStatement\", got \"{statement.GetType()}\""
+                
+            do! testInfixExpression expressionStatement.Expression "x" "+" "y"
+        }
+        |> function
+           | Ok _ -> Assert.Pass()
+           | Error errorMsg -> Assert.Fail(errorMsg)
+           
+    [<Test>]
+    member this.``Test function parameters parsing 1``() =
+        let testCases = [
+            // input, expected params
+            ("fn() {};", [])
+            ("fn(x) {};", [ "x" ])
+            ("fn(x, y, z) {};", [ "x"; "y"; "z" ])
+        ]
+        
+        let mutable currentCase = 0  // provides a way for the debugger to stop at a specific test case
+        for testCase in testCases do
+            result {
+                currentCase <- currentCase + 1  
+                let testInput, expectedParameters = testCase
+                let program = Parser.parseProgram testInput
+                
+                let! statement =
+                    match program.Statements with
+                    | head :: _ -> Ok head
+                    | _ -> Error $"Program has not enough statements. Expected 1, got {program.Statements.Length}"
+                    
+                let! expressionStatement =
+                    match statement with
+                    | ExpressionStatement expStat -> Ok expStat
+                    | _ -> Error $"program.Statements[0] is not a \"ExpressionStatement\", got \"${statement.GetType()}\""
+                    
+                let! functionLiteral =
+                    match expressionStatement.Expression with
+                    | FunctionLiteral funcLit -> Ok funcLit
+                    | expr -> Error $"expressionStatement.Expression is not a \"FunctionLiteral\", got \"${expr.GetType()}\""
+                    
+                let parameters = functionLiteral.Parameters |> List.map (_.Value)
+                
+                do! if List.forall2 (=) parameters expectedParameters
+                    then Ok ()
+                    else
+                        let expectedParamsStr = String.concat ", " expectedParameters
+                        let actualParamsStr = String.concat ", " parameters 
+                        Error $"Expected parameters list: [{expectedParamsStr}], got [{actualParamsStr}]"
+            } 
+            |> function
+               | Ok _ -> Assert.Pass()
+               | Error errorMsg -> Assert.Fail(errorMsg)
