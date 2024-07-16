@@ -130,6 +130,16 @@ module private ParserHelpers =
         peekTokenAndExecute unit onTypeMismatch onEmptyQueue expectedTokenType tokensQueue
         
         
+    // Helper function for parsing function arguments/parameters. After parsing something, asserts that the next token
+    // is either a semicolon or rparen
+    let assertNextTokenIsValid tokensQueue =
+        match (queuePeekToken tokensQueue) with
+        | Ok peekToken when peekToken.Type = COMMA -> Ok (Queue.removeTop tokensQueue)
+        | Ok peekToken when peekToken.Type = RPAREN -> Ok tokensQueue
+        | Ok peekToken -> Error (tokensQueue, [ $"Expected token \"COMMA\" or \"RPAREN\" after expression, got {TokenType.ToCaseString peekToken.Type}" ])
+        | Error errorValue -> Error errorValue
+        
+        
         
 module rec Parser =
     let rec parseProgram (input: string) : Program =
@@ -163,16 +173,14 @@ module rec Parser =
         | _ ->
             tokensQueue |> tryParseExpressionStatement |> encapsulateIntoCase Statement.ExpressionStatement
             
-    let rec internal tryParseExpression tokensQueue precedence
-        : Result<Token Queue * Expression, Token Queue * string list> =
+    let rec internal tryParseExpression tokensQueue precedence =
         result {
             let! prefixParseFunc = tryGetPrefixParseFunc prefixParseFunctionsMap tokensQueue
             let! newTokensQueue, leftExpression = prefixParseFunc tokensQueue
             return! tryParseExpressionHelper newTokensQueue precedence leftExpression
         }
         
-    and internal tryParseExpressionHelper tokensQueue precedence leftExpr
-        : Result<Token Queue * Expression, Token Queue * string list> =
+    and internal tryParseExpressionHelper tokensQueue precedence leftExpr =
         result {
             let! peekToken = queuePeekToken tokensQueue
             let peekPrecedence = Precedence.peekPrecedence tokensQueue
@@ -371,31 +379,16 @@ module rec Parser =
         
     and tryParseFunctionParameters (tokensQueue: Token Queue) (identifiers: Identifier list) =
         result {
-            match dequeueToken tokensQueue with
-            | Ok (newTokensQueue, dequeuedToken) when dequeuedToken.Type = IDENT ->
-                // Case for function with >= 1 parameters
-                let identifier: Identifier = { Token = dequeuedToken; Value = dequeuedToken.Literal }
-                let! newTokensQueue, dequeuedToken = dequeueToken newTokensQueue 
-                match dequeuedToken.Type with
-                | tokType when tokType = COMMA ->
-                    return! tryParseFunctionParameters newTokensQueue (identifier :: identifiers)
-                | tokType when tokType = RPAREN ->
-                    return! Ok (newTokensQueue, List.rev (identifier :: identifiers))
-                | _ ->
-                    let errorMsg = $"[tryParseFunctionParameters] Expected a semicolon or right paren, got {TokenType.ToCaseString dequeuedToken.Type}"
-                    return! Error (newTokensQueue, [ errorMsg ] )
-                    
-            | Ok (newTokensQueue, dequeuedToken) when dequeuedToken.Type = RPAREN ->
-                // Case for function with 0 parameters
-                return! Ok (newTokensQueue, [])
-                
-            | Ok (newTokensQueue, dequeuedToken) ->
-                let errorMsg = $"Expected a token type of \"IDENT\" or \"RPAREN\", got \"{TokenType.ToCaseString dequeuedToken.Type}\""
-                return! Error (newTokensQueue, [ errorMsg ])
-                
-            | Error dequeueError ->
-                return! Error dequeueError
-        }
+            match (queuePeekToken tokensQueue) with
+            | Ok peekToken when peekToken.Type = RPAREN ->
+                return (Queue.removeTop tokensQueue, List.rev identifiers)
+            | Ok peekToken ->
+                let identifier: Identifier = { Token = peekToken; Value = peekToken.Literal }
+                let! newTokensQueue = assertNextTokenIsValid (Queue.removeTop tokensQueue) 
+                return! tryParseFunctionParameters newTokensQueue (identifier :: identifiers)
+            | Error err ->
+                return! Error err
+        } 
         
     let internal prefixParseFunctionsMap
         : Map<TokenType, Token Queue -> Result<Token Queue * Expression, Token Queue * string list>> =
@@ -441,25 +434,17 @@ module rec Parser =
         }
         
     and private tryParseCallArguments (tokensQueue: Token Queue) (arguments: Expression list) =
-        // after parsing the expression, the next valid tokens are COMMA or RPAREN
-        let assertNextTokenType (_tokensQueue, expression) =
-            match (queuePeekToken _tokensQueue) with
-            | Ok peekToken when peekToken.Type = COMMA -> Ok (Queue.removeTop _tokensQueue, expression)
-            | Ok peekToken when peekToken.Type = RPAREN -> Ok (_tokensQueue, expression)
-            | Ok peekToken -> Error (_tokensQueue, [ $"Expected token \"COMMA\" or \"RPAREN\" after expression, got {TokenType.ToCaseString peekToken.Type}" ])
-            | Error errorValue -> Error errorValue
-            
-        match (queuePeekToken tokensQueue) with
-        | Ok peekToken when peekToken.Type = RPAREN ->
-            Ok (Queue.removeTop tokensQueue, List.rev arguments)
-        | Ok _ ->
-            result {
-                let! newTokensQueue, expr = tryParseExpression tokensQueue Precedence.LOWEST |> Result.bind assertNextTokenType
-                let updatedArguments = expr :: arguments
-                return! tryParseCallArguments newTokensQueue updatedArguments
-            }
-        | Error err ->
-            Error err
+        result {
+            match (queuePeekToken tokensQueue) with
+            | Ok peekToken when peekToken.Type = RPAREN ->
+                return (Queue.removeTop tokensQueue, List.rev arguments)
+            | Ok _ ->
+                let! newTokensQueue, expr = tryParseExpression tokensQueue Precedence.LOWEST
+                let! newTokensQueue = assertNextTokenIsValid newTokensQueue
+                return! tryParseCallArguments newTokensQueue (expr :: arguments)
+            | Error err ->
+                return! Error err
+        }
             
     let internal infixParseFunctionsMap
         : Map<TokenType, Token Queue -> Expression -> Result<Token Queue * Expression, Token Queue * string list>> =
