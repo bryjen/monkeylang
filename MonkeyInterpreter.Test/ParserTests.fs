@@ -12,6 +12,8 @@ open MonkeyInterpreter
 
 [<AutoOpen>]
 module private ParserHelpers =
+    
+    [<Obsolete("Deprecated")>]
     let printTestLetStatementResults (evaluatedTestCases: (Statement * (int * string) * Result<unit, string>) list) =
         for evaluatedTestCase in evaluatedTestCases do
             let statement, testCase, result = evaluatedTestCase
@@ -23,17 +25,20 @@ module private ParserHelpers =
                 | Error errorMessage -> errorMessage 
             printfn $"[Test #{testCount}] Raw statement: {statement}; Expected name: {expectedName}; Status: {evaluationMessage}"
             
+    [<Obsolete("Deprecated")>]
     let assertNumberOfStatements numberOfExpectedStatements (program: Program) =
         match program.Statements.Length with
         | len when len = numberOfExpectedStatements -> ()
         | len -> Assert.Fail($"Error with 'program.Statements', expected {numberOfExpectedStatements} statements, got {len}")
         
+    [<Obsolete("Deprecated")>]
     let assertNumberOfErrors numberOfExpectedErrors (program: Program) =
         match program.Errors.Length with
         | len when len = numberOfExpectedErrors -> ()
         | len -> Assert.Fail($"Error with 'program.Errors', expected {numberOfExpectedErrors} errors, got {len}")
         
         
+    [<Obsolete("Deprecated")>]
     let testLetStatement (statement: Statement) (testCase: int * string) =
         result {
             let testCount = fst testCase 
@@ -57,8 +62,7 @@ module private ParserHelpers =
                 | identName -> Error $"[test #{testCount}] statement.Name returned \"{identName}\", expected \"{expectedName}\""
         }
     
-    [<Obsolete("See if you can find a way to integrate this same functionality using 'testEachStatement'
-               (more generic & composable)")>]
+    [<Obsolete("Deprecated")>]
     let testExpectedIdentifiers (program: Program) (testCases: string list) = 
         result {
             let statementAndTestCasePairs =
@@ -82,6 +86,7 @@ module private ParserHelpers =
             | Ok _ -> Assert.Pass()
             | Error errorMsg -> Assert.Fail(errorMsg)
             
+    [<Obsolete("Deprecated")>]
     let testEachStatement (program: Program) (predicates: (Statement -> Result<unit, string>) list) =
         result {
             let statementAndPredicateTuples = List.zip program.Statements predicates
@@ -97,11 +102,8 @@ module private ParserHelpers =
         |> function
             | Ok _ -> Assert.Pass()
             | Error errorMsg -> Assert.Fail(errorMsg)
+            
 
-
-
-[<TestFixture>]
-type ParserTests() =
     let testIntegerLiteral (expr: Expression) (expectedValue: int64) =
         result {
             let! integerLiteral =
@@ -174,8 +176,11 @@ type ParserTests() =
             
             do! testLiteralExpression infixExpression.Right expectedRight 
         }
-        
-        
+
+
+[<TestFixture>]
+type ParserTests() =
+    
     [<Test>]
     [<Order(1)>]
     member this.``Test 'let' statement parsing 1``() =
