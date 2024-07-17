@@ -1,36 +1,26 @@
-namespace MonkeyInterpreter
+module MonkeyInterpreter.Object
 
 open System
 
-type ObjectType =
-    | INTEGER_OBJ
-    | BOOLEAN_OBJ 
-    | NULL_OBJ 
+
+type Object =
+    | Integer of Int64
+    | Boolean of bool
+    | Null
+    | String of string
 with
-    member this.ToString() =
+    member this.Type() =
         match this with
-        | INTEGER_OBJ -> "INTEGER"
-        | BOOLEAN_OBJ -> "BOOLEAN"
-        | NULL_OBJ -> "NULL"
-    
-
-type IObject =
-    abstract member Type: unit -> ObjectType
-    abstract member Inspect: unit -> string
-    
-    
-type Integer(value: Int64) =
-    interface IObject with
-        member this.Type() = INTEGER_OBJ
-        member this.Inspect() = $"{value}"
-
-
-type Boolean(value: bool) =
-    interface IObject with
-        member this.Type() = BOOLEAN_OBJ 
-        member this.Inspect() = $"{value}"
-
-type Null =
-    interface IObject with
-        member this.Type() = NULL_OBJ 
-        member this.Inspect() = "null"
+        | Integer _ -> "INTEGER"
+        | Boolean _ -> "BOOLEAN"
+        | Null -> "NULL"
+        | String _ -> "STRING"
+        
+    member this.Inspect() = this.ToString()
+        
+    override this.ToString() =
+        match this with
+        | Integer integer -> $"{integer}"
+        | Boolean boolean -> $"{boolean}"
+        | Null -> "null"
+        | String string -> string

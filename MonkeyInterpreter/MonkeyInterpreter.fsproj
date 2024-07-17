@@ -16,6 +16,7 @@
         <Compile Include="Ast.fs" />
         <Compile Include="Parser.fs" />
         <Compile Include="Object.fs" />
+        <Compile Include="Evaluator.fs" />
         <Compile Include="Repl.fs" />
         <Compile Include="Program.fs"/>
     </ItemGroup>
