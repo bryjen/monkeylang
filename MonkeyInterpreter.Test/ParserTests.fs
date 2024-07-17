@@ -391,6 +391,42 @@ let 838383;
             
             
     [<Test>]
+    member this.``Test string literal expressions 1``() =
+        result {
+            let testInput = "\"foobar\";"
+            let program = Parser.parseProgram testInput
+            
+            let! statement =
+                match program.Statements with
+                | head :: _ -> Ok head
+                | _ -> Error $"Program has not enough statements. Expected 1, got {program.Statements.Length}"
+
+            let! expressionStatement =
+                match statement with
+                | ExpressionStatement expStat -> Ok expStat
+                | _ -> Error $"program.Statements[0] is not a \"ExpressionStatement\", got \"${statement}\""
+                
+            let! stringLiteral =
+                match expressionStatement.Expression with
+                | StringLiteral strLit -> Ok strLit
+                | expr -> Error $"exp not \"StringLiteral\", got \"{expr}\""
+                
+            let expectedValue = "foobar" 
+            do! if stringLiteral.Value = expectedValue
+                then Ok ()
+                else Error $"stringLiteral.Value not \"{expectedValue}\", got \"{stringLiteral.Value}\""
+                
+            let tokenLiteral = stringLiteral.Token.Literal
+            do! if tokenLiteral = $"{expectedValue}" 
+                then Ok ()
+                else Error $"stringLiteral.TokenLiteral() not \"{expectedValue}\", got \"{tokenLiteral}\""
+        }
+        |> function
+            | Ok _ -> Assert.Pass()
+            | Error errorMsg -> Assert.Fail(errorMsg)
+            
+            
+    [<Test>]
     member this.``Test parsing prefix expressions 1``() =
         let prefixTests = [
             ("!5", "!", 5)

@@ -388,7 +388,15 @@ module rec Parser =
                 return! tryParseFunctionParameters newTokensQueue (identifier :: identifiers)
             | Error err ->
                 return! Error err
-        } 
+        }
+        
+    let internal tryParseStringLiteral (tokensQueue: Token Queue) =
+        result {
+            let! newTokensQueue, dequeuedToken = dequeueToken tokensQueue
+            let expression = Expression.StringLiteral { Token = dequeuedToken; Value = dequeuedToken.Literal }
+            return newTokensQueue, expression
+        }
+        
         
     let internal prefixParseFunctionsMap
         : Map<TokenType, Token Queue -> Result<Token Queue * Expression, Token Queue * string list>> =
@@ -402,6 +410,7 @@ module rec Parser =
             (TokenType.LPAREN, tryParseGroupedExpression)
             (TokenType.IF, tryParseIfExpression)
             (TokenType.FUNCTION, tryParseFunctionLiteral)
+            (TokenType.STRING, tryParseStringLiteral)
         ]
     
     let internal tryParseInfixExpression (tokensQueue: Token Queue) (leftExpr: Expression) = 

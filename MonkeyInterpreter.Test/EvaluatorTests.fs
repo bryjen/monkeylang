@@ -143,3 +143,38 @@ type EvaluatorTests() =
                | Error errorMsg ->
                    Assert.Fail(errorMsg)
                    
+                   
+    [<Test>]
+    member this.``Test string evaluation 1``() =
+        let testCases = [
+            ("\"foo\" + \"bar\"", "foobar")
+            ("\"Hello\" + \" world\" + \"!\"", "Hello world!")
+            ("\"a\" + (\"b\" + \"c\" + \"d\") + \"e\"", "abcde")
+        ]
+       
+        let mutable currentTestCase = 0
+        for testCase in testCases do
+            currentTestCase <- currentTestCase + 1
+            let testInput, expectedValue = testCase
+            let program = Parser.parseProgram testInput
+            
+            result {
+                do! assertNoErrors program
+                do! assertNumberOfStatements 1 program
+                
+                let statement = program.Statements.Head
+                let! _ = assertIsExpressionStatement program.Statements.Head
+                let! evalResult = Evaluator.evalStatement Environment.Empty statement
+                                  |> Result.mapError (fun errorMsg -> "[Evaluation Error] " + errorMsg)
+                return! 
+                    match evalResult with
+                    | String str when str = expectedValue -> Ok str 
+                    | String str -> Error $"[Evaluation Error] Expected {expectedValue}, got {str}"  
+                    | _ -> Error $"[Evaluation Error] Expected \"String\", got {evalResult.GetType()}" 
+            }
+            |> function
+               | Ok actualValue ->
+                   TestContext.WriteLine($"[Test #{currentTestCase}] \"{testInput}\", ex {expectedValue}, got {actualValue}")
+               | Error errorMsg ->
+                   Assert.Fail(errorMsg)
+                   

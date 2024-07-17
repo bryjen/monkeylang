@@ -9,6 +9,7 @@ type TokenType =
     // Identifiers + literals
     | IDENT // add, foobar, x, ... 
     | INT // 10, 12, ...
+    | STRING
     
     // Operators 
     | ASSIGN

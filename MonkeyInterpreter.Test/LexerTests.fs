@@ -243,3 +243,19 @@ if (5 < 10) {
         ]
         
         testLexer testInput testCases
+        
+        
+    [<Test>]
+    member this.``Test string lexing 1``() =
+        let testInput = "let foo = \"bar\";"
+        
+        let testCases = [
+            (TokenType.LET, "let")
+            (TokenType.IDENT, "foo")
+            (TokenType.ASSIGN, "=")
+            (TokenType.STRING, "bar")
+            (TokenType.SEMICOLON, ";")
+            (TokenType.EOF, "")
+        ]
+        
+        testLexer testInput testCases
