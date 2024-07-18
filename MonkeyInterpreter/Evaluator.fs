@@ -1,17 +1,7 @@
 module rec MonkeyInterpreter.Evaluator
 
-open MonkeyInterpreter.Object
 open FsToolkit.ErrorHandling
-
-
-
-type Environment = internal Environment of Map<string, Object>
-with
-    static member Empty = [ ] |> Map.ofList |> Environment
-    
-    member this.Map =
-        let (Environment e) = this
-        e
+open MonkeyInterpreter.Object
 
 
 
@@ -48,8 +38,7 @@ module Evaluator =
     and private evalLetStatement environment letStatement : Result<Environment * Object, string> =
         match evalExpression environment letStatement.Value with
         | Ok (newEnv, object) ->
-            let newEnv = newEnv.Map.Add (letStatement.Name.Value, object) |> Environment
-            Ok (newEnv, Null)  // binding does not return any value
+            Ok (newEnv.Set letStatement.Name.Value object, Null)  // binding does not return any value
         | Error errorMsg ->
             Error errorMsg
 
@@ -77,11 +66,12 @@ module Evaluator =
             |> Result.map attachCurrentEnvironment
         | IfExpression ifExpression ->
             evalIfExpression environment ifExpression
-        | CallExpression callExpression ->
-            failwith "todo"
-        | IndexExpression indexExpression ->
-            failwith "todo"
         | Expression.FunctionLiteral functionLiteral ->
+            evalFunctionLiteral environment functionLiteral
+            |> Result.map (Function >> attachCurrentEnvironment)
+        | CallExpression callExpression ->
+            evalCallExpression environment callExpression
+        | IndexExpression indexExpression ->
             failwith "todo"
         | ArrayLiteral arrayLiteral ->
             failwith "todo"
@@ -91,7 +81,7 @@ module Evaluator =
             failwith "todo"
 
     and private evalIdentifier environment identifier =
-        match Map.tryFind identifier.Value environment.Map with
+        match environment.Get identifier.Value with
         | Some value -> Ok value
         | None -> Error $"The variable \"{identifier.Value}\" is not defined." 
 
@@ -133,6 +123,10 @@ module Evaluator =
             return! doEval operator leftObj rightObj
         }
         
+    and private evalFunctionLiteral environment functionLiteral : Result<Function, string> =
+        let enclosedEnv = Environment.CreateEnclosedEnv environment
+        Ok (Function.FromFunctionLiteral enclosedEnv functionLiteral)
+        
     and private evalIfExpression environment ifExpression =
         result {
             // Variable binding cannot occur during evaluation of the conditional
@@ -149,4 +143,55 @@ module Evaluator =
                 return! evalStatementsList environment alternativeBlockStatement.Statements
             else
                 return (environment, Null)
-        } 
+        }
+        
+    // REGION evalCallExpression
+    and private evalCallExpression (environment: Environment) (callExpression: CallExpression) =
+        result {
+            let! evaluatedArguments = evalArgumentsAndAddToEnv environment callExpression.Arguments []
+            
+            let! func =
+                match callExpression.Function with
+                | Identifier identifier -> tryGetFunctionFromIdentifier environment identifier
+                | FunctionLiteral functionLiteral -> evalFunctionLiteral environment functionLiteral
+                
+            let! updatedFunc = populateEnvWithArgumentValues func evaluatedArguments
+            return! evalStatement updatedFunc.Env (Statement.BlockStatement updatedFunc.Body)
+        }
+        
+    and private evalArgumentsAndAddToEnv env expressions evalObjs =
+        match expressions with
+        | [] -> Ok (List.rev evalObjs)
+        | head :: tail ->
+            match evalExpression env head with
+            | Ok (newEnv, object) -> evalArgumentsAndAddToEnv newEnv tail (object :: evalObjs)
+            | Error error -> Error error
+            
+    and private tryGetFunctionFromIdentifier env identifier =
+        match evalIdentifier env identifier with
+        | Ok object ->
+            match object with
+            | Function func -> Ok func
+            | _ -> Error $"The value assigned to \"{identifier.Value}\" is not a function, got \"{object.Type()}\""
+        | Error error ->
+            Error error
+            
+    and private populateEnvWithArgumentValues func evalObjs =
+        let rec populateEnv (env: Environment) pairs =
+            match pairs with
+            | [] ->
+                env
+            | (varName, object) :: tail ->
+                let newEnv = env.Set varName object
+                populateEnv newEnv tail
+        
+        result {
+            do! if func.Parameters.Length <> evalObjs.Length
+                then Error $"Expected {func.Parameters.Length} arguments, got {evalObjs.Length}"
+                else Ok ()
+                
+            let identifierNames = func.Parameters |> List.map (_.Value)
+            let nameAndValPairs = List.zip identifierNames evalObjs
+            return { func with Env = populateEnv func.Env nameAndValPairs }
+        }
+    // END REGION evalCallExpression

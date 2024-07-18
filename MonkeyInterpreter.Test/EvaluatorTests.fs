@@ -320,6 +320,45 @@ type EvaluatorTests() =
                    Assert.Fail(errorMsg)
                    
                    
+    [<Test>]
+    member this.``Test function call evaluation 1``() =
+        let testCases: (string * obj) list = [
+            ("let identity = fn(x) { x; }; identity(5);", 5)
+            ("let identity = fn(x) { return x; }; identity(5);", 5)
+            ("let double = fn(x) { x * 2; }; double(5);", 10)
+            ("let add = fn(x, y) { x + y; }; add(5, 5);", 10)
+            ("let add = fn(x, y) { x + y; }; add(5 + 5, add(5, 5));", 20)
+            
+            ("let add = fn(x, y) { x + y; }; add(5 + 5, add(add(add(5, add(5, add(10, 10))), 5), 5));", 50)
+            
+            ("fn(x) { x; }(5)", 5)
+            ("
+             let message = \"Some message\";
+             let addPrefix = fn(str) { \"[Prefix] \" + str; };
+             addPrefix(message);",
+             "[Prefix] Some message")
+        ]
+       
+        let mutable currentTestCase = 0
+        for testCase in testCases do
+            currentTestCase <- currentTestCase + 1
+            let testInput, expectedValue = testCase
+            let program = Parser.parseProgram testInput
+            
+            result {
+                do! assertNoErrors program
+                let! _, evalResult = Evaluator.evalStatementsList Environment.Empty program.Statements 
+                                  |> Result.mapError (fun errorMsg -> "[Evaluation Error] " + errorMsg)
+                do! assertEqualObj expectedValue evalResult
+                return evalResult
+            }
+            |> function
+               | Ok actualValue ->
+                   TestContext.WriteLine($"[Test #{currentTestCase}] \"{testInput}\", ex {expectedValue}, got {actualValue}")
+               | Error errorMsg ->
+                   Assert.Fail($"[Test #{currentTestCase}] {errorMsg}")
+                   
+                   
                    
 [<TestFixture>]
 type EvaluatorErrorHandlingTests() =
