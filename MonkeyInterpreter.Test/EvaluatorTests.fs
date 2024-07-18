@@ -1,5 +1,6 @@
 namespace MonkeyInterpreter.Test
 
+open System
 open MonkeyInterpreter.Evaluator
 open MonkeyInterpreter.Object
 open NUnit.Framework
@@ -25,10 +26,42 @@ module private TestHelpers =
         | _ ->
             Ok ()
             
+    let assertIsNull (object: Object) =
+        match object with
+        | Null -> Ok ()
+        | _ -> Error $"[assertIsNull] Expected a Null type, got \"{object.Type()}\""
+            
     let assertIsExpressionStatement statement =
         match statement with
         | ExpressionStatement expressionStatement -> Ok expressionStatement
         | _ -> Error $"Expected an \"ExpressionStatement\", got \"{statement.GetType()}\""
+        
+    let assertEqualIntegers (expectedValue: Int64) (object: Object) =
+        match object with
+        | Integer int64 when int64 = expectedValue -> Ok () 
+        | Integer int64 -> Error $"[assertEqualIntegers] Expected {expectedValue}, got {int64}" 
+        | _ -> Error $"[assertEqualIntegers] Expected an Integer type, got \"{object.Type()}\"" 
+        
+    let assertEqualStrings (expectedValue: string) (object: Object) =
+        match object with
+        | String string when string = expectedValue -> Ok () 
+        | String string -> Error $"[assertEqualStrings] Expected {expectedValue}, got {string}" 
+        | _ -> Error $"[assertEqualStrings] Expected a String type, got \"{object.Type()}\"" 
+        
+    let assertEqualBooleans (expectedValue: bool) (object: Object) =
+        match object with
+        | Boolean boolean when boolean = expectedValue -> Ok () 
+        | Boolean boolean -> Error $"[assertEqualBooleans] Expected {expectedValue}, got {boolean}" 
+        | _ -> Error $"[assertEqualBooleans] Expected a Boolean type, got \"{object.Type()}\""
+        
+    let assertEqualObj (expectedValue: obj) (object: Object) =
+        match expectedValue with
+        | null -> assertIsNull object
+        | :? int as value -> assertEqualIntegers (int64 value) object
+        | :? int64 as value -> assertEqualIntegers value object
+        | :? string as value -> assertEqualStrings value object
+        | :? bool as value -> assertEqualBooleans value object 
+        | _ -> Error $"Fatal error - testing: The type \"{expectedValue.GetType()}\" is not registered. See \"TestHelpers.assertEqualObj\"."
 
 
 
@@ -68,13 +101,9 @@ type EvaluatorTests() =
                 
                 let statement = program.Statements.Head
                 let! _ = assertIsExpressionStatement program.Statements.Head
-                let! evalResult = Evaluator.evalStatement Environment.Empty statement
+                let! _, evalResult = Evaluator.evalStatement Environment.Empty statement
                                   |> Result.mapError (fun errorMsg -> "[Evaluation Error] " + errorMsg)
-                return! 
-                    match evalResult with
-                    | Integer int64, _ when int64 = expectedValue -> Ok int64
-                    | Integer int64, _ -> Error $"[Evaluation Error] Expected {expectedValue}, got {int64}" 
-                    | _ -> Error $"[Evaluation Error] Expected \"Integer\", got {evalResult.GetType()}" 
+                return! assertEqualObj expectedValue evalResult
             }
             |> function
                | Ok actualValue ->
@@ -129,13 +158,9 @@ type EvaluatorTests() =
                 
                 let statement = program.Statements.Head
                 let! _ = assertIsExpressionStatement program.Statements.Head
-                let! evalResult = Evaluator.evalStatement Environment.Empty statement
+                let! _, evalResult = Evaluator.evalStatement Environment.Empty statement
                                   |> Result.mapError (fun errorMsg -> "[Evaluation Error] " + errorMsg)
-                return! 
-                    match evalResult with
-                    | Boolean boolean, _ when boolean = expectedValue -> Ok boolean 
-                    | Boolean boolean, _ -> Error $"[Evaluation Error] Expected {expectedValue}, got {boolean}"  
-                    | _ -> Error $"[Evaluation Error] Expected \"Boolean\", got {evalResult.GetType()}" 
+                return! assertEqualObj expectedValue evalResult
             }
             |> function
                | Ok actualValue ->
@@ -164,13 +189,9 @@ type EvaluatorTests() =
                 
                 let statement = program.Statements.Head
                 let! _ = assertIsExpressionStatement program.Statements.Head
-                let! evalResult = Evaluator.evalStatement Environment.Empty statement
+                let! _, evalResult = Evaluator.evalStatement Environment.Empty statement
                                   |> Result.mapError (fun errorMsg -> "[Evaluation Error] " + errorMsg)
-                return! 
-                    match evalResult with
-                    | String str, _ when str = expectedValue -> Ok str 
-                    | String str, _ -> Error $"[Evaluation Error] Expected {expectedValue}, got {str}"  
-                    | _ -> Error $"[Evaluation Error] Expected \"String\", got {evalResult.GetType()}" 
+                return! assertEqualObj expectedValue evalResult
             }
             |> function
                | Ok actualValue ->
@@ -206,13 +227,57 @@ type EvaluatorTests() =
             result {
                 do! assertNoErrors program
                 
-                let! evalResult = Evaluator.evalStatementsList Environment.Empty program.Statements 
+                let! _, evalResult = Evaluator.evalStatementsList Environment.Empty program.Statements 
                                   |> Result.mapError (fun errorMsg -> "[Evaluation Error] " + errorMsg)
-                return! 
-                    match evalResult with
-                    | Integer int64, _ when int64 = expectedValue -> Ok int64
-                    | Integer int64, _ -> Error $"[Evaluation Error] Expected {expectedValue}, got {int64}" 
-                    | _ -> Error $"[Evaluation Error] Expected \"Integer\", got {evalResult.GetType()}" 
+                return! assertEqualObj expectedValue evalResult
+            }
+            |> function
+               | Ok actualValue ->
+                   TestContext.WriteLine($"[Test #{currentTestCase}] \"{testInput}\", ex {expectedValue}, got {actualValue}")
+               | Error errorMsg ->
+                   Assert.Fail(errorMsg)
+                   
+                   
+    [<Test>]
+    member this.``Test if expression evaluation 1``() =
+        let testCases: (string * obj) list = [
+            ("
+             let x = 2;
+             let y = 1;
+             let foo = if (x > y) { \"foo\"; } else { \"bar\"; };
+             foo;",
+             "foo")
+            
+            ("
+             let statusCode = if (10 < 1) { 0; } else { 1; };
+             statusCode;",
+             1)
+            
+            ("if (true) { 10 }",10)
+            
+            ("if (1 < 2) { 10 }", 10)
+            
+            ("if (1 > 2) { 10 } else { 20 }", 20)
+            
+            ("if (1 < 2) { 10 } else { 20 }", 10)
+            
+            ("if (false) { 10 }", null)
+            
+            ("if (1 > 2) { 10 }", null)
+        ]
+       
+        let mutable currentTestCase = 0
+        for testCase in testCases do
+            currentTestCase <- currentTestCase + 1
+            let testInput, expectedValue = testCase
+            let program = Parser.parseProgram testInput
+            
+            result {
+                do! assertNoErrors program
+                
+                let! _, evalResult = Evaluator.evalStatementsList Environment.Empty program.Statements 
+                                  |> Result.mapError (fun errorMsg -> "[Evaluation Error] " + errorMsg)
+                return! assertEqualObj expectedValue evalResult
             }
             |> function
                | Ok actualValue ->

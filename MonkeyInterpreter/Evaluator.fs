@@ -4,6 +4,7 @@ open MonkeyInterpreter.Object
 open FsToolkit.ErrorHandling
 
 
+
 type Environment = internal Environment of Map<string, Object>
 with
     static member Empty = [ ] |> Map.ofList |> Environment
@@ -16,18 +17,18 @@ with
 
 [<RequireQualifiedAccess>]
 module Evaluator =
-    let evalStatementsList environment statements =
+    let evalStatementsList (environment: Environment) statements =
         match statements with
         | [ head ] ->
             evalStatement environment head            
         | head :: remaining ->
             match evalStatement environment head with
-            | Ok (_, newEnv) -> evalStatementsList newEnv remaining
+            | Ok (newEnv, _) -> evalStatementsList newEnv remaining
             | Error error -> Error error
         | [] ->
-            Ok (Null, environment)
+            Ok (environment, Null)
     
-    let rec evalStatement environment statement : Result<Object * Environment, string> =
+    let rec evalStatement environment statement : Result<Environment * Object, string> =
         match statement with
         | LetStatement letStatement ->
             evalLetStatement environment letStatement
@@ -35,34 +36,40 @@ module Evaluator =
             failwith "todo"
         | ExpressionStatement expressionStatement ->
             evalExpression environment expressionStatement.Expression
-            |> Result.map (fun obj -> (obj, environment))
-        | BlockStatement blockStatement -> 
-            failwith "todo"
+        | BlockStatement blockStatement ->
+            evalStatementsList environment blockStatement.Statements
             
-    and evalLetStatement environment letStatement =
+    and private evalLetStatement environment letStatement : Result<Environment * Object, string> =
         match evalExpression environment letStatement.Value with
-        | Ok object ->
-            let newEnv = environment.Map.Add (letStatement.Name.Value, object) |> Environment
-            Ok (object, newEnv)
+        | Ok (newEnv, object) ->
+            Ok (newEnv.Map.Add (letStatement.Name.Value, object) |> Environment, object)
         | Error errorMsg ->
             Error errorMsg
 
-    let rec evalExpression (environment: Environment) expression : Result<Object, string> =
+    let rec evalExpression (environment: Environment) expression : Result<Environment * Object, string> =
+        let attachCurrentEnvironment value = (environment, value) 
+        
         match expression with
         | IntegerLiteral integerLiteral ->
             Ok (Integer(integerLiteral.Value))
+            |> Result.map attachCurrentEnvironment
         | StringLiteral stringLiteral ->
             Ok (String(stringLiteral.Value))
+            |> Result.map attachCurrentEnvironment
         | BooleanLiteral booleanLiteral ->
             Ok (Boolean(booleanLiteral.Value))
+            |> Result.map attachCurrentEnvironment
         | Expression.Identifier identifier ->
             evalIdentifier environment identifier
+            |> Result.map attachCurrentEnvironment
         | PrefixExpression prefixExpression ->
             evalPrefixExpression environment prefixExpression
+            |> Result.map attachCurrentEnvironment
         | InfixExpression infixExpression ->
             evalInfixExpression environment infixExpression
+            |> Result.map attachCurrentEnvironment
         | IfExpression ifExpression ->
-            failwith "todo"
+            evalIfExpression environment ifExpression
         | CallExpression callExpression ->
             failwith "todo"
         | IndexExpression indexExpression ->
@@ -89,7 +96,8 @@ module Evaluator =
             | c, r -> Error $"The prefix operator \"{c}\" is not compatible with the type \"{r.Type()}\"."
         
         result {
-            let! rightObj = evalExpression environment prefixExpression.Right
+            // Impossible for variable binding to occur during prefix evaluation
+            let! _, rightObj = evalExpression environment prefixExpression.Right
             let operator = prefixExpression.Operator
             return! doEval operator rightObj
         }
@@ -111,8 +119,27 @@ module Evaluator =
             | _ -> Error $"The operation \"{left.Type()}\" \"{operator}\" \"{right.Type()}\" is not valid." 
         
         result {
-            let! leftObj = evalExpression environment infixExpression.Left
-            let! rightObj = evalExpression environment infixExpression.Right
+            // Impossible for variable binding to occur during infix evaluation
+            let! _, leftObj = evalExpression environment infixExpression.Left
+            let! _, rightObj = evalExpression environment infixExpression.Right
             let operator = infixExpression.Operator
             return! doEval operator leftObj rightObj
         }
+        
+    and private evalIfExpression environment ifExpression =
+        result {
+            // Variable binding cannot occur during evaluation of the conditional
+            let! _, conditionObj = evalExpression environment ifExpression.Condition
+            
+            let! asBool = match conditionObj with
+                          | Boolean value -> Ok value
+                          | object -> Error $"Condition expression does not evaluate into a boolean, got \"{object.Type()}\"."
+                          
+            if asBool then
+                return! evalStatementsList environment ifExpression.Consequence.Statements
+            elif not asBool && ifExpression.Alternative.IsSome then
+                let alternativeBlockStatement = (Option.get ifExpression.Alternative)
+                return! evalStatementsList environment alternativeBlockStatement.Statements
+            else
+                return (environment, Null)
+        } 
