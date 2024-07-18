@@ -72,8 +72,8 @@ type EvaluatorTests() =
                                   |> Result.mapError (fun errorMsg -> "[Evaluation Error] " + errorMsg)
                 return! 
                     match evalResult with
-                    | Integer int64 when int64 = expectedValue -> Ok int64
-                    | Integer int64 -> Error $"[Evaluation Error] Expected {expectedValue}, got {int64}" 
+                    | Integer int64, _ when int64 = expectedValue -> Ok int64
+                    | Integer int64, _ -> Error $"[Evaluation Error] Expected {expectedValue}, got {int64}" 
                     | _ -> Error $"[Evaluation Error] Expected \"Integer\", got {evalResult.GetType()}" 
             }
             |> function
@@ -133,8 +133,8 @@ type EvaluatorTests() =
                                   |> Result.mapError (fun errorMsg -> "[Evaluation Error] " + errorMsg)
                 return! 
                     match evalResult with
-                    | Boolean boolean when boolean = expectedValue -> Ok boolean 
-                    | Boolean boolean -> Error $"[Evaluation Error] Expected {expectedValue}, got {boolean}"  
+                    | Boolean boolean, _ when boolean = expectedValue -> Ok boolean 
+                    | Boolean boolean, _ -> Error $"[Evaluation Error] Expected {expectedValue}, got {boolean}"  
                     | _ -> Error $"[Evaluation Error] Expected \"Boolean\", got {evalResult.GetType()}" 
             }
             |> function
@@ -168,8 +168,8 @@ type EvaluatorTests() =
                                   |> Result.mapError (fun errorMsg -> "[Evaluation Error] " + errorMsg)
                 return! 
                     match evalResult with
-                    | String str when str = expectedValue -> Ok str 
-                    | String str -> Error $"[Evaluation Error] Expected {expectedValue}, got {str}"  
+                    | String str, _ when str = expectedValue -> Ok str 
+                    | String str, _ -> Error $"[Evaluation Error] Expected {expectedValue}, got {str}"  
                     | _ -> Error $"[Evaluation Error] Expected \"String\", got {evalResult.GetType()}" 
             }
             |> function
@@ -178,3 +178,44 @@ type EvaluatorTests() =
                | Error errorMsg ->
                    Assert.Fail(errorMsg)
                    
+                   
+    [<Test>]
+    member this.``Test integer + identifier evaluation 1``() =
+        let testCases = [
+            ("
+             let x = 10;
+             let y = 20;
+             x + y",
+             30)
+            
+            ("
+             let a = 12;
+             let b = 7;
+             let c = -a;
+             let d = a + b - c;
+             (a + b * c + d * 2) * 3 + -d",
+             -61)
+        ]
+       
+        let mutable currentTestCase = 0
+        for testCase in testCases do
+            currentTestCase <- currentTestCase + 1
+            let testInput, expectedValue = testCase
+            let program = Parser.parseProgram testInput
+            
+            result {
+                do! assertNoErrors program
+                
+                let! evalResult = Evaluator.evalStatementsList Environment.Empty program.Statements 
+                                  |> Result.mapError (fun errorMsg -> "[Evaluation Error] " + errorMsg)
+                return! 
+                    match evalResult with
+                    | Integer int64, _ when int64 = expectedValue -> Ok int64
+                    | Integer int64, _ -> Error $"[Evaluation Error] Expected {expectedValue}, got {int64}" 
+                    | _ -> Error $"[Evaluation Error] Expected \"Integer\", got {evalResult.GetType()}" 
+            }
+            |> function
+               | Ok actualValue ->
+                   TestContext.WriteLine($"[Test #{currentTestCase}] \"{testInput}\", ex {expectedValue}, got {actualValue}")
+               | Error errorMsg ->
+                   Assert.Fail(errorMsg)

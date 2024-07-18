@@ -15,17 +15,37 @@ with
 
 
 [<RequireQualifiedAccess>]
-module Evaluator = 
-    let evalStatement (environment: Environment) statement : Result<Object, string> =
+module Evaluator =
+    let evalStatementsList environment statements =
+        match statements with
+        | [ head ] ->
+            evalStatement environment head            
+        | head :: remaining ->
+            match evalStatement environment head with
+            | Ok (_, newEnv) -> evalStatementsList newEnv remaining
+            | Error error -> Error error
+        | [] ->
+            Ok (Null, environment)
+    
+    let rec evalStatement environment statement : Result<Object * Environment, string> =
         match statement with
         | LetStatement letStatement ->
-            failwith "todo"
+            evalLetStatement environment letStatement
         | ReturnStatement returnStatement -> 
             failwith "todo"
         | ExpressionStatement expressionStatement ->
             evalExpression environment expressionStatement.Expression
+            |> Result.map (fun obj -> (obj, environment))
         | BlockStatement blockStatement -> 
             failwith "todo"
+            
+    and evalLetStatement environment letStatement =
+        match evalExpression environment letStatement.Value with
+        | Ok object ->
+            let newEnv = environment.Map.Add (letStatement.Name.Value, object) |> Environment
+            Ok (object, newEnv)
+        | Error errorMsg ->
+            Error errorMsg
 
     let rec evalExpression (environment: Environment) expression : Result<Object, string> =
         match expression with
@@ -62,19 +82,16 @@ module Evaluator =
         | None -> Error $"The variable \"{identifier.Value}\" is not defined." 
 
     and private evalPrefixExpression environment prefixExpression =
+        let doEval operator right =
+            match operator, right with
+            | "!", Boolean bool -> bool |> not |> Boolean |> Ok
+            | "-", Integer integer -> (-integer) |> Integer |> Ok
+            | c, r -> Error $"The prefix operator \"{c}\" is not compatible with the type \"{r.Type()}\"."
+        
         result {
-            let! returnObj = evalExpression environment prefixExpression.Right
-            match prefixExpression.Token.Type with
-            | BANG ->
-                return! match returnObj with
-                        | Boolean boolean -> Ok (boolean |> not |> Boolean)
-                        | _ -> Error $"The type \"{returnObj.Type()}\" is not compatible with the \"!\" operator."
-            | MINUS -> 
-                return! match returnObj with
-                        | Integer integer -> Ok (Integer (-integer))
-                        | _ -> Error $"The type \"{returnObj.Type()}\" is not compatible with the \"-\" operator."
-            | tokType ->
-                return! Error $"\"{TokenType.ToCaseString tokType}\" is not a valid prefix operator."
+            let! rightObj = evalExpression environment prefixExpression.Right
+            let operator = prefixExpression.Operator
+            return! doEval operator rightObj
         }
 
     and private evalInfixExpression environment infixExpression =
