@@ -19,21 +19,27 @@ with
 module Evaluator =
     let evalStatementsList (environment: Environment) statements =
         match statements with
-        | [ head ] ->
-            evalStatement environment head            
-        | head :: remaining ->
-            match evalStatement environment head with
-            | Ok (newEnv, _) -> evalStatementsList newEnv remaining
-            | Error error -> Error error
         | [] ->
             Ok (environment, Null)
+            
+        | [ head ] ->
+            evalStatement environment head
+            
+        | head :: remaining ->
+            match head with
+            | ReturnStatement _ -> // stop if return statement
+                evalStatement environment head
+            | _ -> 
+                match evalStatement environment head with
+                | Ok (newEnv, _) -> evalStatementsList newEnv remaining
+                | Error error -> Error error
     
     let rec evalStatement environment statement : Result<Environment * Object, string> =
         match statement with
         | LetStatement letStatement ->
             evalLetStatement environment letStatement
         | ReturnStatement returnStatement -> 
-            failwith "todo"
+            evalExpression environment returnStatement.ReturnValue
         | ExpressionStatement expressionStatement ->
             evalExpression environment expressionStatement.Expression
         | BlockStatement blockStatement ->
@@ -42,7 +48,8 @@ module Evaluator =
     and private evalLetStatement environment letStatement : Result<Environment * Object, string> =
         match evalExpression environment letStatement.Value with
         | Ok (newEnv, object) ->
-            Ok (newEnv.Map.Add (letStatement.Name.Value, object) |> Environment, object)
+            let newEnv = newEnv.Map.Add (letStatement.Name.Value, object) |> Environment
+            Ok (newEnv, Null)  // binding does not return any value
         | Error errorMsg ->
             Error errorMsg
 
