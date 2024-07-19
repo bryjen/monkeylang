@@ -1,6 +1,8 @@
-module MonkeyInterpreter.Object
+module MonkeyInterpreter.Eval.Object
 
 open System
+open FsToolkit.ErrorHandling
+open MonkeyInterpreter
 
 
 type Environment =
@@ -35,6 +37,7 @@ and Object =
     | Null
     | String of string
     | Function of Function
+    | ErrorType of ErrorType 
 with
     member this.Type() =
         match this with
@@ -43,6 +46,7 @@ with
         | Null -> "NULL"
         | String _ -> "STRING"
         | Function _ -> "FUNCTION" 
+        | ErrorType _ -> "ERROR" 
         
     member this.Inspect() = this.ToString()
         
@@ -53,10 +57,16 @@ with
         | Null -> "null"
         | String string -> string
         | Function _ -> failwith "todo" 
+        | ErrorType _ -> failwith "todo" 
 
 
 
 and Function =
+    | UserFunction of UserFunction
+    | BuiltinFunction of BuiltinFunction
+    
+    
+and UserFunction =
     { Parameters: Identifier list
       Body: BlockStatement
       Env: Environment }
@@ -68,4 +78,13 @@ with
         let commaSeparatedParameters = String.concat ", " (this.Parameters |> List.map (_.Value)) 
         $"fn ({commaSeparatedParameters}) {{ {this.Body.ToString()} }}" 
 
-    
+and BuiltinFunction =
+    { Fn: Object list -> Object
+      ParametersLength: int }
+
+
+and ErrorType = ErrorType of string
+with
+    member this.GetMsg =
+        let (ErrorType e) = this
+        e

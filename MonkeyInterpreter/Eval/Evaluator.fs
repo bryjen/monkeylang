@@ -1,7 +1,8 @@
-module rec MonkeyInterpreter.Evaluator
+module rec MonkeyInterpreter.Eval.Evaluator
 
 open FsToolkit.ErrorHandling
-open MonkeyInterpreter.Object
+open MonkeyInterpreter
+open MonkeyInterpreter.Eval.Object
 
 
 
@@ -22,7 +23,7 @@ module Evaluator =
             | _ -> 
                 match evalStatement environment head with
                 | Ok (newEnv, _) -> evalStatementsList newEnv remaining
-                | Error error -> Error error
+                | Result.Error error -> Result.Error error
     
     let rec evalStatement environment statement : Result<Environment * Object, string> =
         match statement with
@@ -39,8 +40,8 @@ module Evaluator =
         match evalExpression environment letStatement.Value with
         | Ok (newEnv, object) ->
             Ok (newEnv.Set letStatement.Name.Value object, Null)  // binding does not return any value
-        | Error errorMsg ->
-            Error errorMsg
+        | Result.Error errorMsg ->
+            Result.Error errorMsg
 
     let rec evalExpression (environment: Environment) expression : Result<Environment * Object, string> =
         let attachCurrentEnvironment value = (environment, value) 
@@ -81,16 +82,20 @@ module Evaluator =
             failwith "todo"
 
     and private evalIdentifier environment identifier =
+        // TODO: Make it so that the user cannot override builtin values so we don't do this anymore 
         match environment.Get identifier.Value with
         | Some value -> Ok value
-        | None -> Error $"The variable \"{identifier.Value}\" is not defined." 
-
+        | None ->
+            match Map.tryFind identifier.Value Builtins.builtins with
+            | Some value -> Ok value
+            | None -> Result.Error $"The variable \"{identifier.Value}\" is not defined."
+        
     and private evalPrefixExpression environment prefixExpression =
         let doEval operator right =
             match operator, right with
             | "!", Boolean bool -> bool |> not |> Boolean |> Ok
             | "-", Integer integer -> (-integer) |> Integer |> Ok
-            | c, r -> Error $"The prefix operator \"{c}\" is not compatible with the type \"{r.Type()}\"."
+            | c, r -> Result.Error $"The prefix operator \"{c}\" is not compatible with the type \"{r.Type()}\"."
         
         result {
             // Impossible for variable binding to occur during prefix evaluation
@@ -113,7 +118,7 @@ module Evaluator =
             | "!=", Boolean l, Boolean r -> (l <> r) |> Boolean |> Ok 
             | ">", Integer l, Integer r -> (l > r) |> Boolean |> Ok 
             | "<", Integer l, Integer r -> (l < r) |> Boolean |> Ok 
-            | _ -> Error $"The operation \"{left.Type()}\" \"{operator}\" \"{right.Type()}\" is not valid." 
+            | _ -> Result.Error $"The operation \"{left.Type()}\" \"{operator}\" \"{right.Type()}\" is not valid." 
         
         result {
             // Impossible for variable binding to occur during infix evaluation
@@ -125,7 +130,7 @@ module Evaluator =
         
     and private evalFunctionLiteral environment functionLiteral : Result<Function, string> =
         let enclosedEnv = Environment.CreateEnclosedEnv environment
-        Ok (Function.FromFunctionLiteral enclosedEnv functionLiteral)
+        UserFunction.FromFunctionLiteral enclosedEnv functionLiteral |> Function.UserFunction |> Ok
         
     and private evalIfExpression environment ifExpression =
         result {
@@ -134,7 +139,7 @@ module Evaluator =
             
             let! asBool = match conditionObj with
                           | Boolean value -> Ok value
-                          | object -> Error $"Condition expression does not evaluate into a boolean, got \"{object.Type()}\"."
+                          | object -> Result.Error $"Condition expression does not evaluate into a boolean, got \"{object.Type()}\"."
                           
             if asBool then
                 return! evalStatementsList environment ifExpression.Consequence.Statements
@@ -147,36 +152,59 @@ module Evaluator =
         
     // REGION evalCallExpression
     and private evalCallExpression (environment: Environment) (callExpression: CallExpression) =
+        let rec evalArguments env expressions evalObjs =
+            match expressions with
+            | [] -> Ok (List.rev evalObjs)
+            | head :: tail ->
+                match evalExpression env head with
+                | Ok (newEnv, object) -> evalArguments newEnv tail (object :: evalObjs)
+                | Result.Error error -> Result.Error error
+        
         result {
-            let! evaluatedArguments = evalArgumentsAndAddToEnv environment callExpression.Arguments []
+            let! applicationFunction = getApplicationFunction environment callExpression
+            let! requiredArgsLength = getNumberOfParameters environment callExpression
             
-            let! func =
-                match callExpression.Function with
-                | Identifier identifier -> tryGetFunctionFromIdentifier environment identifier
-                | FunctionLiteral functionLiteral -> evalFunctionLiteral environment functionLiteral
+            do! if callExpression.Arguments.Length = requiredArgsLength
+                then Ok ()
+                else Result.Error $"Expected {requiredArgsLength} arguments, got {callExpression.Arguments.Length}"
                 
-            let! updatedFunc = populateEnvWithArgumentValues func evaluatedArguments
-            return! evalStatement updatedFunc.Env (Statement.BlockStatement updatedFunc.Body)
+            let! evaluatedArgs = evalArguments environment callExpression.Arguments []
+            return! applicationFunction evaluatedArgs
         }
         
-    and private evalArgumentsAndAddToEnv env expressions evalObjs =
-        match expressions with
-        | [] -> Ok (List.rev evalObjs)
-        | head :: tail ->
-            match evalExpression env head with
-            | Ok (newEnv, object) -> evalArgumentsAndAddToEnv newEnv tail (object :: evalObjs)
-            | Error error -> Error error
-            
+    and private getFunction environment callExpression =
+        match callExpression.Function with
+        | Identifier identifier -> tryGetFunctionFromIdentifier environment identifier
+        | FunctionLiteral functionLiteral -> evalFunctionLiteral environment functionLiteral
+        
+    and private getApplicationFunction environment callExpression =
+        match getFunction environment callExpression with
+        | Ok func -> 
+            match func with
+            | UserFunction userFunction -> applyUserFunction userFunction |> Ok 
+            | BuiltinFunction builtinFunction -> applyBuiltinFunction environment builtinFunction |> Ok
+        | Error error ->
+            Error error 
+        
+    and private getNumberOfParameters environment callExpression = 
+        match getFunction environment callExpression with
+        | Ok func -> 
+            match func with
+            | UserFunction userFunction -> userFunction.Parameters.Length |> Ok 
+            | BuiltinFunction builtinFunction -> builtinFunction.ParametersLength |> Ok
+        | Error error ->
+            Error error
+        
     and private tryGetFunctionFromIdentifier env identifier =
         match evalIdentifier env identifier with
         | Ok object ->
             match object with
             | Function func -> Ok func
-            | _ -> Error $"The value assigned to \"{identifier.Value}\" is not a function, got \"{object.Type()}\""
-        | Error error ->
-            Error error
+            | _ -> Result.Error $"The value assigned to \"{identifier.Value}\" is not a function, got \"{object.Type()}\""
+        | Result.Error error ->
+            Result.Error error
             
-    and private populateEnvWithArgumentValues func evalObjs =
+    and private applyUserFunction userFunc evaluatedArguments =
         let rec populateEnv (env: Environment) pairs =
             match pairs with
             | [] ->
@@ -184,14 +212,14 @@ module Evaluator =
             | (varName, object) :: tail ->
                 let newEnv = env.Set varName object
                 populateEnv newEnv tail
-        
-        result {
-            do! if func.Parameters.Length <> evalObjs.Length
-                then Error $"Expected {func.Parameters.Length} arguments, got {evalObjs.Length}"
-                else Ok ()
                 
-            let identifierNames = func.Parameters |> List.map (_.Value)
-            let nameAndValPairs = List.zip identifierNames evalObjs
-            return { func with Env = populateEnv func.Env nameAndValPairs }
-        }
+        let identifierNames = userFunc.Parameters |> List.map (_.Value)
+        let nameAndValPairs = List.zip identifierNames evaluatedArguments
+        let updatedFunc = { userFunc with Env = populateEnv userFunc.Env nameAndValPairs }
+        evalStatement updatedFunc.Env (Statement.BlockStatement updatedFunc.Body)
+        
+    and private applyBuiltinFunction environment builtinFunc evaluatedArguments =
+        match builtinFunc.Fn evaluatedArguments with
+        | Object.ErrorType error -> Result.Error error.GetMsg
+        | returnObject -> Ok (environment, returnObject)
     // END REGION evalCallExpression

@@ -1,8 +1,8 @@
 namespace MonkeyInterpreter.Test
 
 open System
-open MonkeyInterpreter.Evaluator
-open MonkeyInterpreter.Object
+open MonkeyInterpreter.Eval.Evaluator
+open MonkeyInterpreter.Eval.Object
 open NUnit.Framework
 open FsToolkit.ErrorHandling
 open MonkeyInterpreter
@@ -337,6 +337,34 @@ type EvaluatorTests() =
              let addPrefix = fn(str) { \"[Prefix] \" + str; };
              addPrefix(message);",
              "[Prefix] Some message")
+        ]
+       
+        let mutable currentTestCase = 0
+        for testCase in testCases do
+            currentTestCase <- currentTestCase + 1
+            let testInput, expectedValue = testCase
+            let program = Parser.parseProgram testInput
+            
+            result {
+                do! assertNoErrors program
+                let! _, evalResult = Evaluator.evalStatementsList Environment.Empty program.Statements 
+                                  |> Result.mapError (fun errorMsg -> "[Evaluation Error] " + errorMsg)
+                do! assertEqualObj expectedValue evalResult
+                return evalResult
+            }
+            |> function
+               | Ok actualValue ->
+                   TestContext.WriteLine($"[Test #{currentTestCase}] \"{testInput}\", ex {expectedValue}, got {actualValue}")
+               | Error errorMsg ->
+                   Assert.Fail($"[Test #{currentTestCase}] {errorMsg}")
+                   
+                   
+    [<Test>]
+    member this.``Test builtin function call evaluation 1``() =
+        let testCases: (string * obj) list = [
+            ("len(\"\")", 0)
+            ("len(\"four\")", 4)
+            ("len(\"hello world\")", 11)
         ]
        
         let mutable currentTestCase = 0
