@@ -26,6 +26,7 @@ type internal Precedence =
     | PRODUCT = 5
     | PREFIX = 6
     | CALL = 7
+    | INDEX = 8
     
 module private Precedence =     
     let tokenTypeToPrecedenceMap = Map.ofList [
@@ -38,6 +39,7 @@ module private Precedence =
         (SLASH, Precedence.PRODUCT)
         (ASTERISK, Precedence.PRODUCT)
         (LPAREN, Precedence.CALL)
+        (LBRACKET, Precedence.INDEX)
     ]
     
     let peekPrecedence (tokensQueue: Token Queue) : Precedence =
@@ -494,11 +496,23 @@ module rec Parser =
             | Error err ->
                 return! Error err
         }
+        
+    let internal tryParseIndexExpression (tokensQueue: Token Queue) (leftExpr: Expression) =
+        result {
+            let! newTokensQueue, lbracketToken = dequeueToken tokensQueue
+            let! newTokensQueue, expr = tryParseExpression newTokensQueue Precedence.LOWEST
+            do! assertNextTokenIsOfType RBRACKET newTokensQueue
+            let newTokensQueue = Queue.removeTop newTokensQueue
+            
+            let indexExpr = { Token = lbracketToken; Left = leftExpr; Index = expr }
+            return newTokensQueue, Expression.IndexExpression indexExpr
+        }
             
     let internal infixParseFunctionsMap
         : Map<TokenType, Token Queue -> Expression -> Result<Token Queue * Expression, Token Queue * string list>> =
         Map.ofList [
             (TokenType.LPAREN, tryParseCallExpression) // parse call expr
+            (TokenType.LBRACKET, tryParseIndexExpression) // parse index expr 
             (TokenType.PLUS, tryParseInfixExpression)
             (TokenType.MINUS, tryParseInfixExpression)
             (TokenType.SLASH, tryParseInfixExpression)

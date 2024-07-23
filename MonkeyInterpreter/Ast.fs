@@ -161,6 +161,10 @@ type IndexExpression =
     { Token: Token
       Left: Expression
       Index: Expression }
+with
+    member this.GetTokenLiteral() = this.Token.Literal
+    
+    override this.ToString() = $"({this.Left})[{this.Index}]" 
     
     
     
@@ -172,6 +176,7 @@ with
     member this.GetTokenLiteral() = this.Token.Literal
     
     override this.ToString() = $"{this.GetTokenLiteral()}" 
+    
     
 type StringLiteral =
     { Token: Token
@@ -188,7 +193,7 @@ type ArrayLiteral =
 with
     member this.GetTokenLiteral() = this.Token.Literal
     
-    override this.ToString() = $"{this.GetTokenLiteral()}" 
+    override this.ToString() = $"[ ... ], Length = {this.Elements.Length}" 
     
     
 type HashLiteral =

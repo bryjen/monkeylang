@@ -988,3 +988,51 @@ let y = 10;
         |> function
            | Ok _ -> Assert.Pass()
            | Error errorMsg -> Assert.Fail(errorMsg)
+
+
+    [<Test>]
+    member this.``Test index expression parsing 1``() =
+        result {
+            let testInput = "[1, 2 * 2, 3 + 3][1 + 2];"
+            let program = Parser.parseProgram testInput
+            
+            let! statement =
+                match program.Statements with
+                | head :: _ -> Ok head
+                | _ -> Error $"Program has not enough statements. Expected 1, got {program.Statements.Length}"
+                
+            let! expressionStatement =
+                match statement with
+                | ExpressionStatement expStat -> Ok expStat
+                | _ -> Error $"program.Statements[0] is not a \"ExpressionStatement\", got \"${statement.GetType()}\""
+                
+            let! indexExpression =
+                match expressionStatement.Expression with
+                | IndexExpression indexExpr -> Ok indexExpr
+                | expr -> Error $"expressionStatement.Expression not \"IndexExpression\", got \"{expr.GetType()}\""
+                
+            // Testing 'left' for array literal
+            let! arrayLiteral = 
+                match indexExpression.Left with
+                | ArrayLiteral arrLiteral -> Ok arrLiteral
+                | expr -> Error $"indexExpression.Left not \"ArrayLiteral\", got \"{expr.GetType()}\""
+            
+            do! if arrayLiteral.Elements.Length = 3
+                then Ok ()
+                else Error $"arrayLiteral.Elements.Length expected to be 3, got \"{arrayLiteral.Elements.Length}\""
+                
+            do! testLiteralExpression (List.item 0 arrayLiteral.Elements) 1
+            do! testInfixExpression (List.item 1 arrayLiteral.Elements) 2 "*" 2
+            do! testInfixExpression (List.item 2 arrayLiteral.Elements) 3 "+" 3
+            
+            // Testing 'index' for infix expr
+            let! _ = 
+                match indexExpression.Index with
+                | InfixExpression infixExpr -> Ok infixExpr
+                | expr -> Error $"indexExpression.Index not \"InfixExpression\", got \"{expr.GetType()}\""
+                
+            do! testInfixExpression indexExpression.Index 1 "+" 2
+        }
+        |> function
+           | Ok _ -> Assert.Pass()
+           | Error errorMsg -> Assert.Fail(errorMsg)
