@@ -954,3 +954,37 @@ let y = 10;
         |> function
            | Ok _ -> Assert.Pass()
            | Error errorMsg -> Assert.Fail(errorMsg)
+           
+           
+    [<Test>]
+    member this.``Test array literal parsing 1``() =
+        result {
+            let testInput = "[1, 2 * 2, 3 + 3];"
+            let program = Parser.parseProgram testInput
+            
+            let! statement =
+                match program.Statements with
+                | head :: _ -> Ok head
+                | _ -> Error $"Program has not enough statements. Expected 1, got {program.Statements.Length}"
+                
+            let! expressionStatement =
+                match statement with
+                | ExpressionStatement expStat -> Ok expStat
+                | _ -> Error $"program.Statements[0] is not a \"ExpressionStatement\", got \"${statement.GetType()}\""
+                
+            let! arrayLiteral =
+                match expressionStatement.Expression with
+                | ArrayLiteral arrayLiteral -> Ok arrayLiteral
+                | expr -> Error $"expressionStatement.Expression not \"ArrayLiteral\", got \"{expr.GetType()}\""
+            
+            do! if arrayLiteral.Elements.Length = 3
+                then Ok ()
+                else Error $"callExpression.Elements.Length expected to be 3, got \"{arrayLiteral.Elements.Length}\""
+                
+            do! testLiteralExpression (List.item 0 arrayLiteral.Elements) 1
+            do! testInfixExpression (List.item 1 arrayLiteral.Elements) 2 "*" 2
+            do! testInfixExpression (List.item 2 arrayLiteral.Elements) 3 "+" 3
+        }
+        |> function
+           | Ok _ -> Assert.Pass()
+           | Error errorMsg -> Assert.Fail(errorMsg)

@@ -129,15 +129,21 @@ module private ParserHelpers =
         let onEmptyQueue tokensQueue = tokensQueue, [ emptyQueueErrorMsg ]
         peekTokenAndExecute unit onTypeMismatch onEmptyQueue expectedTokenType tokensQueue
         
-        
-    // Helper function for parsing function arguments/parameters. After parsing something, asserts that the next token
-    // is either a semicolon or rparen
-    let assertNextTokenIsValid tokensQueue =
+    let rec assertNextTokenAndExecute (functionsMap: Map<TokenType, Token Queue -> Token Queue>) tokensQueue =
         match (queuePeekToken tokensQueue) with
-        | Ok peekToken when peekToken.Type = COMMA -> Ok (Queue.removeTop tokensQueue)
-        | Ok peekToken when peekToken.Type = RPAREN -> Ok tokensQueue
-        | Ok peekToken -> Error (tokensQueue, [ $"Expected token \"COMMA\" or \"RPAREN\" after expression, got {TokenType.ToCaseString peekToken.Type}" ])
-        | Error errorValue -> Error errorValue
+        | Ok peekToken ->
+            match (Map.tryFind peekToken.Type functionsMap) with
+            | Some func -> Ok (func tokensQueue)
+            | None -> Error (tokensQueue, [ getErrorMsg functionsMap peekToken.Type ])
+        | Error error ->
+            Error error
+            
+    and private getErrorMsg functionsMap actualTokenType =
+        let tokensAsStr = (Map.keys functionsMap)
+                          |> Seq.toList
+                          |> List.map TokenType.ToCaseString
+                          |> String.concat ", "
+        $"Expected any token type from: {{ {tokensAsStr} }}. Got {TokenType.ToCaseString actualTokenType}"
         
         
         
@@ -374,17 +380,22 @@ module rec Parser =
             let newTokensQueue = Queue.removeTop newTokensQueue
             
             let functionLiteral: FunctionLiteral = { Token = functionLiteralToken; Parameters = identifiersList; Body = funcBlockStatement }
-            return (newTokensQueue, Expression.FunctionLiteral functionLiteral) 
+            return newTokensQueue, Expression.FunctionLiteral functionLiteral
         }
         
-    and tryParseFunctionParameters (tokensQueue: Token Queue) (identifiers: Identifier list) =
+    and parameterParsingFuncMap: Map<TokenType, Token Queue -> Token Queue> = Map.ofList [
+        (COMMA, Queue.removeTop)
+        (RPAREN, id)
+    ] 
+        
+    and private tryParseFunctionParameters (tokensQueue: Token Queue) (identifiers: Identifier list) =
         result {
             match (queuePeekToken tokensQueue) with
             | Ok peekToken when peekToken.Type = RPAREN ->
                 return (Queue.removeTop tokensQueue, List.rev identifiers)
             | Ok peekToken ->
                 let identifier: Identifier = { Token = peekToken; Value = peekToken.Literal }
-                let! newTokensQueue = assertNextTokenIsValid (Queue.removeTop tokensQueue) 
+                let! newTokensQueue = assertNextTokenAndExecute parameterParsingFuncMap (Queue.removeTop tokensQueue) 
                 return! tryParseFunctionParameters newTokensQueue (identifier :: identifiers)
             | Error err ->
                 return! Error err
@@ -395,6 +406,34 @@ module rec Parser =
             let! newTokensQueue, dequeuedToken = dequeueToken tokensQueue
             let expression = Expression.StringLiteral { Token = dequeuedToken; Value = dequeuedToken.Literal }
             return newTokensQueue, expression
+        }
+        
+    let rec internal tryParseArrayLiteral (tokensQueue: Token Queue) =
+        result {
+            let! newTokensQueue, lbracketToken = dequeueToken tokensQueue
+            
+            let! newTokensQueue, exprList = tryParseArrayContents newTokensQueue []
+            
+            let arrayLiteral = { Token = lbracketToken; Elements = exprList }
+            return newTokensQueue, Expression.ArrayLiteral arrayLiteral
+        }
+    
+    and private tryParseArrayContents (tokensQueue: Token Queue) (exprList: Expression list) =
+        let arrayParsingFuncMap = Map.ofList [
+            (COMMA, Queue.removeTop)
+            (RBRACKET, id)
+        ] 
+        
+        result {
+            match (queuePeekToken tokensQueue) with
+            | Ok peekToken when peekToken.Type = RBRACKET ->
+                return (Queue.removeTop tokensQueue, List.rev exprList)
+            | Ok _ ->
+                let! newTokensQueue, expr = tryParseExpression tokensQueue Precedence.LOWEST
+                let! newTokensQueue = assertNextTokenAndExecute arrayParsingFuncMap newTokensQueue
+                return! tryParseArrayContents newTokensQueue (expr :: exprList)
+            | Error err ->
+                return! Error err
         }
         
         
@@ -411,6 +450,7 @@ module rec Parser =
             (TokenType.IF, tryParseIfExpression)
             (TokenType.FUNCTION, tryParseFunctionLiteral)
             (TokenType.STRING, tryParseStringLiteral)
+            (TokenType.LBRACKET, tryParseArrayLiteral)
         ]
     
     let internal tryParseInfixExpression (tokensQueue: Token Queue) (leftExpr: Expression) = 
@@ -449,7 +489,7 @@ module rec Parser =
                 return (Queue.removeTop tokensQueue, List.rev arguments)
             | Ok _ ->
                 let! newTokensQueue, expr = tryParseExpression tokensQueue Precedence.LOWEST
-                let! newTokensQueue = assertNextTokenIsValid newTokensQueue
+                let! newTokensQueue = assertNextTokenAndExecute parameterParsingFuncMap newTokensQueue
                 return! tryParseCallArguments newTokensQueue (expr :: arguments)
             | Error err ->
                 return! Error err

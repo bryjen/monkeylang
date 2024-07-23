@@ -418,3 +418,27 @@ type EvaluatorErrorHandlingTests() =
                    TestContext.WriteLine($"[Test #{currentTestCase}] \"{testInput}\", Expected error, got error with message:\n\t\"{errorMsg}\"\n")
                | Ok _ ->
                    Assert.Fail($"[Test #{currentTestCase}] Did not throw an error.")
+
+    
+    [<Test>]
+    member this.``Test builtin function call evaluation 1``() =
+        let testCases = [
+            "len(1)"
+            "len(\"one\", \"two\")"
+        ]
+       
+        let mutable currentTestCase = 0
+        for testInput in testCases do
+            currentTestCase <- currentTestCase + 1
+            let program = Parser.parseProgram testInput
+            
+            result {
+                let! _, _ = Evaluator.evalStatementsList Environment.Empty program.Statements 
+                                  |> Result.mapError (fun errorMsg -> "[Evaluation Error] " + errorMsg)
+                return! assertEqualObj Null Null  // returns true/Ok
+            }
+            |> function
+               | Error errorMsg ->
+                   TestContext.WriteLine($"[Test #{currentTestCase}] \"{testInput}\", Expected error, got error with message:\n\t\"{errorMsg}\"\n")
+               | Ok _ ->
+                   Assert.Fail($"[Test #{currentTestCase}] Did not throw an error.")

@@ -69,6 +69,8 @@ module private LexerHelpers =
                 | ')' -> RPAREN
                 | '{' -> LBRACE
                 | '}' -> RBRACE
+                | '[' -> LBRACKET 
+                | ']' -> RBRACKET 
                     
                 // Other
                 | '\u0000' -> EOF

@@ -259,3 +259,23 @@ if (5 < 10) {
         ]
         
         testLexer testInput testCases
+        
+        
+    [<Test>]
+    member this.``Test array literal 1``() =
+        let testInput = "let bar = [ \"foo\", 1 ];"
+        
+        let testCases = [
+            (TokenType.LET, "let")
+            (TokenType.IDENT, "bar")
+            (TokenType.ASSIGN, "=")
+            (TokenType.LBRACKET, "[")
+            (TokenType.STRING, "foo")
+            (TokenType.COMMA, ",")
+            (TokenType.INT, "1")
+            (TokenType.RBRACKET, "]")
+            (TokenType.SEMICOLON, ";")
+            (TokenType.EOF, "")
+        ]
+        
+        testLexer testInput testCases
