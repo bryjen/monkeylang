@@ -198,11 +198,11 @@ with
     
 type HashLiteral =
     { Token: Token
-      Pairs: Dictionary<Expression, Expression> }
+      Pairs: Map<Expression, Expression> }
 with
     member this.GetTokenLiteral() = this.Token.Literal
     
-    override this.ToString() = $"{this.GetTokenLiteral()}" 
+    override this.ToString() = $"{{ ... }}, Count = {this.Pairs.Count}" 
     
     
 type FunctionLiteral =

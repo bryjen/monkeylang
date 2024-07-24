@@ -7,7 +7,7 @@ open MonkeyInterpreter.Eval.Object
 module private Functions = 
     let len object =
         match object with
-        | Object.StringType str -> str.Length |> int64 |> IntegerType
+        | Object.StringType str -> str.Length |> int64 |> Object.IntegerType
         | _ -> ErrorType $"Argument to 'len' not supported, got {object.Inspect()}" |> Object.ErrorType 
     
 let private wrap fn =

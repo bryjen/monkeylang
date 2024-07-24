@@ -424,7 +424,7 @@ module rec Parser =
         let arrayParsingFuncMap = Map.ofList [
             (COMMA, Queue.removeTop)
             (RBRACKET, id)
-        ] 
+        ]
         
         result {
             match (queuePeekToken tokensQueue) with
@@ -434,6 +434,39 @@ module rec Parser =
                 let! newTokensQueue, expr = tryParseExpression tokensQueue Precedence.LOWEST
                 let! newTokensQueue = assertNextTokenAndExecute arrayParsingFuncMap newTokensQueue
                 return! tryParseArrayContents newTokensQueue (expr :: exprList)
+            | Error err ->
+                return! Error err
+        }
+        
+    let rec internal tryParseHashLiteral (tokensQueue: Token Queue) =
+        result {
+            let! newTokensQueue, lbraceToken = dequeueToken tokensQueue
+            let! newTokensQueue, keyValueExprs = tryParseHashContents newTokensQueue []
+            let hashLiteral = { Token = lbraceToken; Pairs = Map.ofList keyValueExprs }
+            return newTokensQueue, Expression.HashLiteral hashLiteral
+        }
+        
+    and private tryParseHashContents (tokensQueue: Token Queue) (exprPairList: (Expression * Expression) list) =
+        let hashParsingFuncMap = Map.ofList [
+            (COMMA, Queue.removeTop)
+            (RBRACE, id)
+        ]
+        
+        result {
+            match (queuePeekToken tokensQueue) with
+            | Ok peekToken when peekToken.Type = RBRACE ->
+                return (Queue.removeTop tokensQueue, List.rev exprPairList)
+            | Ok _ ->
+                let! newTokensQueue, keyExpr = tryParseExpression tokensQueue Precedence.LOWEST
+                
+                do! assertNextTokenIsOfType COLON newTokensQueue
+                let newTokensQueue = Queue.removeTop newTokensQueue
+                
+                let! newTokensQueue, valueExpr = tryParseExpression newTokensQueue Precedence.LOWEST
+                let keyValueExprPair = keyExpr, valueExpr
+                
+                let! newTokensQueue = assertNextTokenAndExecute hashParsingFuncMap newTokensQueue
+                return! tryParseHashContents newTokensQueue (keyValueExprPair :: exprPairList)
             | Error err ->
                 return! Error err
         }
@@ -453,6 +486,7 @@ module rec Parser =
             (TokenType.FUNCTION, tryParseFunctionLiteral)
             (TokenType.STRING, tryParseStringLiteral)
             (TokenType.LBRACKET, tryParseArrayLiteral)
+            (TokenType.LBRACE, tryParseHashLiteral)
         ]
     
     let internal tryParseInfixExpression (tokensQueue: Token Queue) (leftExpr: Expression) = 

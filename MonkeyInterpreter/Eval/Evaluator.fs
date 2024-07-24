@@ -6,6 +6,42 @@ open MonkeyInterpreter.Eval.Object
 
 
 
+[<AutoOpen>]
+module private EvaluatorHelpers = 
+    let rec processResults currentObjResults objs errors =
+        match currentObjResults with
+        | head :: tail ->
+            match head with
+            | Ok obj -> processResults tail (obj :: objs) errors
+            | Error error -> processResults tail objs (error :: errors)
+        | _ ->
+            if errors.Length = 0
+            then Ok (List.rev objs)
+            else (Error errors.Head)
+            
+    let rec filterOkResults objList resultsList =
+        match resultsList with
+        | head :: tail ->
+            match head with
+            | Ok obj -> filterOkResults (obj :: objList) tail
+            | Error err -> Error err
+        | [] ->
+            Ok (List.rev objList)
+            
+    let rec filterSomeResults objList optionsList =
+        match optionsList with
+        | head :: tail ->
+            match head with
+            | Some obj ->
+                filterSomeResults (obj :: objList) tail
+            | None ->
+                // TODO: Find a way to make this error msg more descriptive
+                Error "This aint hashable." 
+        | [] ->
+            Ok (List.rev objList)
+
+
+
 [<RequireQualifiedAccess>]
 module Evaluator =
     let evalStatementsList (environment: Environment) statements =
@@ -37,49 +73,50 @@ module Evaluator =
             evalStatementsList environment blockStatement.Statements
             
     and private evalLetStatement environment letStatement : Result<Environment * Object, string> =
+        let variableName = letStatement.Name.Value
+        
         match evalExpression environment letStatement.Value with
+        | Ok _ when isBuiltinFunctionName variableName ->
+            Error $"[evalLetStatement] Cannot bind to variable, \"{variableName}\" is a builtin function."
         | Ok (newEnv, object) ->
-            Ok (newEnv.Set letStatement.Name.Value object, NullType)  // binding does not return any value
-        | Result.Error errorMsg ->
-            Result.Error errorMsg
+            Ok (newEnv.Set variableName object, NullType)  // binding does not return any value
+        | Error errorMsg ->
+            Error errorMsg
+            
+    and private isBuiltinFunctionName identName = (Map.tryFind identName Builtins.builtins) |> Option.isSome
 
     let rec evalExpression (environment: Environment) expression : Result<Environment * Object, string> =
         let attachCurrentEnvironment value = (environment, value) 
         
         match expression with
         | IntegerLiteral integerLiteral ->
-            Ok (IntegerType(integerLiteral.Value))
-            |> Result.map attachCurrentEnvironment
+            integerLiteral.Value |> Object.IntegerType |> attachCurrentEnvironment |> Ok
         | StringLiteral stringLiteral ->
-            Ok (StringType(stringLiteral.Value))
-            |> Result.map attachCurrentEnvironment
+            stringLiteral.Value |> Object.StringType |> attachCurrentEnvironment |> Ok
         | BooleanLiteral booleanLiteral ->
-            Ok (BooleanType(booleanLiteral.Value))
-            |> Result.map attachCurrentEnvironment
+            booleanLiteral.Value |> Object.BooleanType |> attachCurrentEnvironment |> Ok
         | Expression.Identifier identifier ->
-            evalIdentifier environment identifier
-            |> Result.map attachCurrentEnvironment
+            evalIdentifier environment identifier |> Result.map attachCurrentEnvironment
+            
         | PrefixExpression prefixExpression ->
-            evalPrefixExpression environment prefixExpression
-            |> Result.map attachCurrentEnvironment
+            evalPrefixExpression environment prefixExpression |> Result.map attachCurrentEnvironment
         | InfixExpression infixExpression ->
-            evalInfixExpression environment infixExpression
-            |> Result.map attachCurrentEnvironment
+            evalInfixExpression environment infixExpression |> Result.map attachCurrentEnvironment
         | IfExpression ifExpression ->
             evalIfExpression environment ifExpression
+            
+        | ArrayLiteral arrayLiteral ->
+            evalArrayLiteral environment arrayLiteral |> Result.map attachCurrentEnvironment
+        | HashLiteral hashLiteral ->
+            evalHashLiteral environment hashLiteral |> Result.map attachCurrentEnvironment
+        | IndexExpression indexExpression ->
+            evalIndexExpression environment indexExpression |> Result.map attachCurrentEnvironment
+            
         | Expression.FunctionLiteral functionLiteral ->
-            evalFunctionLiteral environment functionLiteral
-            |> Result.map (FunctionType >> attachCurrentEnvironment)
+            evalFunctionLiteral environment functionLiteral |> Result.map (FunctionType >> attachCurrentEnvironment)
         | CallExpression callExpression ->
             evalCallExpression environment callExpression
-        | IndexExpression indexExpression ->
-            evalIndexExpression environment indexExpression
-            |> Result.map attachCurrentEnvironment
-        | ArrayLiteral arrayLiteral ->
-            evalArrayLiteral environment arrayLiteral
-            |> Result.map attachCurrentEnvironment
-        | HashLiteral hashLiteral ->
-            failwith "todo"
+            
         | MacroLiteral macroLiteral ->
             failwith "todo"
 
@@ -95,8 +132,8 @@ module Evaluator =
     and private evalPrefixExpression environment prefixExpression =
         let doEval operator right =
             match operator, right with
-            | "!", BooleanType bool -> bool |> not |> BooleanType |> Ok
-            | "-", IntegerType integer -> (-integer) |> IntegerType |> Ok
+            | "!", Object.BooleanType bool -> bool |> not |> Object.BooleanType |> Ok
+            | "-", Object.IntegerType integer -> (-integer) |> Object.IntegerType |> Ok
             | c, r -> Result.Error $"The prefix operator \"{c}\" is not compatible with the type \"{r.Type()}\"."
         
         result {
@@ -109,19 +146,19 @@ module Evaluator =
     and private evalInfixExpression environment infixExpression =
         let doEval operator left right =
             match operator, left, right with
-            | "+", IntegerType l, IntegerType r -> (l + r) |> IntegerType |> Ok 
-            | "+", StringType l, StringType r -> (l + r) |> StringType |> Ok 
-            | "+", IntegerType l, StringType r -> ($"{l}" + r) |> StringType |> Ok 
-            | "+", StringType l, IntegerType r -> (l + $"{r}") |> StringType |> Ok 
-            | "-", IntegerType l, IntegerType r -> (l - r) |> IntegerType |> Ok 
-            | "/", IntegerType l, IntegerType r -> (l / r) |> IntegerType |> Ok 
-            | "*", IntegerType l, IntegerType r -> (l * r) |> IntegerType |> Ok 
-            | "==", IntegerType l, IntegerType r -> (l = r) |> BooleanType |> Ok 
-            | "==", BooleanType l, BooleanType r -> (l = r) |> BooleanType |> Ok 
-            | "!=", IntegerType l, IntegerType r -> (l <> r) |> BooleanType |> Ok 
-            | "!=", BooleanType l, BooleanType r -> (l <> r) |> BooleanType |> Ok 
-            | ">", IntegerType l, IntegerType r -> (l > r) |> BooleanType |> Ok 
-            | "<", IntegerType l, IntegerType r -> (l < r) |> BooleanType |> Ok
+            | "+", Object.IntegerType l, Object.IntegerType r -> (l + r) |> Object.IntegerType |> Ok 
+            | "+", Object.StringType l, Object.StringType r -> (l + r) |> Object.StringType |> Ok 
+            | "+", Object.IntegerType l, Object.StringType r -> ($"{l}" + r) |> Object.StringType |> Ok 
+            | "+", Object.StringType l, Object.IntegerType r -> (l + $"{r}") |> Object.StringType |> Ok 
+            | "-", Object.IntegerType l, Object.IntegerType r -> (l - r) |> Object.IntegerType |> Ok 
+            | "/", Object.IntegerType l, Object.IntegerType r -> (l / r) |> Object.IntegerType |> Ok 
+            | "*", Object.IntegerType l, Object.IntegerType r -> (l * r) |> Object.IntegerType |> Ok 
+            | "==", Object.IntegerType l, Object.IntegerType r -> (l = r) |> Object.BooleanType |> Ok 
+            | "==", Object.BooleanType l, Object.BooleanType r -> (l = r) |> Object.BooleanType |> Ok 
+            | "!=", Object.IntegerType l, Object.IntegerType r -> (l <> r) |> Object.BooleanType |> Ok 
+            | "!=", Object.BooleanType l, Object.BooleanType r -> (l <> r) |> Object.BooleanType |> Ok 
+            | ">", Object.IntegerType l, Object.IntegerType r -> (l > r) |> Object.BooleanType |> Ok 
+            | "<", Object.IntegerType l, Object.IntegerType r -> (l < r) |> Object.BooleanType |> Ok
             | _ -> Result.Error $"The operation \"{left.Type()}\" \"{operator}\" \"{right.Type()}\" is not valid." 
         
         result {
@@ -142,7 +179,7 @@ module Evaluator =
             let! _, conditionObj = evalExpression environment ifExpression.Condition
             
             let! asBool = match conditionObj with
-                          | BooleanType value -> Ok value
+                          | Object.BooleanType value -> Ok value
                           | object -> Result.Error $"Condition expression does not evaluate into a boolean, got \"{object.Type()}\"."
                           
             if asBool then
@@ -227,18 +264,8 @@ module Evaluator =
         | Object.ErrorType error -> Result.Error error.GetMsg
         | returnObject -> Ok (environment, returnObject)
     // END REGION evalCallExpression
-
+    
     and private evalArrayLiteral environment arrayLiteral =
-        let rec processResults currentObjResults objs errors =
-            match currentObjResults with
-            | head :: tail ->
-                match head with
-                | Ok obj -> processResults tail (obj :: objs) errors
-                | Error error -> processResults tail objs (error :: errors)
-            | _ ->
-                if errors.Length = 0
-                then Ok (List.rev objs)
-                else (Error errors.Head)
         
         let evaluatedExpressions = arrayLiteral.Elements |> List.map (evalExpression environment)
         match (processResults evaluatedExpressions [] []) with
@@ -262,7 +289,7 @@ module Evaluator =
             let! _, evaluatedIndex = evalExpression environment indexExpression.Index
             let! indexAsInt =
                 match evaluatedIndex with
-                | IntegerType int -> Ok int
+                | Object.IntegerType int -> Ok int
                 | _ -> Error $"[evalIndexExpression] Index was expected to be an \"IntegerType\", got {evaluatedIndex.Type()}"
                 
             do! if indexAsInt >= 0 && indexAsInt < asArrayType.Length
@@ -272,4 +299,20 @@ module Evaluator =
             return (List.item (int indexAsInt) asArrayType)
         } 
         
+    and private evalHashLiteral environment hashLiteral =
+        result {
+            let keyExpressions, valueExpressions = hashLiteral.Pairs |> Map.toList |> List.unzip
+            let evaluatedKeyExprs = List.map (evalExpression environment >> Result.map snd) keyExpressions
+            let evaluatedValueExprs = List.map (evalExpression environment >> Result.map snd) valueExpressions
+            
+            // Filter for any errors in evaluation
+            let! filteredKeyExprs = evaluatedKeyExprs |> filterOkResults []
+            let! filteredValueExprs = evaluatedValueExprs |> filterOkResults []
+            
+            // Filter only hashable keys
+            let! typeFilteredKeyExprs = filteredKeyExprs |> List.map HashableObject.FromObject |> filterSomeResults []
+            
+            // Zip can't error, component lists are guaranteed to be equal in length
+            return List.zip typeFilteredKeyExprs filteredValueExprs |> Map.ofList |> HashType
+        }
         

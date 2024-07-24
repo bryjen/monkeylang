@@ -279,3 +279,27 @@ if (5 < 10) {
         ]
         
         testLexer testInput testCases
+
+    
+    [<Test>]
+    member this.``Test hash literal 1``() =
+        let testInput = "let bar = { \"foo\": \"bar\", \"hello\": 1 };"
+        
+        let testCases = [
+            (TokenType.LET, "let")
+            (TokenType.IDENT, "bar")
+            (TokenType.ASSIGN, "=")
+            (TokenType.LBRACE, "{")
+            (TokenType.STRING, "foo")
+            (TokenType.COLON, ":")
+            (TokenType.STRING, "bar")
+            (TokenType.COMMA, ",")
+            (TokenType.STRING, "hello")
+            (TokenType.COLON, ":")
+            (TokenType.INT, "1")
+            (TokenType.RBRACE, "}")
+            (TokenType.SEMICOLON, ";")
+            (TokenType.EOF, "")
+        ]
+        
+        testLexer testInput testCases

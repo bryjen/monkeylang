@@ -38,20 +38,20 @@ module private TestHelpers =
         
     let assertEqualIntegers (expectedValue: Int64) (object: Object) =
         match object with
-        | IntegerType int64 when int64 = expectedValue -> Ok () 
-        | IntegerType int64 -> Error $"[assertEqualIntegers] Expected {expectedValue}, got {int64}" 
+        | Object.IntegerType int64 when int64 = expectedValue -> Ok () 
+        | Object.IntegerType int64 -> Error $"[assertEqualIntegers] Expected {expectedValue}, got {int64}" 
         | _ -> Error $"[assertEqualIntegers] Expected an Integer type, got \"{object.Type()}\"" 
         
     let assertEqualStrings (expectedValue: string) (object: Object) =
         match object with
-        | StringType string when string = expectedValue -> Ok () 
-        | StringType string -> Error $"[assertEqualStrings] Expected {expectedValue}, got {string}" 
+        | Object.StringType string when string = expectedValue -> Ok () 
+        | Object.StringType string -> Error $"[assertEqualStrings] Expected {expectedValue}, got {string}" 
         | _ -> Error $"[assertEqualStrings] Expected a String type, got \"{object.Type()}\"" 
         
     let assertEqualBooleans (expectedValue: bool) (object: Object) =
         match object with
-        | BooleanType boolean when boolean = expectedValue -> Ok () 
-        | BooleanType boolean -> Error $"[assertEqualBooleans] Expected {expectedValue}, got {boolean}" 
+        | Object.BooleanType boolean when boolean = expectedValue -> Ok () 
+        | Object.BooleanType boolean -> Error $"[assertEqualBooleans] Expected {expectedValue}, got {boolean}" 
         | _ -> Error $"[assertEqualBooleans] Expected a Boolean type, got \"{object.Type()}\""
         
     let assertEqualObj (expectedValue: obj) (object: Object) =

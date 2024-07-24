@@ -121,13 +121,14 @@ module private ParserHelpers =
                 else Error $"integerLiteral.Token.Literal not \"{asStringLiteral}\", got \"{integerLiteral.GetTokenLiteral()}\""
         }
         
-    let testIdentifier (expr: Expression) (expectedValue: string) =
+    let rec testIdentifierOrStringLiteral (expr: Expression) (expectedValue: string) =
+        match expr with
+        | Expression.Identifier identifier -> testIdentifier identifier expectedValue
+        | StringLiteral stringLiteral ->  testStringLiteral stringLiteral expectedValue
+        | _ -> Error $"Expected an \"Identifier\" or \"StringLiteral\", but got \"{expr.GetType()}\""
+        
+    and testIdentifier identifier expectedValue =
         result {
-            let! identifier =
-                match expr with
-                | Expression.Identifier identifier -> Ok identifier
-                | _ -> Error $"expr not \"Identifier\", got \"{expr.GetType()}\""
-                
             do! if identifier.Value = expectedValue
                 then Ok ()
                 else Error $"identifier.Value not \"{expectedValue}\", got \"{identifier.Value}\""
@@ -135,6 +136,17 @@ module private ParserHelpers =
             do! if identifier.GetTokenLiteral() = expectedValue 
                 then Ok ()
                 else Error $"identifier.GetTokenLiteral() not \"{expectedValue}\", got \"{identifier.GetTokenLiteral()}\""
+        }
+        
+    and testStringLiteral stringLiteral expectedValue =
+        result {
+            do! if stringLiteral.Value = expectedValue
+                then Ok ()
+                else Error $"identifier.Value not \"{expectedValue}\", got \"{stringLiteral.Value}\""
+                
+            do! if stringLiteral.GetTokenLiteral() = expectedValue 
+                then Ok ()
+                else Error $"identifier.GetTokenLiteral() not \"{expectedValue}\", got \"{stringLiteral.GetTokenLiteral()}\""
         }
         
     let testBooleanLiteral (expr: Expression) (expectedValue: bool) =
@@ -157,7 +169,7 @@ module private ParserHelpers =
         match expectedType with
         | :? int as value -> testIntegerLiteral expr (int64 value) 
         | :? int64 as value -> testIntegerLiteral expr value
-        | :? string as value -> testIdentifier expr value
+        | :? string as value -> testIdentifierOrStringLiteral expr value
         | :? bool as value -> testBooleanLiteral expr value
         | _ -> Error $"Type of expr not handled, got type \"{expectedType.GetType()}\""
         
@@ -176,7 +188,29 @@ module private ParserHelpers =
             
             do! testLiteralExpression infixExpression.Right expectedRight 
         }
-
+        
+    let rec testKeyValuePairInMap expectedValue map key =
+        match Map.tryFind (wrapIntoAstType key) map with
+        | Some value -> testLiteralExpression value expectedValue
+        | None -> Error $"Hash was expected to have a key \"{key.ToString()}\", but is not found."
+        
+    and private wrapIntoAstType (value: obj) =
+        match value with
+        | :? int as value ->
+            let token = { Token.Default with Literal = $"{value}" }
+            { Token = token; Value = value } : IntegerLiteral |> Expression.IntegerLiteral
+        | :? int64 as value ->
+            let token = { Token.Default with Literal = $"{value}" }
+            { Token = token; Value = value } : IntegerLiteral |> Expression.IntegerLiteral
+        | :? string as value ->
+            let token = { Token.Default with Literal = value }
+            { Token = token; Value = value } : StringLiteral |> Expression.StringLiteral
+        | :? bool as value ->
+            let token = { Token.Default with Literal = $"{value}" }
+            { Token = token; Value = value } : BooleanLiteral |> Expression.BooleanLiteral
+        | _ ->
+            failwith $"Type of expr not handled, got type \"{value.GetType()}\""
+        
 
 [<TestFixture>]
 type ParserTests() =
@@ -757,7 +791,7 @@ let y = 10;
                 | consequenceStatement ->
                     Error $"ifExpression.Consequence.Statements.Head is not a \"ExpressionStatement\", got \"{consequenceStatement.GetType()}\""
                     
-            do! testIdentifier consequenceExpressionStatement.Expression "x"
+            do! testLiteralExpression consequenceExpressionStatement.Expression "x"
             
             do! match ifExpression.Alternative with
                 | Some _ -> Error "ifStatement was found to have an 'alternative/else' block, when it was not supsoed to"
@@ -804,7 +838,7 @@ let y = 10;
                 | consequenceStatement ->
                     Error $"ifExpression.Consequence.Statements.Head is not a \"ExpressionStatement\", got \"{consequenceStatement.GetType()}\""
                     
-            do! testIdentifier consequenceExpressionStatement.Expression "x"
+            do! testLiteralExpression consequenceExpressionStatement.Expression "x"
             
             
             // Testing alternative
@@ -824,7 +858,7 @@ let y = 10;
                 | alternativeStatement ->
                     Error $"ifExpression.Alternative.Statements.Head is not a \"ExpressionStatement\", got \"{alternativeStatement.GetType()}\""
                     
-            do! testIdentifier alternativeExpressionStatement.Expression "y"
+            do! testLiteralExpression alternativeExpressionStatement.Expression "y"
         }
         |> function
            | Ok _ -> Assert.Pass()
@@ -941,7 +975,7 @@ let y = 10;
                 | Expression.CallExpression callExpr -> Ok callExpr
                 | expr -> Error $"expressionStatement.Expression not \"CallExpression\", got \"{expr.GetType()}\""
                 
-            do! testIdentifier (CallExpr.ToExpression callExpression.Function) "add"
+            do! testLiteralExpression (CallExpr.ToExpression callExpression.Function) "add"
             
             do! if callExpression.Arguments.Length = 3
                 then Ok ()
@@ -1032,6 +1066,73 @@ let y = 10;
                 | expr -> Error $"indexExpression.Index not \"InfixExpression\", got \"{expr.GetType()}\""
                 
             do! testInfixExpression indexExpression.Index 1 "+" 2
+        }
+        |> function
+           | Ok _ -> Assert.Pass()
+           | Error errorMsg -> Assert.Fail(errorMsg)
+           
+           
+    [<Test>]
+    member this.``Test hash literal parsing 1``() =
+        result {
+            let testInput = "{\"one\": 1, \"two\": 2, \"three\": 3};"
+            let program = Parser.parseProgram testInput
+            
+            let! statement =
+                match program.Statements with
+                | head :: _ -> Ok head
+                | _ -> Error $"Program has not enough statements. Expected 1, got {program.Statements.Length}"
+                
+            let! expressionStatement =
+                match statement with
+                | ExpressionStatement expStat -> Ok expStat
+                | _ -> Error $"program.Statements[0] is not a \"ExpressionStatement\", got \"${statement.GetType()}\""
+                
+            let! hashLiteral =
+                match expressionStatement.Expression with
+                | HashLiteral hashLiteral -> Ok hashLiteral
+                | expr -> Error $"expressionStatement.Expression not \"HashLiteral\", got \"{expr.GetType()}\""
+                
+            do! if hashLiteral.Pairs.Count = 3
+                then Ok ()
+                else Error $"The dictionary was expected to have a count of 3, got {hashLiteral.Pairs.Count}"
+                
+            let sortHeuristic (_, expr) =
+                match expr with
+                | IntegerLiteral integerLiteral -> integerLiteral.Value
+                | _ -> failwith "testing failure"
+                
+            let mapAsList = Map.toList hashLiteral.Pairs |> List.sortBy sortHeuristic
+            
+            let key1, value1 = List.item 0 mapAsList
+            do! match key1 with
+                | StringLiteral stringLiteral when stringLiteral.Value = "one" -> Ok ()
+                | StringLiteral stringLiteral -> Error $"StringLiteral.Value expected to be \"one\", got \"{stringLiteral.Value}\"" 
+                | _ -> Error $"Key1: Expected a \"StringLiteral\", got \"{key1.GetType()}\"" 
+            do! match value1 with
+                | IntegerLiteral integerLiteral when integerLiteral.Value = 1 -> Ok ()
+                | IntegerLiteral integerLiteral -> Error $"IntegerLiteral.Value expected to be \"1\", got \"{integerLiteral.Value}\"" 
+                | _ -> Error $"Value1: Expected a \"IntegerLiteral\", got \"{value1.GetType()}\"" 
+            
+            let key2, value2 = List.item 1 mapAsList
+            do! match key2 with
+                | StringLiteral stringLiteral when stringLiteral.Value = "two" -> Ok ()
+                | StringLiteral stringLiteral -> Error $"StringLiteral.Value expected to be \"two\", got \"{stringLiteral.Value}\"" 
+                | _ -> Error $"Key2: Expected a \"StringLiteral\", got \"{key2.GetType()}\"" 
+            do! match value2 with
+                | IntegerLiteral integerLiteral when integerLiteral.Value = 2 -> Ok ()
+                | IntegerLiteral integerLiteral -> Error $"IntegerLiteral.Value expected to be \"2\", got \"{integerLiteral.Value}\"" 
+                | _ -> Error $"Value2: Expected a \"IntegerLiteral\", got \"{value1.GetType()}\"" 
+            
+            let key3, value3 = List.item 2 mapAsList
+            do! match key3 with
+                | StringLiteral stringLiteral when stringLiteral.Value = "three" -> Ok ()
+                | StringLiteral stringLiteral -> Error $"StringLiteral.Value expected to be \"three\", got \"{stringLiteral.Value}\"" 
+                | _ -> Error $"Key3: Expected a \"StringLiteral\", got \"{key3.GetType()}\"" 
+            do! match value3 with
+                | IntegerLiteral integerLiteral when integerLiteral.Value = 3 -> Ok ()
+                | IntegerLiteral integerLiteral -> Error $"IntegerLiteral.Value expected to be \"3\", got \"{integerLiteral.Value}\"" 
+                | _ -> Error $"Value3: Expected a \"IntegerLiteral\", got \"{value1.GetType()}\"" 
         }
         |> function
            | Ok _ -> Assert.Pass()

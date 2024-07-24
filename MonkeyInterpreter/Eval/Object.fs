@@ -38,6 +38,7 @@ and Object =
     | FunctionType of Function
     | ErrorType of ErrorType
     | ArrayType of Object list 
+    | HashType of Map<HashableObject, Object>
 with
     member this.Type() =
         match this with
@@ -48,6 +49,7 @@ with
         | FunctionType _ -> "FUNCTION" 
         | ErrorType _ -> "ERROR" 
         | ArrayType _ -> "ARRAY" 
+        | HashType _ -> "HASH" 
         
     member this.Inspect() = this.ToString()
         
@@ -62,6 +64,7 @@ with
         | ArrayType arr ->
             let elementsString = String.concat ", " (arr |> List.map (_.ToString()))
             $"[{elementsString}]"
+        | HashType hashmap -> failwith "todo"
 
 
 
@@ -92,3 +95,17 @@ with
     member this.GetMsg =
         let (ErrorType e) = this
         e
+        
+        
+
+and HashableObject =
+    | IntegerType of Int64
+    | BooleanType of bool
+    | StringType of string
+with
+    static member FromObject (object: Object) =
+        match object with
+        | Object.IntegerType integerType -> integerType |> HashableObject.IntegerType |> Some 
+        | Object.BooleanType booleanType -> booleanType |> HashableObject.BooleanType |> Some 
+        | Object.StringType stringType -> stringType  |> HashableObject.StringType |> Some 
+        | _ -> None 

@@ -64,6 +64,7 @@ module private LexerHelpers =
                     
                 // Delimiters
                 | ',' -> COMMA
+                | ':' -> COLON 
                 | ';' -> SEMICOLON
                 | '(' -> LPAREN
                 | ')' -> RPAREN

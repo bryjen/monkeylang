@@ -25,6 +25,7 @@ type TokenType =
     
     // Delimiters
     | COMMA
+    | COLON
     | SEMICOLON
     | LPAREN
     | RPAREN
@@ -66,3 +67,5 @@ module Keywords =
 type Token =
     { Type: TokenType
       Literal: string }
+with
+    static member internal Default = { Type = ILLEGAL; Literal = "" }
