@@ -120,7 +120,7 @@ module Evaluator =
         | MacroLiteral macroLiteral ->
             failwith "todo"
 
-    and private evalIdentifier environment identifier =
+    and internal evalIdentifier environment identifier =
         // TODO: Make it so that the user cannot override builtin values so we don't do this anymore 
         match environment.Get identifier.Value with
         | Some value -> Ok value
@@ -129,7 +129,7 @@ module Evaluator =
             | Some value -> Ok value
             | None -> Result.Error $"The variable \"{identifier.Value}\" is not defined."
         
-    and private evalPrefixExpression environment prefixExpression =
+    and internal evalPrefixExpression environment prefixExpression =
         let doEval operator right =
             match operator, right with
             | "!", Object.BooleanType bool -> bool |> not |> Object.BooleanType |> Ok
@@ -143,7 +143,7 @@ module Evaluator =
             return! doEval operator rightObj
         }
 
-    and private evalInfixExpression environment infixExpression =
+    and internal evalInfixExpression environment infixExpression =
         let doEval operator left right =
             match operator, left, right with
             | "+", Object.IntegerType l, Object.IntegerType r -> (l + r) |> Object.IntegerType |> Ok 
@@ -169,11 +169,11 @@ module Evaluator =
             return! doEval operator leftObj rightObj
         }
         
-    and private evalFunctionLiteral environment functionLiteral : Result<Function, string> =
+    and internal evalFunctionLiteral environment functionLiteral : Result<Function, string> =
         let enclosedEnv = Environment.CreateEnclosedEnv environment
         UserFunction.FromFunctionLiteral enclosedEnv functionLiteral |> Function.UserFunction |> Ok
         
-    and private evalIfExpression environment ifExpression =
+    and internal evalIfExpression environment ifExpression =
         result {
             // Variable binding cannot occur during evaluation of the conditional
             let! _, conditionObj = evalExpression environment ifExpression.Condition
@@ -192,7 +192,7 @@ module Evaluator =
         }
         
     // REGION evalCallExpression
-    and private evalCallExpression (environment: Environment) (callExpression: CallExpression) =
+    and internal evalCallExpression (environment: Environment) (callExpression: CallExpression) =
         let rec evalArguments env expressions evalObjs =
             match expressions with
             | [] -> Ok (List.rev evalObjs)
@@ -265,41 +265,58 @@ module Evaluator =
         | returnObject -> Ok (environment, returnObject)
     // END REGION evalCallExpression
     
-    and private evalArrayLiteral environment arrayLiteral =
-        
+    and internal evalArrayLiteral environment arrayLiteral =
         let evaluatedExpressions = arrayLiteral.Elements |> List.map (evalExpression environment)
         match (processResults evaluatedExpressions [] []) with
         | Ok evaluatedResults -> List.map snd evaluatedResults |> ArrayType |> Ok
         | Error error -> Error error
         
-    and private evalIndexExpression environment indexExpression =
+    and internal evalIndexExpression environment indexExpression =
         result {
             let! evalObj =
                 match indexExpression.Left with
                 | ArrayLiteral arrayLiteral -> evalArrayLiteral environment arrayLiteral
+                | HashLiteral hashLiteral -> evalHashLiteral environment hashLiteral 
                 | Expression.Identifier identifier -> evalIdentifier environment identifier
                 | expr -> Error $"[evalIndexExpression] Expected either an \"ArrayLiteral\" or \"Identifier\", got \"{expr.GetType()}\""
                 
-            let! asArrayType =
+            return! 
                 match evalObj with
-                | ArrayType arr -> Ok arr
+                | ArrayType arr -> indexArray environment indexExpression.Index arr
+                | HashType hash -> indexHash environment indexExpression.Index hash 
                 | _ -> Error $"[evalIndexExpression] Expected an \"ArrayType\", got {evalObj.Type()}."
-                
+        }
+        
+    and private indexArray environment index arr =
+        result {
             // variable binding shouldn't be allowed, so we ignore new env - envs should be the same
-            let! _, evaluatedIndex = evalExpression environment indexExpression.Index
+            let! _, evaluatedIndex = evalExpression environment index
             let! indexAsInt =
                 match evaluatedIndex with
                 | Object.IntegerType int -> Ok int
                 | _ -> Error $"[evalIndexExpression] Index was expected to be an \"IntegerType\", got {evaluatedIndex.Type()}"
                 
-            do! if indexAsInt >= 0 && indexAsInt < asArrayType.Length
+            do! if indexAsInt >= 0 && indexAsInt < arr.Length
                 then Ok ()
                 else Error $"[evalIndexExpression] Index {indexAsInt} out of bounds."
                 
-            return (List.item (int indexAsInt) asArrayType)
-        } 
+            return (List.item (int indexAsInt) arr)
+        }
         
-    and private evalHashLiteral environment hashLiteral =
+    and private indexHash environment index hash =
+        result {
+            let! _, evaluatedIndex = evalExpression environment index
+            let! asHashableObject =
+                match HashableObject.FromObject evaluatedIndex with
+                | Some value -> Ok value
+                | None -> Error $"The index is not a hashable type, got {evaluatedIndex.Type()}"
+                
+            match Map.tryFind asHashableObject hash with
+            | Some value -> return value 
+            | None -> return NullType 
+        }
+        
+    and internal evalHashLiteral environment hashLiteral =
         result {
             let keyExpressions, valueExpressions = hashLiteral.Pairs |> Map.toList |> List.unzip
             let evaluatedKeyExprs = List.map (evalExpression environment >> Result.map snd) keyExpressions

@@ -1,6 +1,8 @@
 namespace MonkeyInterpreter.Test
 
 open System
+open System.IO
+open Microsoft.VisualBasic.CompilerServices
 open MonkeyInterpreter.Eval.Evaluator
 open MonkeyInterpreter.Eval.Object
 open NUnit.Framework
@@ -45,7 +47,7 @@ module private TestHelpers =
     let assertEqualStrings (expectedValue: string) (object: Object) =
         match object with
         | Object.StringType string when string = expectedValue -> Ok () 
-        | Object.StringType string -> Error $"[assertEqualStrings] Expected {expectedValue}, got {string}" 
+        | Object.StringType string -> Error $"[assertEqualStrings] Expected \"{expectedValue}\", got \"{string}\"." 
         | _ -> Error $"[assertEqualStrings] Expected a String type, got \"{object.Type()}\"" 
         
     let assertEqualBooleans (expectedValue: bool) (object: Object) =
@@ -370,32 +372,6 @@ type EvaluatorTests() =
                    Assert.Fail($"[Test #{currentTestCase}] {errorMsg}")
                    
                    
-    [<Test>]
-    member this.``Test builtin function call evaluation 1``() =
-        let testCases: (string * obj) list = [
-            ("len(\"\")", 0)
-            ("len(\"four\")", 4)
-            ("len(\"hello world\")", 11)
-        ]
-       
-        let mutable currentTestCase = 0
-        for testCase in testCases do
-            currentTestCase <- currentTestCase + 1
-            let testInput, expectedValue = testCase
-            let program = Parser.parseProgram testInput
-            
-            result {
-                do! assertNoErrors program
-                let! _, evalResult = Evaluator.evalStatementsList Environment.Empty program.Statements 
-                                  |> Result.mapError (fun errorMsg -> "[Evaluation Error] " + errorMsg)
-                do! assertEqualObj expectedValue evalResult
-                return evalResult
-            }
-            |> function
-               | Ok actualValue ->
-                   TestContext.WriteLine($"[Test #{currentTestCase}] \"{testInput}\", ex {expectedValue}, got {actualValue}")
-               | Error errorMsg ->
-                   Assert.Fail($"[Test #{currentTestCase}] {errorMsg}")
                    
                    
     [<Test>]
@@ -453,6 +429,195 @@ type EvaluatorTests() =
                                   |> Result.mapError (fun errorMsg -> "[Evaluation Error] " + errorMsg)
                 do! assertEqualObj expectedValue evalResult 
                 return evalResult
+            }
+            |> function
+               | Ok actualValue ->
+                   TestContext.WriteLine($"[Test #{currentTestCase}] \"{testInput}\", ex {expectedValue}, got {actualValue}")
+               | Error errorMsg ->
+                   Assert.Fail($"[Test #{currentTestCase}] {errorMsg}")
+                   
+                   
+    // Mainly tests indexing of hash literals
+    [<Test>]
+    member this.``Test index expression evaluation 2``() =
+        let testCases: (string * obj) list = [
+            ("{\"foo\": 5}[\"foo\"]", 5)
+            ("{\"foo\": 5}[\"bar\"]", null)
+            ("let key = \"foo\"; {\"foo\": 5}[key]", 5)
+            ("{}[\"foo\"]", null)
+            ("{true: 5}[true]", 5)
+            ("{false: 5}[false]", 5)
+            
+            ("{ \"one\" : 1, \"two\" : 2, \"three\" : 3 }[\"two\"]", 2)
+            
+            ("let func = { \"one\" : fn (x) { return x * x; }, \"two\" : 2 }[\"one\"];
+             func(10)",
+             100)
+            
+            ("let hash = { \"one\" : fn (x) { return x * x; }, \"two\" : 2 };
+             let func = hash[\"one\"];
+             func(hash[\"two\"])",
+             4)
+        ]
+       
+        let mutable currentTestCase = 0
+        for testCase in testCases do
+            currentTestCase <- currentTestCase + 1
+            let testInput, expectedValue = testCase
+            let program = Parser.parseProgram testInput
+            
+            result {
+                do! assertNoErrors program
+                let! _, evalResult = Evaluator.evalStatementsList Environment.Empty program.Statements 
+                                  |> Result.mapError (fun errorMsg -> "[Evaluation Error] " + errorMsg)
+                do! assertEqualObj expectedValue evalResult 
+                return evalResult
+            }
+            |> function
+               | Ok actualValue ->
+                   TestContext.WriteLine($"[Test #{currentTestCase}] \"{testInput}\", ex {expectedValue}, got {actualValue}")
+               | Error errorMsg ->
+                   Assert.Fail($"[Test #{currentTestCase}] {errorMsg}")
+                   
+                   
+    [<Test>]
+    member this.``Test builtins 1``() =
+        let testCases: (string * obj) list = [
+            ("len(\"\")", 0)
+            ("len(\"four\")", 4)
+            ("len(\"hello world\")", 11)
+        ]
+       
+        let mutable currentTestCase = 0
+        for testCase in testCases do
+            currentTestCase <- currentTestCase + 1
+            let testInput, expectedValue = testCase
+            let program = Parser.parseProgram testInput
+            
+            result {
+                do! assertNoErrors program
+                let! _, evalResult = Evaluator.evalStatementsList Environment.Empty program.Statements 
+                                  |> Result.mapError (fun errorMsg -> "[Evaluation Error] " + errorMsg)
+                do! assertEqualObj expectedValue evalResult
+                return evalResult
+            }
+            |> function
+               | Ok actualValue ->
+                   TestContext.WriteLine($"[Test #{currentTestCase}] \"{testInput}\", ex {expectedValue}, got {actualValue}")
+               | Error errorMsg ->
+                   Assert.Fail($"[Test #{currentTestCase}] {errorMsg}")
+                   
+                   
+    [<Test>]
+    member this.``Test builtins 2``() =
+        let testCases: (string * obj) list = [
+            ("let arr = [ \"foo\", \"bar\", \"hello\", \"world\" ];
+             len(arr);",
+             4)
+            
+            ("len([]);",
+             0)
+            
+            ("let hash = { \"one\" : fn (x) { return x * x; }, \"two\" : 2 };
+             len(hash);",
+             2)
+            
+            ("len({});",
+             0)
+        ]
+       
+        let mutable currentTestCase = 0
+        for testCase in testCases do
+            currentTestCase <- currentTestCase + 1
+            let testInput, expectedValue = testCase
+            let program = Parser.parseProgram testInput
+            
+            result {
+                do! assertNoErrors program
+                let! _, evalResult = Evaluator.evalStatementsList Environment.Empty program.Statements 
+                                  |> Result.mapError (fun errorMsg -> "[Evaluation Error] " + errorMsg)
+                do! assertEqualObj expectedValue evalResult
+                return evalResult
+            }
+            |> function
+               | Ok actualValue ->
+                   TestContext.WriteLine($"[Test #{currentTestCase}] \"{testInput}\", ex {expectedValue}, got {actualValue}")
+               | Error errorMsg ->
+                   Assert.Fail($"[Test #{currentTestCase}] {errorMsg}")
+                   
+                   
+    [<Test>]
+    member this.``Test builtins 3``() =
+        let testCases: (string * obj) list = [
+            ("let arr = [ \"foo\", \"bar\", \"hello\", \"world\" ];
+             head(arr);",
+             "foo")
+            
+            ("let arr = [ \"foo\", \"bar\", \"hello\", \"world\" ];
+             head(tail(arr));",
+             "bar")
+            
+            ("let arr = [ \"foo\", \"bar\", \"hello\", \"world\" ];
+             head(tail(tail(arr)));",
+             "hello")
+            
+            ("let arr = [ \"foo\", \"bar\", \"hello\", \"world\" ];
+             head(tail(tail(tail(arr))));",
+             "world")
+            
+            ("let arr = [ \"foo\", \"bar\", \"hello\", \"world\" ];
+             head(tail(tail(tail(tail(arr)))));",
+             null)
+            
+            ("let arr = [ ];
+             let newArr = push(arr, \"bar\");
+             head(newArr)",
+             "bar")
+        ]
+       
+        let mutable currentTestCase = 0
+        for testCase in testCases do
+            currentTestCase <- currentTestCase + 1
+            let testInput, expectedValue = testCase
+            let program = Parser.parseProgram testInput
+            
+            result {
+                do! assertNoErrors program
+                let! _, evalResult = Evaluator.evalStatementsList Environment.Empty program.Statements 
+                                  |> Result.mapError (fun errorMsg -> "[Evaluation Error] " + errorMsg)
+                do! assertEqualObj expectedValue evalResult
+                return evalResult
+            }
+            |> function
+               | Ok actualValue ->
+                   TestContext.WriteLine($"[Test #{currentTestCase}] \"{testInput}\", ex {expectedValue}, got {actualValue}")
+               | Error errorMsg ->
+                   Assert.Fail($"[Test #{currentTestCase}] {errorMsg}")
+                   
+                   
+    [<Test>]
+    member this.``Test builtins 4``() =
+        let testCases: (string * obj) list = [
+            ("println(\"Hello World\")",
+             "Hello World\n")
+        ]
+       
+        let mutable currentTestCase = 0
+        for testCase in testCases do
+            currentTestCase <- currentTestCase + 1
+            let testInput, expectedValue = testCase
+            let program = Parser.parseProgram testInput
+            
+            use sw = new StringWriter()
+            Console.SetOut(sw)
+            
+            result {
+                do! assertNoErrors program
+                let! _, _ = Evaluator.evalStatementsList Environment.Empty program.Statements
+                            |> Result.mapError (fun errorMsg -> "[Evaluation Error] " + errorMsg)
+                            
+                do! assertEqualObj expectedValue (sw.ToString() |> Object.StringType)
+                return sw.ToString() 
             }
             |> function
                | Ok actualValue ->
