@@ -2,6 +2,7 @@ namespace rec MonkeyInterpreter
 
 open System.Collections.Generic
 open System.Diagnostics
+open System.Net.WebSockets
 
 
 
@@ -25,13 +26,13 @@ type Identifier =
     { Token: Token // 'Token and.IDENT' token
       Value: string }
 with
+#if DEBUG
+    static member internal Default = { Token = Token.Default; Value = "" }
+#endif
+    
     member this.GetTokenLiteral() = this.Value
     
     override this.ToString() = $"{this.Value}"
-    
-#if DEBUG
-    static member internal Default = { Token = { Literal = ""; Type = EOF }; Value = "" }
-#endif
     
     
     
@@ -63,6 +64,11 @@ type Expression =
     | Identifier of Identifier
     | BooleanLiteral of BooleanLiteral
 with
+#if DEBUG
+    // Default is an int literal
+    static member internal Default: Expression = Expression.IntegerLiteral IntegerLiteral.Default
+#endif
+
     member this.GetTokenLiteral() =
         match this with
         | PrefixExpression prefixExpression -> prefixExpression.Token.Literal
@@ -78,6 +84,24 @@ with
         | MacroLiteral macroLiteral -> macroLiteral.Token.Literal
         | Identifier identifier -> identifier.Token.Literal
         | BooleanLiteral booleanLiteral -> booleanLiteral.Token.Literal
+        
+#if DEBUG 
+    member internal this.GetNonUnionCaseType() =
+        match this with
+        | PrefixExpression value -> value.GetType()
+        | InfixExpression value -> value.GetType()
+        | IfExpression value -> value.GetType()
+        | CallExpression value -> value.GetType()
+        | IndexExpression value -> value.GetType()
+        | IntegerLiteral value -> value.GetType()
+        | FunctionLiteral value -> value.GetType()
+        | StringLiteral value -> value.GetType()
+        | ArrayLiteral value -> value.GetType()
+        | HashLiteral value -> value.GetType()
+        | MacroLiteral value -> value.GetType()
+        | Identifier value -> value.GetType()
+        | BooleanLiteral value -> value.GetType()
+#endif
             
     override this.ToString() =
         match this with
@@ -104,6 +128,11 @@ type Statement =
     | ExpressionStatement of ExpressionStatement
     | BlockStatement of BlockStatement
 with
+#if DEBUG
+    // Default is expression statement containing the default expression
+    static member internal Default: Statement = Statement.ExpressionStatement ExpressionStatement.Default
+#endif
+    
     member this.GetTokenLiteral() =
         match this with
         | LetStatement letStatement -> letStatement.Token.Literal 
@@ -116,7 +145,7 @@ with
         | LetStatement letStatement -> letStatement.ToString() 
         | ReturnStatement returnStatement -> returnStatement.ToString() 
         | ExpressionStatement expressionStatement -> expressionStatement.ToString() 
-        | BlockStatement blockStatement -> blockStatement.ToString() 
+        | BlockStatement blockStatement -> blockStatement.ToString()
 
 
 // 'General' Expression ands
@@ -125,6 +154,10 @@ type PrefixExpression =
       Operator: string
       Right: Expression }
 with
+#if DEBUG
+    static member internal Default = { Token = Token.Default; Operator = ""; Right = Expression.Default }
+#endif
+    
     member this.GetTokenLiteral() = this.Token.Literal
     
     override this.ToString() = $"({this.Operator}{this.Right.ToString()})" 
@@ -136,6 +169,10 @@ type InfixExpression =
       Operator: string
       Right: Expression }
 with
+#if DEBUG
+    static member internal Default = { Token = Token.Default; Left = Expression.Default; Operator = ""; Right = Expression.Default }
+#endif
+    
     member this.GetTokenLiteral() = this.Token.Literal
     
     override this.ToString() = $"({this.Left.ToString()} {this.Operator} {this.Right.ToString()})" 
@@ -147,6 +184,13 @@ type IfExpression =
       Consequence: BlockStatement
       Alternative: BlockStatement Option }
 with
+#if DEBUG
+    static member internal Default = { Token = Token.Default
+                                       Condition = Expression.Default
+                                       Consequence = BlockStatement.Default
+                                       Alternative = None }
+#endif
+    
     member this.GetTokenLiteral() = this.Token.Literal
     
     override this.ToString() =
@@ -162,6 +206,10 @@ type IndexExpression =
       Left: Expression
       Index: Expression }
 with
+#if DEBUG
+    static member internal Default = { Token = Token.Default; Left = Expression.Default; Index = Expression.Default }
+#endif
+    
     member this.GetTokenLiteral() = this.Token.Literal
     
     override this.ToString() = $"({this.Left})[{this.Index}]" 
@@ -173,6 +221,10 @@ type IntegerLiteral =
     { Token: Token
       Value: int64 }
 with
+#if DEBUG
+    static member internal Default: IntegerLiteral = { Token = Token.Default; Value = 0 }
+#endif
+    
     member this.GetTokenLiteral() = this.Token.Literal
     
     override this.ToString() = $"{this.GetTokenLiteral()}" 
@@ -182,6 +234,10 @@ type StringLiteral =
     { Token: Token
       Value: string }
 with
+#if DEBUG
+    static member internal Default = { Token = Token.Default; Value = "" }
+#endif
+    
     member this.GetTokenLiteral() = this.Token.Literal
     
     override this.ToString() = $"{this.GetTokenLiteral()}" 
@@ -191,6 +247,10 @@ type ArrayLiteral =
     { Token: Token
       Elements: Expression list }
 with
+#if DEBUG
+    static member internal Default = { Token = Token.Default; Elements = [] }
+#endif
+    
     member this.GetTokenLiteral() = this.Token.Literal
     
     override this.ToString() = $"[ ... ], Length = {this.Elements.Length}" 
@@ -200,6 +260,10 @@ type HashLiteral =
     { Token: Token
       Pairs: Map<Expression, Expression> }
 with
+#if DEBUG
+    static member internal Default = { Token = Token.Default; Pairs = Map.ofList [] }
+#endif
+    
     member this.GetTokenLiteral() = this.Token.Literal
     
     override this.ToString() = $"{{ ... }}, Count = {this.Pairs.Count}" 
@@ -210,6 +274,10 @@ type FunctionLiteral =
       Parameters: Identifier list
       Body: BlockStatement }
 with
+#if DEBUG
+    static member internal Default = { Token = Token.Default; Parameters = [ ]; Body = BlockStatement.Default }
+#endif
+        
     member this.GetTokenLiteral() = this.Token.Literal
     
     override this.ToString() =
@@ -222,6 +290,12 @@ type CallExpression =
       Function: CallExpr 
       Arguments: Expression list }
 with
+#if DEBUG
+    static member internal Default = { Token = Token.Default
+                                       Function = CallExpr.Identifier Identifier.Default
+                                       Arguments = [ ] }
+#endif
+    
     member this.GetTokenLiteral() = this.Token.Literal
     
     override this.ToString() =
@@ -264,6 +338,10 @@ type BooleanLiteral =
     { Token: Token
       Value: bool }
 with
+#if DEBUG
+    static member internal Default = { Token = Token.Default; Value = true }
+#endif
+    
     member this.GetTokenLiteral() = this.Token.Literal
     
     override this.ToString() = $"{this.GetTokenLiteral()}" 
@@ -276,6 +354,10 @@ type LetStatement =
        Name: Identifier 
        Value: Expression }
 with
+#if DEBUG
+    static member internal Default = { Token = Token.Default; Name = Identifier.Default; Value = Expression.Default }
+#endif
+    
     member this.GetTokenLiteral() = this.Token.Literal
     
     override this.ToString() = $"{this.Token.Literal} {this.Name.Value} = {this.Value};"
@@ -285,6 +367,10 @@ type ReturnStatement =
     { Token: Token // 'Token and.RETURN' token
       ReturnValue: Expression }
 with
+#if DEBUG
+    static member internal Default = { Token = Token.Default; ReturnValue = Expression.Default }
+#endif
+    
     member this.GetTokenLiteral() = this.Token.Literal
     
     override this.ToString() = $"{this.Token.Literal} {this.ReturnValue};"
@@ -294,6 +380,10 @@ type ExpressionStatement =
     { Token: Token // The first token of the expression
       Expression: Expression }
 with
+#if DEBUG
+    static member internal Default = { Token = Token.Default; Expression = Expression.Default }
+#endif
+    
     member this.GetTokenLiteral() = this.Token.Literal
     
     override this.ToString() = $"{this.Expression}"
@@ -303,6 +393,10 @@ type BlockStatement =
     { Token: Token
       Statements: Statement list }
 with
+#if DEBUG
+    static member internal Default = { Token = Token.Default; Statements = [ Statement.Default ] }
+#endif
+    
     member this.GetTokenLiteral() = this.Token.Literal
     
     override this.ToString() =

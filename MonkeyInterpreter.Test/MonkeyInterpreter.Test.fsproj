@@ -6,6 +6,7 @@
         <GenerateProgramFile>false</GenerateProgramFile>
         <IsTestProject>true</IsTestProject>
         <AssemblyName>MonkeyInterpreter.Test</AssemblyName>
+        <DefineConstants>UNIT_TESTS</DefineConstants>
     </PropertyGroup>
 
     <ItemGroup>
@@ -14,6 +15,8 @@
         <Compile Include="AstTests.fs" />
         <Compile Include="LexerTests.fs" />
         <Compile Include="ParserTests.fs" />
+        <Compile Include="Parser\Helpers.fs" />
+        <Compile Include="Parser\ParserTests.fs" />
         <Compile Include="EvaluatorTests.fs" />
         <Compile Include="Program.fs"/>
     </ItemGroup>
