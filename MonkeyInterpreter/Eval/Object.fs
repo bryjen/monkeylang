@@ -1,7 +1,6 @@
 module MonkeyInterpreter.Eval.Object
 
 open System
-open FsToolkit.ErrorHandling
 open MonkeyInterpreter
 
 
@@ -32,32 +31,37 @@ with
           
 
 and Object =
-    | Integer of Int64
-    | Boolean of bool
-    | Null
-    | String of string
-    | Function of Function
-    | ErrorType of ErrorType 
+    | IntegerType of Int64
+    | BooleanType of bool
+    | NullType
+    | StringType of string
+    | FunctionType of Function
+    | ErrorType of ErrorType
+    | ArrayType of Object list 
 with
     member this.Type() =
         match this with
-        | Integer _ -> "INTEGER"
-        | Boolean _ -> "BOOLEAN"
-        | Null -> "NULL"
-        | String _ -> "STRING"
-        | Function _ -> "FUNCTION" 
+        | IntegerType _ -> "INTEGER"
+        | BooleanType _ -> "BOOLEAN"
+        | NullType -> "NULL"
+        | StringType _ -> "STRING"
+        | FunctionType _ -> "FUNCTION" 
         | ErrorType _ -> "ERROR" 
+        | ArrayType _ -> "ARRAY" 
         
     member this.Inspect() = this.ToString()
         
     override this.ToString() =
         match this with
-        | Integer integer -> $"{integer}"
-        | Boolean boolean -> $"{boolean}"
-        | Null -> "null"
-        | String string -> string
-        | Function _ -> failwith "todo" 
+        | IntegerType integer -> $"{integer}"
+        | BooleanType boolean -> $"{boolean}"
+        | NullType -> "null"
+        | StringType string -> string
+        | FunctionType _ -> failwith "todo" 
         | ErrorType _ -> failwith "todo" 
+        | ArrayType arr ->
+            let elementsString = String.concat ", " (arr |> List.map (_.ToString()))
+            $"[{elementsString}]"
 
 
 

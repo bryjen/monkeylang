@@ -7,7 +7,7 @@ open MonkeyInterpreter.Eval.Object
 module private Functions = 
     let len object =
         match object with
-        | Object.String str -> str.Length |> int64 |> Integer
+        | Object.StringType str -> str.Length |> int64 |> IntegerType
         | _ -> ErrorType $"Argument to 'len' not supported, got {object.Inspect()}" |> Object.ErrorType 
     
 let private wrap fn =
@@ -16,7 +16,7 @@ let private wrap fn =
         | [ value ] -> fn value
         | _ -> ErrorType $"Wrong number of arguments, expected 1, got {args.Length}" |> Object.ErrorType 
         
-    { Fn = wrappedFn; ParametersLength = 1 } |> Function.BuiltinFunction |> Function
+    { Fn = wrappedFn; ParametersLength = 1 } |> Function.BuiltinFunction |> FunctionType
     
 let builtins = Map.ofList [
     ("len", wrap len)

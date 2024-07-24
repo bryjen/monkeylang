@@ -11,7 +11,7 @@ module Evaluator =
     let evalStatementsList (environment: Environment) statements =
         match statements with
         | [] ->
-            Ok (environment, Null)
+            Ok (environment, NullType)
             
         | [ head ] ->
             evalStatement environment head
@@ -39,7 +39,7 @@ module Evaluator =
     and private evalLetStatement environment letStatement : Result<Environment * Object, string> =
         match evalExpression environment letStatement.Value with
         | Ok (newEnv, object) ->
-            Ok (newEnv.Set letStatement.Name.Value object, Null)  // binding does not return any value
+            Ok (newEnv.Set letStatement.Name.Value object, NullType)  // binding does not return any value
         | Result.Error errorMsg ->
             Result.Error errorMsg
 
@@ -48,13 +48,13 @@ module Evaluator =
         
         match expression with
         | IntegerLiteral integerLiteral ->
-            Ok (Integer(integerLiteral.Value))
+            Ok (IntegerType(integerLiteral.Value))
             |> Result.map attachCurrentEnvironment
         | StringLiteral stringLiteral ->
-            Ok (String(stringLiteral.Value))
+            Ok (StringType(stringLiteral.Value))
             |> Result.map attachCurrentEnvironment
         | BooleanLiteral booleanLiteral ->
-            Ok (Boolean(booleanLiteral.Value))
+            Ok (BooleanType(booleanLiteral.Value))
             |> Result.map attachCurrentEnvironment
         | Expression.Identifier identifier ->
             evalIdentifier environment identifier
@@ -69,13 +69,15 @@ module Evaluator =
             evalIfExpression environment ifExpression
         | Expression.FunctionLiteral functionLiteral ->
             evalFunctionLiteral environment functionLiteral
-            |> Result.map (Function >> attachCurrentEnvironment)
+            |> Result.map (FunctionType >> attachCurrentEnvironment)
         | CallExpression callExpression ->
             evalCallExpression environment callExpression
         | IndexExpression indexExpression ->
-            failwith "todo"
+            evalIndexExpression environment indexExpression
+            |> Result.map attachCurrentEnvironment
         | ArrayLiteral arrayLiteral ->
-            failwith "todo"
+            evalArrayLiteral environment arrayLiteral
+            |> Result.map attachCurrentEnvironment
         | HashLiteral hashLiteral ->
             failwith "todo"
         | MacroLiteral macroLiteral ->
@@ -93,8 +95,8 @@ module Evaluator =
     and private evalPrefixExpression environment prefixExpression =
         let doEval operator right =
             match operator, right with
-            | "!", Boolean bool -> bool |> not |> Boolean |> Ok
-            | "-", Integer integer -> (-integer) |> Integer |> Ok
+            | "!", BooleanType bool -> bool |> not |> BooleanType |> Ok
+            | "-", IntegerType integer -> (-integer) |> IntegerType |> Ok
             | c, r -> Result.Error $"The prefix operator \"{c}\" is not compatible with the type \"{r.Type()}\"."
         
         result {
@@ -107,17 +109,19 @@ module Evaluator =
     and private evalInfixExpression environment infixExpression =
         let doEval operator left right =
             match operator, left, right with
-            | "+", Integer l, Integer r -> (l + r) |> Integer |> Ok 
-            | "+", String l, String r -> (l + r) |> String |> Ok 
-            | "-", Integer l, Integer r -> (l - r) |> Integer |> Ok 
-            | "/", Integer l, Integer r -> (l / r) |> Integer |> Ok 
-            | "*", Integer l, Integer r -> (l * r) |> Integer |> Ok 
-            | "==", Integer l, Integer r -> (l = r) |> Boolean |> Ok 
-            | "==", Boolean l, Boolean r -> (l = r) |> Boolean |> Ok 
-            | "!=", Integer l, Integer r -> (l <> r) |> Boolean |> Ok 
-            | "!=", Boolean l, Boolean r -> (l <> r) |> Boolean |> Ok 
-            | ">", Integer l, Integer r -> (l > r) |> Boolean |> Ok 
-            | "<", Integer l, Integer r -> (l < r) |> Boolean |> Ok 
+            | "+", IntegerType l, IntegerType r -> (l + r) |> IntegerType |> Ok 
+            | "+", StringType l, StringType r -> (l + r) |> StringType |> Ok 
+            | "+", IntegerType l, StringType r -> ($"{l}" + r) |> StringType |> Ok 
+            | "+", StringType l, IntegerType r -> (l + $"{r}") |> StringType |> Ok 
+            | "-", IntegerType l, IntegerType r -> (l - r) |> IntegerType |> Ok 
+            | "/", IntegerType l, IntegerType r -> (l / r) |> IntegerType |> Ok 
+            | "*", IntegerType l, IntegerType r -> (l * r) |> IntegerType |> Ok 
+            | "==", IntegerType l, IntegerType r -> (l = r) |> BooleanType |> Ok 
+            | "==", BooleanType l, BooleanType r -> (l = r) |> BooleanType |> Ok 
+            | "!=", IntegerType l, IntegerType r -> (l <> r) |> BooleanType |> Ok 
+            | "!=", BooleanType l, BooleanType r -> (l <> r) |> BooleanType |> Ok 
+            | ">", IntegerType l, IntegerType r -> (l > r) |> BooleanType |> Ok 
+            | "<", IntegerType l, IntegerType r -> (l < r) |> BooleanType |> Ok
             | _ -> Result.Error $"The operation \"{left.Type()}\" \"{operator}\" \"{right.Type()}\" is not valid." 
         
         result {
@@ -138,7 +142,7 @@ module Evaluator =
             let! _, conditionObj = evalExpression environment ifExpression.Condition
             
             let! asBool = match conditionObj with
-                          | Boolean value -> Ok value
+                          | BooleanType value -> Ok value
                           | object -> Result.Error $"Condition expression does not evaluate into a boolean, got \"{object.Type()}\"."
                           
             if asBool then
@@ -147,7 +151,7 @@ module Evaluator =
                 let alternativeBlockStatement = (Option.get ifExpression.Alternative)
                 return! evalStatementsList environment alternativeBlockStatement.Statements
             else
-                return (environment, Null)
+                return (environment, NullType)
         }
         
     // REGION evalCallExpression
@@ -199,7 +203,7 @@ module Evaluator =
         match evalIdentifier env identifier with
         | Ok object ->
             match object with
-            | Function func -> Ok func
+            | FunctionType func -> Ok func
             | _ -> Result.Error $"The value assigned to \"{identifier.Value}\" is not a function, got \"{object.Type()}\""
         | Result.Error error ->
             Result.Error error
@@ -223,3 +227,49 @@ module Evaluator =
         | Object.ErrorType error -> Result.Error error.GetMsg
         | returnObject -> Ok (environment, returnObject)
     // END REGION evalCallExpression
+
+    and private evalArrayLiteral environment arrayLiteral =
+        let rec processResults currentObjResults objs errors =
+            match currentObjResults with
+            | head :: tail ->
+                match head with
+                | Ok obj -> processResults tail (obj :: objs) errors
+                | Error error -> processResults tail objs (error :: errors)
+            | _ ->
+                if errors.Length = 0
+                then Ok (List.rev objs)
+                else (Error errors.Head)
+        
+        let evaluatedExpressions = arrayLiteral.Elements |> List.map (evalExpression environment)
+        match (processResults evaluatedExpressions [] []) with
+        | Ok evaluatedResults -> List.map snd evaluatedResults |> ArrayType |> Ok
+        | Error error -> Error error
+        
+    and private evalIndexExpression environment indexExpression =
+        result {
+            let! evalObj =
+                match indexExpression.Left with
+                | ArrayLiteral arrayLiteral -> evalArrayLiteral environment arrayLiteral
+                | Expression.Identifier identifier -> evalIdentifier environment identifier
+                | expr -> Error $"[evalIndexExpression] Expected either an \"ArrayLiteral\" or \"Identifier\", got \"{expr.GetType()}\""
+                
+            let! asArrayType =
+                match evalObj with
+                | ArrayType arr -> Ok arr
+                | _ -> Error $"[evalIndexExpression] Expected an \"ArrayType\", got {evalObj.Type()}."
+                
+            // variable binding shouldn't be allowed, so we ignore new env - envs should be the same
+            let! _, evaluatedIndex = evalExpression environment indexExpression.Index
+            let! indexAsInt =
+                match evaluatedIndex with
+                | IntegerType int -> Ok int
+                | _ -> Error $"[evalIndexExpression] Index was expected to be an \"IntegerType\", got {evaluatedIndex.Type()}"
+                
+            do! if indexAsInt >= 0 && indexAsInt < asArrayType.Length
+                then Ok ()
+                else Error $"[evalIndexExpression] Index {indexAsInt} out of bounds."
+                
+            return (List.item (int indexAsInt) asArrayType)
+        } 
+        
+        

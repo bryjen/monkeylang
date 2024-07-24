@@ -28,7 +28,7 @@ module private TestHelpers =
             
     let assertIsNull (object: Object) =
         match object with
-        | Null -> Ok ()
+        | NullType -> Ok ()
         | _ -> Error $"[assertIsNull] Expected a Null type, got \"{object.Type()}\""
             
     let assertIsExpressionStatement statement =
@@ -38,20 +38,20 @@ module private TestHelpers =
         
     let assertEqualIntegers (expectedValue: Int64) (object: Object) =
         match object with
-        | Integer int64 when int64 = expectedValue -> Ok () 
-        | Integer int64 -> Error $"[assertEqualIntegers] Expected {expectedValue}, got {int64}" 
+        | IntegerType int64 when int64 = expectedValue -> Ok () 
+        | IntegerType int64 -> Error $"[assertEqualIntegers] Expected {expectedValue}, got {int64}" 
         | _ -> Error $"[assertEqualIntegers] Expected an Integer type, got \"{object.Type()}\"" 
         
     let assertEqualStrings (expectedValue: string) (object: Object) =
         match object with
-        | String string when string = expectedValue -> Ok () 
-        | String string -> Error $"[assertEqualStrings] Expected {expectedValue}, got {string}" 
+        | StringType string when string = expectedValue -> Ok () 
+        | StringType string -> Error $"[assertEqualStrings] Expected {expectedValue}, got {string}" 
         | _ -> Error $"[assertEqualStrings] Expected a String type, got \"{object.Type()}\"" 
         
     let assertEqualBooleans (expectedValue: bool) (object: Object) =
         match object with
-        | Boolean boolean when boolean = expectedValue -> Ok () 
-        | Boolean boolean -> Error $"[assertEqualBooleans] Expected {expectedValue}, got {boolean}" 
+        | BooleanType boolean when boolean = expectedValue -> Ok () 
+        | BooleanType boolean -> Error $"[assertEqualBooleans] Expected {expectedValue}, got {boolean}" 
         | _ -> Error $"[assertEqualBooleans] Expected a Boolean type, got \"{object.Type()}\""
         
     let assertEqualObj (expectedValue: obj) (object: Object) =
@@ -60,9 +60,20 @@ module private TestHelpers =
         | :? int as value -> assertEqualIntegers (int64 value) object
         | :? int64 as value -> assertEqualIntegers value object
         | :? string as value -> assertEqualStrings value object
-        | :? bool as value -> assertEqualBooleans value object 
+        | :? bool as value -> assertEqualBooleans value object
         | _ -> Error $"Fatal error - testing: The type \"{expectedValue.GetType()}\" is not registered. See \"TestHelpers.assertEqualObj\"."
 
+    let assertEqualObjsList (expectedValues: obj list) (object: Object) =
+        match object with
+        | ArrayType array when array.Length = expectedValues.Length ->
+            let comparisonResults = List.zip expectedValues array |> List.map (fun (e, a) -> assertEqualObj e a) 
+            match (List.tryFind Result.isError comparisonResults) with
+            | Some errorResult -> errorResult 
+            | None -> Ok () 
+        | ArrayType array ->
+            Error $"[assertEqualObjsList] Expected an \"ArrayType\" with length {expectedValues.Length}, got {array.Length}."
+        | _ ->
+            Error $"[assertEqualObjsList] 'object' was expected to be an \"ArrayType\", got \"{object.Type()}\"."
 
 
 [<TestFixture>]
@@ -387,6 +398,69 @@ type EvaluatorTests() =
                    Assert.Fail($"[Test #{currentTestCase}] {errorMsg}")
                    
                    
+    [<Test>]
+    member this.``Test array literal evaluation 1``() =
+        let testCases: (string * obj list) list = [
+            ("[1, 2, 3 + 4]", [1; 2; 7])
+            ("[1, \"foo\", \"Hello\" + \" \" + \"World\"]", [1; "foo";"Hello World"])
+        ]
+       
+        let mutable currentTestCase = 0
+        for testCase in testCases do
+            currentTestCase <- currentTestCase + 1
+            let testInput, expectedValues = testCase
+            let program = Parser.parseProgram testInput
+            
+            result {
+                do! assertNoErrors program
+                let! _, evalResult = Evaluator.evalStatementsList Environment.Empty program.Statements 
+                                  |> Result.mapError (fun errorMsg -> "[Evaluation Error] " + errorMsg)
+                do! assertEqualObjsList expectedValues evalResult
+                return evalResult
+            }
+            |> function
+               | Ok actualValue ->
+                   TestContext.WriteLine($"[Test #{currentTestCase}] \"{testInput}\", ex {expectedValues}, got {actualValue}")
+               | Error errorMsg ->
+                   Assert.Fail($"[Test #{currentTestCase}] {errorMsg}")
+                   
+                   
+    [<Test>]
+    member this.``Test index expression evaluation 1``() =
+        let testCases: (string * obj) list = [
+            ("[1, 2, 3 + 4][0] + 1", 2)
+            
+            ("let someStrings = [ \"hello\", \"world\", \"foo\", \"bar\" ];
+             someStrings[-1 * 2 + 4]",
+             "foo")
+            
+            ("let someStrings = [ \"hello\", \"world\", \"foo\", \"bar\" ];
+             let generator = fn(x) { return \"index\" + x; };
+             let arr = [ generator(0), generator(1), generator(2) ];
+             arr[0] + arr[1] + arr[2];",
+             "index0index1index2")
+        ]
+       
+        let mutable currentTestCase = 0
+        for testCase in testCases do
+            currentTestCase <- currentTestCase + 1
+            let testInput, expectedValue = testCase
+            let program = Parser.parseProgram testInput
+            
+            result {
+                do! assertNoErrors program
+                let! _, evalResult = Evaluator.evalStatementsList Environment.Empty program.Statements 
+                                  |> Result.mapError (fun errorMsg -> "[Evaluation Error] " + errorMsg)
+                do! assertEqualObj expectedValue evalResult 
+                return evalResult
+            }
+            |> function
+               | Ok actualValue ->
+                   TestContext.WriteLine($"[Test #{currentTestCase}] \"{testInput}\", ex {expectedValue}, got {actualValue}")
+               | Error errorMsg ->
+                   Assert.Fail($"[Test #{currentTestCase}] {errorMsg}")
+                   
+                   
                    
 [<TestFixture>]
 type EvaluatorErrorHandlingTests() =
@@ -411,7 +485,7 @@ type EvaluatorErrorHandlingTests() =
             result {
                 let! _, _ = Evaluator.evalStatementsList Environment.Empty program.Statements 
                                   |> Result.mapError (fun errorMsg -> "[Evaluation Error] " + errorMsg)
-                return! assertEqualObj Null Null  // returns true/Ok
+                return! assertEqualObj NullType NullType  // returns true/Ok
             }
             |> function
                | Error errorMsg ->
@@ -435,7 +509,7 @@ type EvaluatorErrorHandlingTests() =
             result {
                 let! _, _ = Evaluator.evalStatementsList Environment.Empty program.Statements 
                                   |> Result.mapError (fun errorMsg -> "[Evaluation Error] " + errorMsg)
-                return! assertEqualObj Null Null  // returns true/Ok
+                return! assertEqualObj NullType NullType  // returns true/Ok
             }
             |> function
                | Error errorMsg ->
