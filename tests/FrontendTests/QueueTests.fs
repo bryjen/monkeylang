@@ -1,8 +1,8 @@
-namespace MonkeyInterpreter.Test
+namespace Monkey.Frontend.Tests
 
 open NUnit.Framework
 open FsToolkit.ErrorHandling
-open MonkeyInterpreter.Helpers.Queue
+open Monkey.Frontend.Helpers.Queue
 
 
 [<TestFixture>]

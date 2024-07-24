@@ -1,5 +1,5 @@
 [<AutoOpen>]
-module MonkeyInterpreter.Helpers.Tuple
+module internal Monkey.Frontend.Helpers.Tuple
 
 
 /// Returns the third element in a tuple.

@@ -1,4 +1,4 @@
-namespace MonkeyInterpreter.Helpers.Queue
+namespace Monkey.Frontend.Helpers.Queue
 
 open System
 open System.Diagnostics

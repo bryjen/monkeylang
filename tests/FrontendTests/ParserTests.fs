@@ -1,13 +1,16 @@
-namespace MonkeyInterpreter.Test
+namespace Monkey.Frontend.Tests
 
 open System
-open MonkeyInterpreter.Helpers
-open MonkeyInterpreter.Helpers.Queue
+open Monkey.Frontend.Ast
+open Monkey.Frontend.Token
+open Monkey.Frontend.Lexer
+open Monkey.Frontend.Parser
+open Monkey.Frontend.Helpers
+open Monkey.Frontend.Helpers.Queue
 open NUnit.Framework
 
 open FsToolkit.ErrorHandling
 
-open MonkeyInterpreter
 
 
 [<AutoOpen>]
@@ -23,7 +26,7 @@ module private ParserHelpers =
                 match result with
                 | Ok _ -> "OK" 
                 | Error errorMessage -> errorMessage 
-            printfn $"[Test #{testCount}] Raw statement: {statement}; Expected name: {expectedName}; Status: {evaluationMessage}"
+            TestContext.WriteLine($"[Test #{testCount}] Raw statement: {statement}; Expected name: {expectedName}; Status: {evaluationMessage}")
             
     [<Obsolete("Deprecated")>]
     let assertNumberOfStatements numberOfExpectedStatements (program: Program) =
@@ -213,7 +216,6 @@ module private ParserHelpers =
         
 
 [<TestFixture>]
-[<Ignore("Old tests")>]
 type ParserTests() =
     
     [<Test>]

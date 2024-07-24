@@ -1,8 +1,7 @@
-namespace rec MonkeyInterpreter
+namespace rec Monkey.Frontend.Ast
 
-open System.Collections.Generic
 open System.Diagnostics
-open System.Net.WebSockets
+open Monkey.Frontend.Token
 
 
 

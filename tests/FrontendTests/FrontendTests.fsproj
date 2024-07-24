@@ -5,8 +5,7 @@
         <IsPackable>false</IsPackable>
         <GenerateProgramFile>false</GenerateProgramFile>
         <IsTestProject>true</IsTestProject>
-        <AssemblyName>MonkeyInterpreter.Test</AssemblyName>
-        <DefineConstants>UNIT_TESTS</DefineConstants>
+        <AssemblyName>Monkey.Frontend.Tests</AssemblyName>
     </PropertyGroup>
 
     <ItemGroup>
@@ -31,7 +30,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\MonkeyInterpreter\MonkeyInterpreter.fsproj" />
+      <ProjectReference Include="..\..\src\Frontend\Frontend.fsproj" />
     </ItemGroup>
 
 </Project>

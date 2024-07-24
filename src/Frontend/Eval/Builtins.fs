@@ -1,7 +1,7 @@
-module MonkeyInterpreter.Eval.Builtins
+module Monkey.Frontend.Eval.Builtins
 
 open Microsoft.FSharp.Core
-open MonkeyInterpreter.Eval.Object
+open Monkey.Frontend.Eval.Object
 
 
 [<AutoOpen>]

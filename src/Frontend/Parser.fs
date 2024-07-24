@@ -1,11 +1,15 @@
-namespace MonkeyInterpreter
+namespace Monkey.Frontend.Parser
 
 open System
 open System.Diagnostics
 open FsToolkit.ErrorHandling
 
 open Microsoft.FSharp.Core
-open MonkeyInterpreter.Helpers.Queue
+
+open Monkey.Frontend.Ast
+open Monkey.Frontend.Token
+open Monkey.Frontend.Lexer
+open Monkey.Frontend.Helpers.Queue
     
 
 type internal ParserState =

@@ -1,6 +1,8 @@
-namespace MonkeyInterpreter
+namespace Monkey.Frontend.Repl
 
 open System.IO
+open Monkey.Frontend.Ast
+open Monkey.Frontend.Parser
 
 module Repl =
     let private Prompt = ">> "

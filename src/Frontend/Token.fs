@@ -1,4 +1,4 @@
-namespace MonkeyInterpreter
+namespace Monkey.Frontend.Token
 
 open Microsoft.FSharp.Reflection
 

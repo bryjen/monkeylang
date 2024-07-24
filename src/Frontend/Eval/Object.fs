@@ -1,7 +1,7 @@
-module MonkeyInterpreter.Eval.Object
+module Monkey.Frontend.Eval.Object
 
 open System
-open MonkeyInterpreter
+open Monkey.Frontend.Ast
 
 
 type Environment =

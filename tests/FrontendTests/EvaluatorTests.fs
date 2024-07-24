@@ -1,17 +1,19 @@
-namespace MonkeyInterpreter.Test
+namespace Monkey.Frontend.Tests 
 
 open System
 open System.IO
-open Microsoft.VisualBasic.CompilerServices
-open MonkeyInterpreter.Eval.Evaluator
-open MonkeyInterpreter.Eval.Object
 open NUnit.Framework
 open FsToolkit.ErrorHandling
-open MonkeyInterpreter
+open Monkey.Frontend.Ast
+open Monkey.Frontend.Parser
+open Monkey.Frontend.Eval.Evaluator
+open Monkey.Frontend.Eval.Object
+
+
 
 [<AutoOpen>]
 module private TestHelpers =
-    let assertNoErrors program =
+    let assertNoErrors (program: Program) =
         match program.Errors.Length with
         | len when len > 0 ->
             let errorsAsString = program.Errors
