@@ -347,8 +347,7 @@ type EvaluatorTests() =
             ("let add = fn(x, y) { x + y; }; add(5 + 5, add(add(add(5, add(5, add(10, 10))), 5), 5));", 50)
             
             ("fn(x) { x; }(5)", 5)
-            ("
-             let message = \"Some message\";
+            ("let message = \"Some message\";
              let addPrefix = fn(str) { \"[Prefix] \" + str; };
              addPrefix(message);",
              "[Prefix] Some message")
@@ -373,6 +372,34 @@ type EvaluatorTests() =
                | Error errorMsg ->
                    Assert.Fail($"[Test #{currentTestCase}] {errorMsg}")
                    
+                   
+    // Tests for closures
+    [<Test>]
+    member this.``Test function call evaluation 2``() =
+        let testCases: (string * obj) list = [
+            ("let x = 1;
+             let operation = fn(n) { x + n; };
+             operation(2);", 3)
+        ]
+       
+        let mutable currentTestCase = 0
+        for testCase in testCases do
+            currentTestCase <- currentTestCase + 1
+            let testInput, expectedValue = testCase
+            let program = Parser.parseProgram testInput
+            
+            result {
+                do! assertNoErrors program
+                let! _, evalResult = Evaluator.evalStatementsList Environment.Empty program.Statements 
+                                  |> Result.mapError (fun errorMsg -> "[Evaluation Error] " + errorMsg)
+                do! assertEqualObj expectedValue evalResult
+                return evalResult
+            }
+            |> function
+               | Ok actualValue ->
+                   TestContext.WriteLine($"[Test #{currentTestCase}] \"{testInput}\", ex {expectedValue}, got {actualValue}")
+               | Error errorMsg ->
+                   Assert.Fail($"[Test #{currentTestCase}] {errorMsg}")
                    
                    
                    
