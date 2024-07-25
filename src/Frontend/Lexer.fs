@@ -1,4 +1,8 @@
-namespace MonkeyInterpreter
+namespace Monkey.Frontend.Lexer
+
+open Monkey.Frontend.Token
+
+
 
 [<AutoOpen>]
 module private LexerHelpers =

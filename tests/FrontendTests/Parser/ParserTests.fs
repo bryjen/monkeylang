@@ -1,14 +1,13 @@
-namespace MonkeyInterpreter.Test.Parser
+namespace Monkey.Frontend.Tests.Parser
 
-open System
-open System.Linq.Expressions
-open MonkeyInterpreter.Helpers
-open MonkeyInterpreter.Helpers.Queue
 open NUnit.Framework
 
 open FsToolkit.ErrorHandling
 
-open MonkeyInterpreter
+open Monkey.Frontend.Ast
+open Monkey.Frontend.Parser
+open Monkey.Frontend.Tests.Parser.Helpers
+
 
 [<TestFixture>]
 type ParsingTests() =

@@ -1,12 +1,8 @@
-namespace MonkeyInterpreter.Test
+namespace Monkey.Frontend.Tests
 
-open System
-open MonkeyInterpreter.Helpers
+open Monkey.Frontend.Token
+open Monkey.Frontend.Ast
 open NUnit.Framework
-
-open FsToolkit.ErrorHandling
-
-open MonkeyInterpreter
 
 
 [<TestFixture>]

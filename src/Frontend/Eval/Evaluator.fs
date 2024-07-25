@@ -1,8 +1,8 @@
-module rec MonkeyInterpreter.Eval.Evaluator
+module rec Monkey.Frontend.Eval.Evaluator
 
 open FsToolkit.ErrorHandling
-open MonkeyInterpreter
-open MonkeyInterpreter.Eval.Object
+open Monkey.Frontend.Ast
+open Monkey.Frontend.Eval.Object
 
 
 

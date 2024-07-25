@@ -1,10 +1,10 @@
 [<AutoOpen>]
-module MonkeyInterpreter.Test.Parser.Helpers
+module Monkey.Frontend.Tests.Parser.Helpers
 
 open System
 open System.Diagnostics
 open FsToolkit.ErrorHandling
-open MonkeyInterpreter
+open Monkey.Frontend.Ast
 
 
 let private getNameOfFunction () =

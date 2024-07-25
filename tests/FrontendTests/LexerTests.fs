@@ -1,11 +1,12 @@
-namespace MonkeyInterpreter.Test
+namespace Monkey.Frontend.Tests
 
-open MonkeyInterpreter.Helpers
 open NUnit.Framework
-
 open FsToolkit.ErrorHandling
 
-open MonkeyInterpreter
+open Monkey.Frontend.Token
+open Monkey.Frontend.Lexer
+open Monkey.Frontend.Helpers
+
 
 
 module private LexerLog =
@@ -57,7 +58,7 @@ module private LexerHelpers =
             |> processResultsList
             
         // Clean-up, post logs, etc. before passing/failing
-        printfn $"Log:\n{LexerLog.log}"
+        TestContext.WriteLine($"Log:\n{LexerLog.log}")
         
         testResult
         |> function

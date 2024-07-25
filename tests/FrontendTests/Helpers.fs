@@ -1,5 +1,5 @@
 [<AutoOpen>]
-module MonkeyInterpreter.Test.Helpers
+module Monkey.Frontend.Tests.Helpers
 
 open FsToolkit.ErrorHandling
 

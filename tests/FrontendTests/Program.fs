@@ -1,4 +1,4 @@
-namespace MonkeyInterpreter.Test
+namespace Monkey.Frontend.Tests
 
 module Program =
 
