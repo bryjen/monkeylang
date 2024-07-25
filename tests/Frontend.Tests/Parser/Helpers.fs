@@ -234,3 +234,19 @@ let testInfixExpression (expr: Expression) (expectedLeft: obj) (expectedOperator
         
         do! testLiteralExpression infixExpression.Right expectedRight 
     }
+
+let assertStatementsHaveEqualStrRepresentation (statement: Statement) (expectedStrRepresentation: string) =
+    let statementStr = statement.ToString()
+    match statementStr = expectedStrRepresentation with
+    | true -> Ok (statementStr, expectedStrRepresentation)
+    | false -> Error $"Expected statement to be \"{expectedStrRepresentation}\", got \"{statementStr}\""
+    
+let assertListHasNoErrors (resultList: Result<'a, string> list) =
+    match (List.tryFind Result.isError resultList) with
+    | Some value -> value |> Result.map (fun _ -> ())
+    | None -> Ok ()
+    
+let forceGetOkCase result =
+    match result with
+    | Ok value -> value
+    | Error _ -> failwith "fatal error, tried to forcibly access the 'Ok' value." 

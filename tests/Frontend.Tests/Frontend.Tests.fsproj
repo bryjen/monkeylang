@@ -10,8 +10,9 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <Compile Include="QueueTests.fs" />
+        <Compile Include="Attributes.fs" />
         <Compile Include="Helpers.fs" />
+        <Compile Include="QueueTests.fs" />
         <Compile Include="AstTests.fs" />
         <Compile Include="LexerTests.fs" />
         <Compile Include="ParserTests.fs" />

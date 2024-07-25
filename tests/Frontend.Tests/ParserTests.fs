@@ -15,7 +15,7 @@ open FsToolkit.ErrorHandling
 
 [<AutoOpen>]
 module private ParserHelpers =
-    
+    (*
     [<Obsolete("Deprecated")>]
     let printTestLetStatementResults (evaluatedTestCases: (Statement * (int * string) * Result<unit, string>) list) =
         for evaluatedTestCase in evaluatedTestCases do
@@ -105,6 +105,7 @@ module private ParserHelpers =
         |> function
             | Ok _ -> Assert.Pass()
             | Error errorMsg -> Assert.Fail(errorMsg)
+    *)
             
 
     let testIntegerLiteral (expr: Expression) (expectedValue: int64) =
@@ -215,9 +216,11 @@ module private ParserHelpers =
             failwith $"Type of expr not handled, got type \"{value.GetType()}\""
         
 
+[<Ignore("Old parser tests, check \"Monkey.Frontend.Tests.Parser\".")>]
 [<TestFixture>]
 type ParserTests() =
     
+    (*
     [<Test>]
     [<Order(1)>]
     member this.``Test 'let' statement parsing 1``() =
@@ -352,6 +355,7 @@ let 838383;
         
         let program = Parser.parseProgram testInput
         List.iter (fun assertion -> assertion program) assertions 
+    *)
 
     
     [<Test>]
