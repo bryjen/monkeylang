@@ -26,7 +26,7 @@ module Repl =
         |> List.map (fun errorMsg -> "- " + errorMsg)
         |> String.concat "\n"
         
-    and private evalLoop stdout currentEnv statements =
+    and internal evalLoop stdout currentEnv statements =
         match statements with
         | currentStatement :: remaining ->
             match Evaluator.evalStatement currentEnv currentStatement with
@@ -43,5 +43,10 @@ module Repl =
 
 [<EntryPoint>]
 let main _ =
+    (*
     Repl.startRepl Environment.Empty stdin stdout
+    *)
+    let testInput = "let signature = \"[ ... ]\"; let format = fn(str) { return signature + \" \" + str; }; println(format(\"Hello World!\"));"
+    let program = Parser.parseProgram testInput
+    Repl.evalLoop stdout Environment.Empty program.Statements |> ignore
     0
