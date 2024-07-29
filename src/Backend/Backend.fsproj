@@ -9,4 +9,8 @@
         <Compile Include="Code.fs" />
     </ItemGroup>
 
+    <ItemGroup>
+        <PackageReference Include="FsToolkit.ErrorHandling" Version="4.15.2" />
+    </ItemGroup>
+
 </Project>
