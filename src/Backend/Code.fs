@@ -1,10 +1,26 @@
-module Monkey.Backend.Code
+module rec Monkey.Backend.Code
 
 open System
-open Microsoft.FSharp.Reflection
+open FsToolkit.ErrorHandling
 
 
 type Instructions = Instructions of byte array
+with
+    member this.GetBytes() =
+        match this with
+        | Instructions bytes -> bytes
+        
+    override this.ToString() =
+        match unmake this with
+        | Ok tupleList ->
+            let formatTuple (offset, definition, operands) =
+                let operandsAsString = operands |> Array.map string |> String.concat " "
+                $"%04d{offset} {definition.Name} {operandsAsString}"
+                
+            tupleList |> List.map formatTuple |> String.concat "\n"
+        | Error errorValue ->
+            $"Error: Could not represent the instructions as a str: \"{errorValue}\""
+
 
 type Opcode =
     | OpConstant = 0x00uy
@@ -14,6 +30,7 @@ type Definition =
     { Name: string
       OperandWidths: int array }
 
+    
     
 let private numberOfCases = Enum.GetValues(typeof<Opcode>).Length |> byte
 
@@ -64,9 +81,49 @@ let rec make (opcode: Opcode) (operands: int array) =
         failwith "todo"
     
     
+let rec unmake (instruction: Instructions) : Result<(int * Definition * int array) list, string> =
+    result {
+        let byteArray = instruction.GetBytes()
+        let! offsetAndDefinitionPairs = getOffsetAndDefinitionPairs 0 byteArray []
+        let operands = List.map (fun (offset, def) -> readOperands byteArray def (offset + 1)) offsetAndDefinitionPairs
+        
+        let offsets, definitions = List.unzip offsetAndDefinitionPairs
+        return List.zip3 offsets definitions operands
+    }
     
-and toBytes (value: int) =
-    let bytes = BitConverter.GetBytes(value)
-    match BitConverter.IsLittleEndian with
-    | true -> Array.rev 
-    | false -> failwith "todo"
+and private getOffsetAndDefinitionPairs (currentIndex: int) (byteArray: byte array) (pairs: (int * Definition) list) =
+    match currentIndex with
+    | i when i >= 0 && i < byteArray.Length ->
+        match lookup byteArray[0] with
+        | Some definition ->
+            let totalWidth = Array.sum definition.OperandWidths
+            let newPairs = (currentIndex, definition) :: pairs
+            getOffsetAndDefinitionPairs (currentIndex + totalWidth + 1) byteArray newPairs 
+        | None ->
+            Error $"Error: Could not find an opcode that corresponds with the byte: \"{byteArray[0]}\""
+    
+    | i ->
+        if i = byteArray.Length then
+            pairs |> List.rev |> Ok
+        else
+            failwith "todo"
+    
+and readOperands byteArray definition initialOffset : int array =
+    let operands = Array.zeroCreate<int> definition.OperandWidths.Length
+    let mutable offset = initialOffset 
+    
+    for i in 0 .. (operands.Length - 1) do
+        let width = definition.OperandWidths[i]
+        match width with
+        | w when w = 2 ->
+            operands[i] <- byteArray[offset..(offset + width - 1)] |> readUInt16 |> int
+        | _ ->
+            failwith "todo"
+            
+        offset <- offset + width
+
+    operands
+    
+and readUInt16 byteArr =
+    let reversedByteArr = Array.rev byteArr
+    BitConverter.ToUInt16(reversedByteArr, 0)

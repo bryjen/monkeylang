@@ -7,10 +7,15 @@
 
     <ItemGroup>
         <Compile Include="Code.fs" />
+        <Compile Include="Compiler.fs" />
     </ItemGroup>
 
     <ItemGroup>
         <PackageReference Include="FsToolkit.ErrorHandling" Version="4.15.2" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\Frontend\Frontend.fsproj" />
     </ItemGroup>
 
 </Project>

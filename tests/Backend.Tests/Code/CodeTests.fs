@@ -56,3 +56,44 @@ type OpcodeTests() =
         |> function
            | Ok _ -> Assert.Pass("Test passed.\n\n")
            | Error errorMsg -> Assert.Fail(errorMsg)
+           
+           
+    (*
+    member this.``C: Test Read Operands``(opcode: Opcode, operands: int array, bytesRead: int) =
+        let instruction = make opcode operands
+        
+        result {
+            let definitionOption = opcode |> byte |> lookup
+            let! definition =
+                match definitionOption with
+                | Some definition -> Ok definition
+                | _ -> Error $"[Error] No definition for the opcode value \"{getEnumCaseName opcode}\""
+                
+            
+        }
+    *)
+        
+           
+    [<Test>]
+    member this.``D: Test Instructions String 1``() =
+        let byteJaggedArray = [|
+            make Opcode.OpConstant [| 1 |]
+            make Opcode.OpConstant [| 2 |]
+            make Opcode.OpConstant [| 65535 |]
+        |]
+        
+        let expected = """0000 OpConstant 1
+0003 OpConstant 2
+0006 OpConstant 65535"""
+
+        let asInstruction = byteJaggedArray |> Array.concat |> Instructions
+        let asString = asInstruction.ToString().Trim()
+        
+        TestContext.WriteLine($"Expected:\n{expected}\n\n")
+        TestContext.WriteLine($"Got:\n{asString}\n\n")
+        
+        match asString.ReplaceLineEndings()  = expected.ReplaceLineEndings() with
+        | true -> Assert.Pass("Passed.") 
+        | false -> Assert.Fail("Failed.")
+
+    

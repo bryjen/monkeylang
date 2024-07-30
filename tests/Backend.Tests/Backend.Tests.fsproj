@@ -20,6 +20,8 @@
     <ItemGroup>
       <Compile Include="Code\Helpers.fs" />
       <Compile Include="Code\CodeTests.fs" />
+      <Compile Include="Compiler\Helpers.fs" />
+      <Compile Include="Compiler\CompilerTests.fs" />
     </ItemGroup>
 
     <ItemGroup>

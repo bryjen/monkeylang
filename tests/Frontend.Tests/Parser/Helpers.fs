@@ -28,7 +28,7 @@ module Program =
             let errorsListAsStr = program.Errors |> List.map (fun str -> "- " + str) |> String.concat "\n"
             Error $"{getNameOfFunction ()} \"Program\" was expected to have no errors, got {program.Errors.Length} errors: \n\n{errorsListAsStr}"
         
-        
+       
         
 [<RequireQualifiedAccess>]
 module Statement =
