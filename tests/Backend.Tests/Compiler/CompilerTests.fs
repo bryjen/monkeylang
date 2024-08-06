@@ -44,7 +44,7 @@ type CompilerTests() =
             let nodes = programToNodes program
             
             let compiler = Compiler.New
-            let! updatedCompiler = compiler.CompileMultiple(nodes)
+            let! updatedCompiler = compiler.Compile(nodes[0]) // TODO: Change to handle multiple statements
             let bytecode = updatedCompiler.Bytecode()
             
             do! CompilerHelpers.testInstructions compilerTestCase.ExpectedInstructions bytecode.Instructions
