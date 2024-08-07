@@ -1,5 +1,7 @@
 module Monkey.Backend.VirtualMachine
 
+
+open FsToolkit.ErrorHandling
 open Monkey.Backend.Code
 open Monkey.Backend.Compiler
 open Monkey.Backend.Helpers
@@ -20,6 +22,8 @@ with
           
           Stack = Array.zeroCreate<ObjectWrapper> stackSize
           StackPointer = 0 }
+        
+    static member private FailedPopMessage = "Could not pop stack. Stack is empty."
         
 
     member this.StackTop() =
@@ -42,9 +46,12 @@ with
             if i < asByteArr.Length then
                 let opcode = LanguagePrimitives.EnumOfValue<byte, Opcode> asByteArr[i] 
                 match opcode with
-                | Opcode.OpConstant -> vm.HandleOpConstant(&i, asByteArr)
-                | Opcode.OpAdd -> failwith "todo"
-                | _ -> failwith "todo"
+                | Opcode.OpConstant ->
+                    vm.HandleOpConstant(&i, asByteArr)
+                | Opcode.OpAdd ->
+                    vm.HandleOpAdd(&i)
+                | _ ->
+                    failwith "todo"
                 |> Result.map (fun newVm -> callback (); newVm) // Call the callback
                 |> Result.bind runHelper
             else
@@ -54,9 +61,25 @@ with
         
         
     member private this.HandleOpConstant(i: byref<int>, byteArr: byte array) : Result<VM, string> =
-        let constIndex = readUInt16 (byteArr[i + 1 .. i + 3])
+        let arraySlice = byteArr[i + 1 .. i + 2]
+        let constIndex = readUInt16 arraySlice
         i <- i + 2
         this.Push(this.Constants[int constIndex])
+        
+    member private this.HandleOpAdd(i: byref<int>) : Result<VM, string> =
+        result {
+            let fromOptionToResult opt = if Option.isSome opt then Ok opt.Value else Error VM.FailedPopMessage
+            let! newVm, right = this.Pop() |> fromOptionToResult
+            let! newVm, left = newVm.Pop() |> fromOptionToResult
+            let! result =
+                match left, right with
+                | Object.IntegerType l, Object.IntegerType r -> (l + r) |> Object.IntegerType |> Ok 
+                | Object.StringType l, Object.StringType r -> failwith "todo"
+                | Object.IntegerType l, Object.StringType r -> failwith "todo"
+                | Object.StringType l, Object.IntegerType r -> failwith "todo"
+                | _ -> Error $"The operation \"{left.Type()}\" \"+\" \"{right.Type()}\" is not valid."
+            return! newVm.Push(result)
+        }
         
     member private this.Push(object: Object) : Result<VM, string> =
         match this.StackPointer >= stackSize with
@@ -66,3 +89,14 @@ with
             this.Stack[this.StackPointer] <- ObjectWrapper object
             this.StackPointer <- this.StackPointer + 1
             Ok this
+            
+    member private this.Pop() : (VM * Object) option =
+        match this.StackPointer >= stackSize with
+        | true -> None
+        | false ->
+            let objectWrapper = this.Stack[this.StackPointer - 1]
+            match isNull objectWrapper with
+            | true -> None 
+            | false ->
+                this.StackPointer <- this.StackPointer - 1
+                Some (this, objectWrapper.Value) 

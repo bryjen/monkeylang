@@ -25,6 +25,7 @@ type CompilerTests() =
           ExpectedInstructions = [|
               make Opcode.OpConstant [| 0 |]
               make Opcode.OpConstant [| 1 |]
+              make Opcode.OpAdd [| |]
           |] |> Array.map Instructions
         }
         
@@ -46,6 +47,13 @@ type CompilerTests() =
             let compiler = Compiler.New
             let! updatedCompiler = compiler.Compile(nodes[0]) // TODO: Change to handle multiple statements
             let bytecode = updatedCompiler.Bytecode()
+            
+            let expectedInstructions = compilerTestCase.ExpectedInstructions
+                                       |> Array.map (_.GetBytes())
+                                       |> Array.concat
+                                       |> Instructions
+            TestContext.WriteLine($"\nExpected:\n{expectedInstructions.ToString()}\n")
+            TestContext.WriteLine($"Got:\n{bytecode.Instructions.ToString()}\n")
             
             do! CompilerHelpers.testInstructions compilerTestCase.ExpectedInstructions bytecode.Instructions
             

@@ -14,6 +14,7 @@ with
         { Instructions = Instructions [|  |]
           Constants = [] }
         
+    // START Private members
     member private this.AddConstant(object: Object) =
         let newCompiler = { this with Constants = object :: this.Constants }
         newCompiler, newCompiler.Constants.Length - 1   // will rev when converting to bytecode
@@ -27,6 +28,19 @@ with
         let newInstructions = Array.append (this.Instructions.GetBytes()) instruction
         let newCompiler = { this with Instructions = Instructions newInstructions }
         newCompiler, instruction.Length
+        
+    member private this.ProcessInfixExprOperator(operator: string) =
+        match operator with
+        | "+" -> this.Emit(Opcode.OpAdd, [|  |]) |> Ok
+        | "-" -> failwith "todo"
+        | "*" -> failwith "todo"
+        | "/" -> failwith "todo"
+        | "==" -> failwith "todo"
+        | "!=" -> failwith "todo"
+        | "<" -> failwith "todo"
+        | ">" -> failwith "todo"
+        | s -> Error $"'{operator}' is not a valid infix expression operator" 
+    // END Private members
         
     member this.Compile(node: Node) : Result<Compiler, string> =
         match node with
@@ -60,6 +74,8 @@ with
         | InfixExpression infixExpression ->
             this.CompileExpression(infixExpression.Left)
             |> Result.bind (_.CompileExpression(infixExpression.Right))
+            |> Result.bind (_.ProcessInfixExprOperator(infixExpression.Operator))
+            |> Result.map fst
         | IfExpression ifExpression -> failwith "todo"
         | CallExpression callExpression -> failwith "todo"
         | IndexExpression indexExpression -> failwith "todo"

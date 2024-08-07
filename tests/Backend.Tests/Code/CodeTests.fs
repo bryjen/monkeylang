@@ -1,6 +1,7 @@
 namespace Monkey.Backend.Tests.Code
 
 open System
+open System.Text.RegularExpressions
 open NUnit.Framework
 open FsToolkit.ErrorHandling
 
@@ -72,28 +73,46 @@ type OpcodeTests() =
             
         }
     *)
-        
-           
-    [<Test>]
-    member this.``D: Test Instructions String 1``() =
-        let byteJaggedArray = [|
+    
+    static member D_TestCasesToExecute = [|
+        ([|
             make Opcode.OpConstant [| 1 |]
             make Opcode.OpConstant [| 2 |]
             make Opcode.OpConstant [| 65535 |]
-        |]
-        
-        let expected = """0000 OpConstant 1
+        |],
+         """0000 OpConstant 1
 0003 OpConstant 2
-0006 OpConstant 65535"""
-
+0006 OpConstant 65535""")
+        
+        ([|
+            make Opcode.OpAdd [| |]
+            make Opcode.OpConstant [| 2 |]
+            make Opcode.OpConstant [| 65535 |]
+        |],
+         """0000 OpAdd 
+0001 OpConstant 2
+0004 OpConstant 65535""")
+    |]
+        
+           
+    [<TestCaseSource("D_TestCasesToExecute")>]
+    member this.``D: Test Instructions String``(testCase: byte array array * string) =
+        let byteJaggedArray, expected = testCase
         let asInstruction = byteJaggedArray |> Array.concat |> Instructions
-        let asString = asInstruction.ToString().Trim()
+        let asInstructionStr = asInstruction.ToString().Trim()
         
         TestContext.WriteLine($"Expected:\n{expected}\n\n")
-        TestContext.WriteLine($"Got:\n{asString}\n\n")
+        TestContext.WriteLine($"Got:\n{asInstructionStr}\n\n")
         
-        match asString.ReplaceLineEndings()  = expected.ReplaceLineEndings() with
-        | true -> Assert.Pass("Passed.") 
-        | false -> Assert.Fail("Failed.")
+        let pattern = @"\s+"
+        let regex = Regex(pattern)
+        let actualToCompare = regex.Replace(asInstructionStr, "")
+        let expectedToCompare = regex.Replace(expected, "")
+        
+        TestContext.WriteLine($"Comparing(expected vs. actual):\n{expectedToCompare}\nvs\n{actualToCompare}\n")
+        
+        match String.Equals(actualToCompare, expectedToCompare) with
+        | true -> Assert.Pass("Passed.\n") 
+        | false -> Assert.Fail("Failed.\n")
 
     

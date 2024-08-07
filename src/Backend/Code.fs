@@ -15,7 +15,7 @@ with
         | Ok tupleList ->
             let formatTuple (offset, definition, operands) =
                 let operandsAsString = operands |> Array.map string |> String.concat " "
-                $"%04d{offset} {definition.Name} {operandsAsString}"
+                $"%04d{offset} {definition.Name} {operandsAsString}".Trim()
                 
             tupleList |> List.map formatTuple |> String.concat "\n"
         | Error errorValue ->
@@ -71,7 +71,8 @@ let rec make (opcode: Opcode) (operands: int array) =
             let operandAsBytesBE = [| operandAsBytes[1]; operandAsBytes[0] |]
             
             match width with
-            | w when w = 2 -> Array.blit operandAsBytesBE 0 instruction offset operandAsBytesBE.Length
+            | w when w = 2 ->
+                Array.blit operandAsBytesBE 0 instruction offset operandAsBytesBE.Length
             | _ -> failwith "todo"
             offset <- offset + width
         
@@ -94,7 +95,7 @@ let rec unmake (instruction: Instructions) : Result<(int * Definition * int arra
 and private getOffsetAndDefinitionPairs (currentIndex: int) (byteArray: byte array) (pairs: (int * Definition) list) =
     match currentIndex with
     | i when i >= 0 && i < byteArray.Length ->
-        match lookup byteArray[0] with
+        match lookup byteArray[i] with
         | Some definition ->
             let totalWidth = Array.sum definition.OperandWidths
             let newPairs = (currentIndex, definition) :: pairs
@@ -115,6 +116,8 @@ and readOperands byteArray definition initialOffset : int array =
     for i in 0 .. (operands.Length - 1) do
         let width = definition.OperandWidths[i]
         match width with
+        | w when w = 0 ->
+            ()
         | w when w = 2 ->
             operands[i] <- byteArray[offset..(offset + width - 1)] |> readUInt16 |> int
         | _ ->

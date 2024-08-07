@@ -21,10 +21,8 @@ type VirtualMachineTests() =
               Expected = 1 }
             { Input = "2"
               Expected = 2 }
-            (*
             { Input = "1 + 2"
               Expected = 3 }
-            *)
         |]
         
         
