@@ -26,15 +26,15 @@ with
     static member private FailedPopMessage = "Could not pop stack. Stack is empty."
         
 
-    member this.StackTop() =
+    member internal this.LastPoppedStackElement() =
         match this.StackPointer with
-        | sp when sp = 0 -> None
-        | sp ->
-            let peek = this.Stack[sp - 1]
+        | sp when sp >= 0 && sp < stackSize ->
+            let peek = this.Stack[sp]
             match System.Object.ReferenceEquals(peek, null) with
             | true -> None 
             | false -> Some peek.Value
-        
+        | _ -> None
+            
     static member Run(vm: VM) : Result<VM, string> =
         let asByteArr = vm.Instructions.GetBytes()
         let mutable i = 0
@@ -47,11 +47,15 @@ with
                 let opcode = LanguagePrimitives.EnumOfValue<byte, Opcode> asByteArr[i] 
                 match opcode with
                 | Opcode.OpConstant ->
-                    vm.HandleOpConstant(&i, asByteArr)
+                    _vm.HandleOpConstant(&i, asByteArr)
                 | Opcode.OpAdd ->
-                    vm.HandleOpAdd(&i)
+                    _vm.HandleOpAdd(&i)
+                | Opcode.OpPop ->
+                    match _vm.Pop() with
+                    | None -> Ok _vm 
+                    | Some (newVm, _) -> Ok newVm 
                 | _ ->
-                    failwith "todo"
+                    failwith "unrecognized opcode"
                 |> Result.map (fun newVm -> callback (); newVm) // Call the callback
                 |> Result.bind runHelper
             else
@@ -94,7 +98,10 @@ with
         match this.StackPointer >= stackSize with
         | true -> None
         | false ->
-            let objectWrapper = this.Stack[this.StackPointer - 1]
+            let i = this.StackPointer - 1
+            let objectWrapper = this.Stack[i]
+            // this.Stack[i] <- null
+            
             match isNull objectWrapper with
             | true -> None 
             | false ->

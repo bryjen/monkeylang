@@ -52,7 +52,9 @@ with
         | LetStatement letStatement -> failwith "todo"
         | ReturnStatement returnStatement -> failwith "todo"
         | ExpressionStatement expressionStatement ->
-            this.CompileExpression(expressionStatement.Expression) 
+            this.CompileExpression(expressionStatement.Expression)
+            |> Result.map (_.Emit(Opcode.OpPop, [|  |]))
+            |> Result.map fst
         | BlockStatement blockStatement -> failwith "todo"
         
     member private this.CompileExpression(expression: Expression) =

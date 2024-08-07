@@ -26,27 +26,41 @@ type CompilerTests() =
               make Opcode.OpConstant [| 0 |]
               make Opcode.OpConstant [| 1 |]
               make Opcode.OpAdd [| |]
+              make Opcode.OpPop [| |]
           |] |> Array.map Instructions
         }
         
+    static member ``B: Test OpPop generation`` = 
+        { Input = "1; 2;"
+          ExpectedConstants = [| 1; 2 |]
+          ExpectedInstructions = [|
+              make Opcode.OpConstant [| 0 |]
+              make Opcode.OpPop [| |]
+              make Opcode.OpConstant [| 1 |]
+              make Opcode.OpPop [| |]
+          |] |> Array.map Instructions
+        }
         
     static member TestCasesToExecute = [|
-        ("\"A: Test Integer Arithmetic Case\"", CompilerTests.``A: Test Integer Arithmetic Case``)
+        CompilerTests.``A: Test Integer Arithmetic Case``
+        CompilerTests.``B: Test OpPop generation``
     |]
     
     [<TestCaseSource("TestCasesToExecute")>]
-    member this.``Run Compiler Tests``(testCase: string * CompilerTestCase) =
-        let testCaseName, compilerTestCase = testCase
-        TestContext.WriteLine($"{testCaseName}")
+    member this.``Run Compiler Tests``(compilerTestCase: CompilerTestCase) =
+        // TestContext.WriteLine($"{testCaseName}")
         TestContext.WriteLine($"Input: \"{compilerTestCase.Input}\"")
         
         result {
             let program = Parser.parseProgram compilerTestCase.Input
             let nodes = programToNodes program
             
-            let compiler = Compiler.New
-            let! updatedCompiler = compiler.Compile(nodes[0]) // TODO: Change to handle multiple statements
-            let bytecode = updatedCompiler.Bytecode()
+            let mutable compiler = Compiler.New
+            for node in nodes do
+                let! newCompiler = compiler.Compile(node)
+                compiler <- newCompiler
+                
+            let bytecode = compiler.Bytecode()
             
             let expectedInstructions = compilerTestCase.ExpectedInstructions
                                        |> Array.map (_.GetBytes())

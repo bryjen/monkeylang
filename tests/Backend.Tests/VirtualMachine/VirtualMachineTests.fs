@@ -42,15 +42,19 @@ type VirtualMachineTests() =
             
             let compiler = Compiler.New
             let! newCompiler = compiler.Compile(nodes[0])
-            let vm = VM.FromByteCode(newCompiler.Bytecode())
-            let! _ = VM.Run(vm)
+            let byteCode = newCompiler.Bytecode()
             
-            let stackTopOption = vm.StackTop()
+            TestContext.WriteLine($"Got:\n{byteCode.Instructions.ToString()}")
+            
+            let vm = VM.FromByteCode(byteCode)
+            let! newVm = VM.Run(vm)
+            
+            let resultOption = newVm.LastPoppedStackElement()
             return! 
-                match stackTopOption with
+                match resultOption with
                 | None -> Error "Stack top is empty" 
-                | Some stackTop -> VMHelpers.testExpectedObject vmTestCase.Expected stackTop
+                | Some result -> VMHelpers.testExpectedObject vmTestCase.Expected result
         }
         |> function
-           | Ok _ -> Assert.Pass("Passed")
+           | Ok _ -> Assert.Pass("Passed\n")
            | Error errorMsg -> Assert.Fail(errorMsg)

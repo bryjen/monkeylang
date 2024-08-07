@@ -25,6 +25,7 @@ with
 type Opcode =
     | OpConstant = 0x00uy
     | OpAdd      = 0x01uy
+    | OpPop      = 0x02uy
 
 type Definition =
     { Name: string
@@ -37,6 +38,7 @@ let private numberOfCases = Enum.GetValues(typeof<Opcode>).Length |> byte
 let private opcodeDefinitions = Map.ofList [
     (Opcode.OpConstant,     { Name = "OpConstant"; OperandWidths = [| 2 |] })
     (Opcode.OpAdd,          { Name = "OpAdd"; OperandWidths = [| |] })
+    (Opcode.OpPop,          { Name = "OpPop"; OperandWidths = [| |] })
 ]
 
 
