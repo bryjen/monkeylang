@@ -45,7 +45,7 @@ type VirtualMachineTests() =
             let compiler = Compiler.New
             let! newCompiler = compiler.Compile(nodes[0])
             let vm = VM.FromByteCode(newCompiler.Bytecode())
-            do! vm.Run()
+            let! _ = VM.Run(vm)
             
             let stackTopOption = vm.StackTop()
             return! 

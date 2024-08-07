@@ -48,23 +48,21 @@ with
             let newCompiler, constPos = this.AddConstant(integerObj)
             let newCompiler, _ = newCompiler.Emit(Opcode.OpConstant, [| constPos |])
             Ok newCompiler
-        | PrefixExpression prefixExpression -> failwith "todo"
-        | InfixExpression infixExpression ->
-            result {
-                let! newCompiler = this.CompileExpression(infixExpression.Left)
-                let! newCompiler = newCompiler.CompileExpression(infixExpression.Right)
-                return newCompiler
-            }
-        | IfExpression ifExpression -> failwith "todo"
-        | CallExpression callExpression -> failwith "todo"
-        | IndexExpression indexExpression -> failwith "todo"
-        | Expression.FunctionLiteral functionLiteral -> failwith "todo"
+        | BooleanLiteral booleanLiteral -> failwith "todo"
         | StringLiteral stringLiteral -> failwith "todo"
+        | Expression.FunctionLiteral functionLiteral -> failwith "todo"
         | ArrayLiteral arrayLiteral -> failwith "todo"
         | HashLiteral hashLiteral -> failwith "todo"
         | MacroLiteral macroLiteral -> failwith "todo"
         | Expression.Identifier identifier -> failwith "todo"
-        | BooleanLiteral booleanLiteral -> failwith "todo"
+        
+        | PrefixExpression prefixExpression -> failwith "todo"
+        | InfixExpression infixExpression ->
+            this.CompileExpression(infixExpression.Left)
+            |> Result.bind (_.CompileExpression(infixExpression.Right))
+        | IfExpression ifExpression -> failwith "todo"
+        | CallExpression callExpression -> failwith "todo"
+        | IndexExpression indexExpression -> failwith "todo"
         
         
     member this.Bytecode() : Bytecode =

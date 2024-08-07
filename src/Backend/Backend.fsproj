@@ -6,6 +6,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <Compile Include="Helpers.fs" />
         <Compile Include="Code.fs" />
         <Compile Include="Compiler.fs" />
         <Compile Include="VirtualMachine.fs" />
