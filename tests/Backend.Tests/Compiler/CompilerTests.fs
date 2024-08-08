@@ -19,7 +19,7 @@ type CompilerTestCase =
 [<TestFixture>]
 type CompilerTests() =
     
-    static member ``A: Test Integer Arithmetic Case`` =
+    static member ``A: Test Integer Arithmetic Case`` = [|
         { Input = "1 + 2"
           ExpectedConstants = [| 1; 2 |]
           ExpectedInstructions = [|
@@ -27,10 +27,8 @@ type CompilerTests() =
               make Opcode.OpConstant [| 1 |]
               make Opcode.OpAdd [| |]
               make Opcode.OpPop [| |]
-          |] |> Array.map Instructions
-        }
+          |] |> Array.map Instructions }
         
-    static member ``B: Test OpPop generation`` = 
         { Input = "1; 2;"
           ExpectedConstants = [| 1; 2 |]
           ExpectedInstructions = [|
@@ -38,13 +36,114 @@ type CompilerTests() =
               make Opcode.OpPop [| |]
               make Opcode.OpConstant [| 1 |]
               make Opcode.OpPop [| |]
-          |] |> Array.map Instructions
-        }
+          |] |> Array.map Instructions }
         
-    static member TestCasesToExecute = [|
-        CompilerTests.``A: Test Integer Arithmetic Case``
-        CompilerTests.``B: Test OpPop generation``
+        { Input = "1 - 2"
+          ExpectedConstants = [| 1; 2 |]
+          ExpectedInstructions = [|
+              make Opcode.OpConstant [| 0 |]
+              make Opcode.OpConstant [| 1 |]
+              make Opcode.OpSub [| |]
+              make Opcode.OpPop [| |]
+          |] |> Array.map Instructions }
+        
+        { Input = "1 * 2"
+          ExpectedConstants = [| 1; 2 |]
+          ExpectedInstructions = [|
+              make Opcode.OpConstant [| 0 |]
+              make Opcode.OpConstant [| 1 |]
+              make Opcode.OpMul [| |]
+              make Opcode.OpPop [| |]
+          |] |> Array.map Instructions }
+        
+        { Input = "2 / 1"
+          ExpectedConstants = [| 2; 1 |]
+          ExpectedInstructions = [|
+              make Opcode.OpConstant [| 0 |]
+              make Opcode.OpConstant [| 1 |]
+              make Opcode.OpDiv [| |]
+              make Opcode.OpPop [| |]
+          |] |> Array.map Instructions }
     |]
+    
+    static member ``B: Test Boolean Expr codegen 1`` = [|
+        { Input = "true"
+          ExpectedConstants = [| |]
+          ExpectedInstructions = [|
+              make Opcode.OpTrue [| |]
+              make Opcode.OpPop [| |]
+          |] |> Array.map Instructions }
+        
+        { Input = "false"
+          ExpectedConstants = [| |]
+          ExpectedInstructions = [|
+              make Opcode.OpFalse [| |]
+              make Opcode.OpPop [| |]
+          |] |> Array.map Instructions }
+    |]
+    
+    static member ``C: Test Boolean Expr codegen 2`` = [|
+        { Input = "1 > 2"
+          ExpectedConstants = [| 1; 2 |]
+          ExpectedInstructions = [|
+              make Opcode.OpConstant [| 0 |]
+              make Opcode.OpConstant [| 1 |]
+              make Opcode.OpGreaterThan [| |]
+              make Opcode.OpPop [| |]
+          |] |> Array.map Instructions }
+        
+        { Input = "1 < 2"
+          ExpectedConstants = [| 2; 1 |]
+          ExpectedInstructions = [|
+              make Opcode.OpConstant [| 0 |]
+              make Opcode.OpConstant [| 1 |]
+              make Opcode.OpGreaterThan [| |]
+              make Opcode.OpPop [| |]
+          |] |> Array.map Instructions }
+        
+        { Input = "1 == 2"
+          ExpectedConstants = [| 1; 2 |]
+          ExpectedInstructions = [|
+              make Opcode.OpConstant [| 0 |]
+              make Opcode.OpConstant [| 1 |]
+              make Opcode.OpEqual [| |]
+              make Opcode.OpPop [| |]
+          |] |> Array.map Instructions }
+        
+        { Input = "1 != 2"
+          ExpectedConstants = [| 1; 2 |]
+          ExpectedInstructions = [|
+              make Opcode.OpConstant [| 0 |]
+              make Opcode.OpConstant [| 1 |]
+              make Opcode.OpNotEqual [| |]
+              make Opcode.OpPop [| |]
+          |] |> Array.map Instructions }
+        
+        { Input = "true == false"
+          ExpectedConstants = [| |]
+          ExpectedInstructions = [|
+              make Opcode.OpTrue [| |]
+              make Opcode.OpFalse [| |]
+              make Opcode.OpEqual [| |]
+              make Opcode.OpPop [| |]
+          |] |> Array.map Instructions }
+        
+        { Input = "true != false"
+          ExpectedConstants = [| |]
+          ExpectedInstructions = [|
+              make Opcode.OpTrue [| |]
+              make Opcode.OpFalse [| |]
+              make Opcode.OpNotEqual [| |]
+              make Opcode.OpPop [| |]
+          |] |> Array.map Instructions }
+    |]
+        
+        
+    static member TestCasesToExecute = Array.concat [
+        CompilerTests.``A: Test Integer Arithmetic Case``
+        CompilerTests.``B: Test Boolean Expr codegen 1``
+        CompilerTests.``C: Test Boolean Expr codegen 2``
+    ]
     
     [<TestCaseSource("TestCasesToExecute")>]
     member this.``Run Compiler Tests``(compilerTestCase: CompilerTestCase) =

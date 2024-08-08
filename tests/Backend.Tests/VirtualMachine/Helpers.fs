@@ -20,8 +20,22 @@ module VMHelpers =
                 | false -> Error $"'actual' has wrong value, expected {expected}, but got {asIntegerType}."
         }
         
+    let testBooleanObject (expected: bool) (actual: Object) =
+        result {
+            let! boolValue =
+                match actual with
+                | Object.BooleanType boolType -> Ok boolType
+                | _ -> Error $"'actual' is not an 'BooleanType', got '{actual.Type()}'."
+                
+            return! 
+                match boolValue = expected with
+                | true -> Ok () 
+                | false -> Error $"'actual' has wrong value, expected {expected}, but got {boolValue}."
+        }
+        
     let testExpectedObject (expected: obj) (actual: Object) =
         match expected with
         | :? int64 as value -> testIntegerObject value actual 
         | :? int as value -> testIntegerObject (int64 value) actual 
+        | :? bool as value -> testBooleanObject value actual 
         | _ -> failwith $"Test method does not handle expected type \"{expected.GetType()}\""

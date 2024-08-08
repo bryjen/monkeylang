@@ -8,6 +8,12 @@ open Monkey.Backend.Helpers
 open Monkey.Frontend.Eval.Object
 
 let private stackSize = 2048
+let private trueObj = Object.BooleanType true
+let private falseObj = Object.BooleanType false
+
+let private getBoolObj boolValue = match boolValue with | true -> trueObj | false -> falseObj
+
+
 
 type VM =
     { Constants: Object array
@@ -48,8 +54,11 @@ with
                 match opcode with
                 | Opcode.OpConstant ->
                     _vm.HandleOpConstant(&i, asByteArr)
-                | Opcode.OpAdd ->
-                    _vm.HandleOpAdd(&i)
+                | Opcode.OpAdd | Opcode.OpSub | Opcode.OpMul | Opcode.OpDiv | Opcode.OpEqual | Opcode.OpNotEqual |
+                  Opcode.OpGreaterThan ->
+                    _vm.HandleInfixOperation(&i, opcode)
+                | Opcode.OpTrue | Opcode.OpFalse ->
+                    _vm.HandleBooleanOpcode(&i, opcode)
                 | Opcode.OpPop ->
                     match _vm.Pop() with
                     | None -> Ok _vm 
@@ -70,20 +79,50 @@ with
         i <- i + 2
         this.Push(this.Constants[int constIndex])
         
-    member private this.HandleOpAdd(i: byref<int>) : Result<VM, string> =
+    member private this.HandleInfixOperation(i: byref<int>, operatorOpcode: Opcode) : Result<VM, string> =
         result {
             let fromOptionToResult opt = if Option.isSome opt then Ok opt.Value else Error VM.FailedPopMessage
             let! newVm, right = this.Pop() |> fromOptionToResult
             let! newVm, left = newVm.Pop() |> fromOptionToResult
+            
             let! result =
-                match left, right with
-                | Object.IntegerType l, Object.IntegerType r -> (l + r) |> Object.IntegerType |> Ok 
-                | Object.StringType l, Object.StringType r -> failwith "todo"
-                | Object.IntegerType l, Object.StringType r -> failwith "todo"
-                | Object.StringType l, Object.IntegerType r -> failwith "todo"
-                | _ -> Error $"The operation \"{left.Type()}\" \"+\" \"{right.Type()}\" is not valid."
+                match operatorOpcode, left, right with
+                // +
+                | Opcode.OpAdd, Object.IntegerType l, Object.IntegerType r -> (l + r) |> Object.IntegerType |> Ok 
+                | Opcode.OpAdd, Object.StringType l, Object.StringType r -> failwith "todo"
+                | Opcode.OpAdd, Object.IntegerType l, Object.StringType r -> failwith "todo"
+                | Opcode.OpAdd, Object.StringType l, Object.IntegerType r -> failwith "todo"
+                
+                // -
+                | Opcode.OpSub, Object.IntegerType l, Object.IntegerType r -> (l - r) |> Object.IntegerType |> Ok
+                
+                // *
+                | Opcode.OpMul, Object.IntegerType l, Object.IntegerType r -> (l * r) |> Object.IntegerType |> Ok
+                
+                // /
+                | Opcode.OpDiv, Object.IntegerType l, Object.IntegerType r -> (l / r) |> Object.IntegerType |> Ok
+                
+                // ==
+                | Opcode.OpEqual, Object.IntegerType l, Object.IntegerType r -> l = r |> getBoolObj |> Ok 
+                | Opcode.OpEqual, Object.BooleanType l, Object.BooleanType r -> l = r |> getBoolObj |> Ok
+                
+                // !=
+                | Opcode.OpNotEqual, Object.IntegerType l, Object.IntegerType r -> l <> r |> getBoolObj |> Ok 
+                | Opcode.OpNotEqual, Object.BooleanType l, Object.BooleanType r -> l <> r |> getBoolObj |> Ok
+                
+                // >
+                | Opcode.OpGreaterThan, Object.IntegerType l, Object.IntegerType r -> l > r |> getBoolObj |> Ok 
+                
+                | _ -> Error $"The operation left: \"{left.Type()}\" right: \"{right.Type()}\" opcode: {operatorOpcode} is not valid."
+            
             return! newVm.Push(result)
         }
+        
+    member private this.HandleBooleanOpcode(i: byref<int>, booleanOpcode: Opcode) : Result<VM, string> =
+        match booleanOpcode with
+        | Opcode.OpTrue -> this.Push(trueObj) 
+        | Opcode.OpFalse -> this.Push(falseObj) 
+        | _ -> Error $"Fatal: The \"{booleanOpcode}\" does not represent a boolean."
         
     member private this.Push(object: Object) : Result<VM, string> =
         match this.StackPointer >= stackSize with

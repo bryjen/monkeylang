@@ -23,9 +23,20 @@ with
 
 
 type Opcode =
-    | OpConstant = 0x00uy
-    | OpAdd      = 0x01uy
-    | OpPop      = 0x02uy
+    | OpConstant    = 0x00uy
+    | OpAdd         = 0x01uy
+    | OpPop         = 0x02uy
+    
+    | OpSub         = 0x03uy
+    | OpMul         = 0x04uy
+    | OpDiv         = 0x05uy
+    
+    | OpTrue        = 0x06uy
+    | OpFalse       = 0x07uy
+    
+    | OpEqual       = 0x08uy
+    | OpNotEqual    = 0x09uy
+    | OpGreaterThan = 0x0Auy
 
 type Definition =
     { Name: string
@@ -39,6 +50,17 @@ let private opcodeDefinitions = Map.ofList [
     (Opcode.OpConstant,     { Name = "OpConstant"; OperandWidths = [| 2 |] })
     (Opcode.OpAdd,          { Name = "OpAdd"; OperandWidths = [| |] })
     (Opcode.OpPop,          { Name = "OpPop"; OperandWidths = [| |] })
+    
+    (Opcode.OpSub,          { Name = "OpSub"; OperandWidths = [| |] })
+    (Opcode.OpMul,          { Name = "OpMul"; OperandWidths = [| |] })
+    (Opcode.OpDiv,          { Name = "OpDiv"; OperandWidths = [| |] })
+    
+    (Opcode.OpTrue,         { Name = "OpTrue"; OperandWidths = [| |] })
+    (Opcode.OpFalse,        { Name = "OpFalse"; OperandWidths = [| |] })
+    
+    (Opcode.OpEqual,         { Name = "OpEqual"; OperandWidths = [| |] })
+    (Opcode.OpNotEqual,      { Name = "OpNotEqual"; OperandWidths = [| |] })
+    (Opcode.OpGreaterThan,   { Name = "OpGreaterThan"; OperandWidths = [| |] })
 ]
 
 

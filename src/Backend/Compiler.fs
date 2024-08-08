@@ -32,13 +32,15 @@ with
     member private this.ProcessInfixExprOperator(operator: string) =
         match operator with
         | "+" -> this.Emit(Opcode.OpAdd, [|  |]) |> Ok
-        | "-" -> failwith "todo"
-        | "*" -> failwith "todo"
-        | "/" -> failwith "todo"
-        | "==" -> failwith "todo"
-        | "!=" -> failwith "todo"
-        | "<" -> failwith "todo"
-        | ">" -> failwith "todo"
+        | "-" -> this.Emit(Opcode.OpSub, [|  |]) |> Ok
+        | "*" -> this.Emit(Opcode.OpMul, [|  |]) |> Ok
+        | "/" -> this.Emit(Opcode.OpDiv, [|  |]) |> Ok
+        
+        | "==" -> this.Emit(Opcode.OpEqual, [|  |]) |> Ok
+        | "!=" -> this.Emit(Opcode.OpNotEqual, [|  |]) |> Ok
+        | ">" -> this.Emit(Opcode.OpGreaterThan, [|  |]) |> Ok
+        // less than operator doesn't exist, code re-orders expression to use greater than instead
+        
         | s -> Error $"'{operator}' is not a valid infix expression operator" 
     // END Private members
         
@@ -64,7 +66,10 @@ with
             let newCompiler, constPos = this.AddConstant(integerObj)
             let newCompiler, _ = newCompiler.Emit(Opcode.OpConstant, [| constPos |])
             Ok newCompiler
-        | BooleanLiteral booleanLiteral -> failwith "todo"
+        | BooleanLiteral booleanLiteral ->
+            let opcodeToEmit = if booleanLiteral.Value then Opcode.OpTrue else Opcode.OpFalse
+            let newCompiler, _ = this.Emit(opcodeToEmit, [|  |])
+            Ok newCompiler
         | StringLiteral stringLiteral -> failwith "todo"
         | Expression.FunctionLiteral functionLiteral -> failwith "todo"
         | ArrayLiteral arrayLiteral -> failwith "todo"
@@ -74,9 +79,15 @@ with
         
         | PrefixExpression prefixExpression -> failwith "todo"
         | InfixExpression infixExpression ->
-            this.CompileExpression(infixExpression.Left)
-            |> Result.bind (_.CompileExpression(infixExpression.Right))
-            |> Result.bind (_.ProcessInfixExprOperator(infixExpression.Operator))
+            // We perform code re-ordering here
+            let left, right, operator =
+                match infixExpression.Operator with
+                | "<" -> infixExpression.Right, infixExpression.Left, ">"
+                | _ -> infixExpression.Left, infixExpression.Right, infixExpression.Operator
+                
+            this.CompileExpression(left)
+            |> Result.bind (_.CompileExpression(right))
+            |> Result.bind (_.ProcessInfixExprOperator(operator))
             |> Result.map fst
         | IfExpression ifExpression -> failwith "todo"
         | CallExpression callExpression -> failwith "todo"
