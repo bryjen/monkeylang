@@ -23,23 +23,26 @@ with
 
 
 type Opcode =
-    | OpConstant    = 0x00uy
-    | OpAdd         = 0x01uy
-    | OpPop         = 0x02uy
+    | OpConstant       = 0x00uy
+    | OpAdd            = 0x01uy
+    | OpPop            = 0x02uy
     
-    | OpSub         = 0x03uy
-    | OpMul         = 0x04uy
-    | OpDiv         = 0x05uy
+    | OpSub            = 0x03uy
+    | OpMul            = 0x04uy
+    | OpDiv            = 0x05uy
     
-    | OpTrue        = 0x06uy
-    | OpFalse       = 0x07uy
+    | OpTrue           = 0x06uy
+    | OpFalse          = 0x07uy
     
-    | OpEqual       = 0x08uy
-    | OpNotEqual    = 0x09uy
-    | OpGreaterThan = 0x0Auy
+    | OpEqual          = 0x08uy
+    | OpNotEqual       = 0x09uy
+    | OpGreaterThan    = 0x0Auy
     
-    | OpMinus       = 0x0Buy
-    | OpBang        = 0x0Cuy
+    | OpMinus          = 0x0Buy
+    | OpBang           = 0x0Cuy
+    
+    | OpJumpNotTrue    = 0x0Duy
+    | OpJump           = 0x0Euy
 
 type Definition =
     { Name: string
@@ -67,6 +70,9 @@ let private opcodeDefinitions = Map.ofList [
     
     (Opcode.OpMinus,         { Name = "OpMinus"; OperandWidths = [| |] })
     (Opcode.OpBang,          { Name = "OpBang"; OperandWidths = [| |] })
+    
+    (Opcode.OpJumpNotTrue,   { Name = "OpJumpNotTrue"; OperandWidths = [| 2 |] })
+    (Opcode.OpJump,          { Name = "OpJump"; OperandWidths = [| 2 |] })
 ]
 
 

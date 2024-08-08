@@ -155,11 +155,39 @@ type CompilerTests() =
               make Opcode.OpPop [| |]
           |] |> Array.map Instructions }
     |]
+    
+    static member ``E: Test If Expr codegen`` = [|
+        { Input = "if (true) { 10 }; 3333;"
+          ExpectedConstants = [| 10; 3333 |]
+          ExpectedInstructions = [|
+              make Opcode.OpTrue [| |]
+              make Opcode.OpJumpNotTrue [| 7 |]
+              make Opcode.OpConstant [| 0 |]
+              make Opcode.OpPop [| |]
+              make Opcode.OpConstant [| 1 |]
+              make Opcode.OpPop [| |]
+          |] |> Array.map Instructions }
+        
+        { Input = "if (true) { 10 } else { 20 }; 3333;"
+          ExpectedConstants = [| 10; 20; 3333 |]
+          ExpectedInstructions = [|
+              make Opcode.OpTrue [| |]
+              make Opcode.OpJumpNotTrue [| 10 |]
+              make Opcode.OpConstant [| 0 |]
+              make Opcode.OpJump [| 13 |]
+              make Opcode.OpConstant [| 1 |]
+              make Opcode.OpPop [| |]
+              make Opcode.OpConstant [| 2 |]
+              make Opcode.OpPop [| |]
+          |] |> Array.map Instructions }
+    |]
         
     static member TestCasesToExecute = Array.concat [
         CompilerTests.``A: Test Integer Arithmetic Case``
         CompilerTests.``B: Test Boolean Expr codegen 1``
         CompilerTests.``C: Test Boolean Expr codegen 2``
+        CompilerTests.``D: Test Prefix Expr codegen``
+        CompilerTests.``E: Test If Expr codegen``
     ]
     
     [<TestCaseSource("TestCasesToExecute")>]

@@ -57,7 +57,7 @@ with
     member this.Compile(node: Node) : Result<Compiler, string> =
         match node with
         | Statement statement ->
-            this.CompileStatement(statement)
+            this.CompileStatement(true, statement)
         | Expression expression ->
             this.CompileExpression(expression)
         |> Result.map (fun (compiler, byteArr) -> compiler.AddInstruction(byteArr)) 
@@ -72,18 +72,32 @@ with
     Adding the compiled insturctions to the compiler is delegated upwards to one of the caller methods.
     *)
         
-    member private this.CompileStatement(statement: Statement) : Result<Compiler * byte array, string> =
+    // TODO: See if you can find a 'better' than using the 'generateOpPop' param
+    member private this.CompileStatement(generateOpPop: bool, statement: Statement) : Result<Compiler * byte array, string> =
         match statement with
         | LetStatement letStatement -> failwith "todo"
         | ReturnStatement returnStatement -> failwith "todo"
         | ExpressionStatement expressionStatement ->
             result {
                 let! newCompiler, exprBytes = this.CompileExpression(expressionStatement.Expression)
-                let opPopBytes = make Opcode.OpPop [|  |]
+                let opPopBytes = if generateOpPop then make Opcode.OpPop [|  |] else [| |]
                 let exprStatementBytes = Array.concat [| exprBytes; opPopBytes |]
                 return newCompiler, exprStatementBytes
             }
-        | BlockStatement blockStatement -> failwith "todo"
+        | BlockStatement blockStatement ->
+            let rec compileMultipleStatements (compiler: Compiler) (statements: Statement list) (compiledInstructions: byte array) =
+                match statements with
+                | statement :: remaining ->
+                    match compiler.CompileStatement(not (statements.Length <= 1), statement) with
+                    | Ok (newCompiler, bytes) ->
+                        let newCompiledInstructions = Array.append compiledInstructions bytes 
+                        compileMultipleStatements newCompiler remaining newCompiledInstructions 
+                    | Error error ->
+                        Error error
+                | [] ->
+                    Ok (compiler, compiledInstructions)
+                    
+            compileMultipleStatements this blockStatement.Statements [| |]
         
     member private this.CompileExpression(expression: Expression) : Result<Compiler * byte array, string> =
         match expression with
@@ -107,7 +121,8 @@ with
             this.CompilePrefixExpression(prefixExpression)
         | InfixExpression infixExpression ->
             this.CompileInfixExpression(infixExpression)
-        | IfExpression ifExpression -> failwith "todo"
+        | IfExpression ifExpression ->
+            this.CompileIfExpression(ifExpression)
         | CallExpression callExpression -> failwith "todo"
         | IndexExpression indexExpression -> failwith "todo"
         
@@ -131,6 +146,33 @@ with
             let! infixOperatorBytes = makeInfixOperator operator
             let infixExprBytes = Array.concat [| leftBytes; rightBytes; infixOperatorBytes |]
             return newCompiler, infixExprBytes
+        }
+        
+    member private this.CompileIfExpression(ifExpression: IfExpression) : Result<Compiler * byte array, string> =
+        result {
+            let! newCompiler, conditionBytes = this.CompileExpression(ifExpression.Condition)
+            let! newCompiler, consequenceBytes = newCompiler.CompileStatement(false, Statement.BlockStatement ifExpression.Consequence)
+            
+            let jumpInstructionLen = 3
+            let initialIndex = this.Instructions.GetBytes().Length
+            
+            match ifExpression.Alternative with
+            | Some altBlockStatement ->
+                let! newCompiler, alternateBytes = newCompiler.CompileStatement(false, Statement.BlockStatement altBlockStatement)
+                
+                let opJumpNotTrueAddress = initialIndex + conditionBytes.Length + consequenceBytes.Length + (2 * jumpInstructionLen)
+                let opJumpNotTrueBytes = make Opcode.OpJumpNotTrue [| opJumpNotTrueAddress |]
+                let opJumpAddress = initialIndex + conditionBytes.Length + consequenceBytes.Length + alternateBytes.Length + (2 * jumpInstructionLen)
+                let opJumpBytes = make Opcode.OpJump [| opJumpAddress |]
+                
+                let ifExprBytes = Array.concat [| conditionBytes; opJumpNotTrueBytes; consequenceBytes; opJumpBytes; alternateBytes |]
+                return (newCompiler, ifExprBytes)
+            | None ->
+                let opJumpNotTrueAddress = initialIndex + conditionBytes.Length + consequenceBytes.Length + jumpInstructionLen
+                let opJumpNotTrueBytes = make Opcode.OpJumpNotTrue [| opJumpNotTrueAddress |]
+                
+                let ifExprBytes = Array.concat [| conditionBytes; opJumpNotTrueBytes; consequenceBytes |]
+                return (newCompiler, ifExprBytes)
         }
         
         
