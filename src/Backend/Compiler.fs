@@ -6,6 +6,29 @@ open Monkey.Frontend.Ast
 open Monkey.Frontend.Eval.Object
 open Monkey.Backend.Code
 
+
+let private makePrefixOperator (operator: string) : Result<byte array, string> =
+    match operator with
+    | "-" -> make Opcode.OpMinus [|  |] |> Ok
+    | "!" -> make Opcode.OpBang [|  |] |> Ok
+    | s -> Error $"'{operator}' is not a valid prefix expression operator" 
+    
+let private makeInfixOperator (operator: string) : Result<byte array, string> =
+    match operator with
+    | "+" -> make Opcode.OpAdd [|  |] |> Ok
+    | "-" -> make Opcode.OpSub [|  |] |> Ok
+    | "*" -> make Opcode.OpMul [|  |] |> Ok
+    | "/" -> make Opcode.OpDiv [|  |] |> Ok
+    
+    | "==" -> make Opcode.OpEqual [|  |] |> Ok
+    | "!=" -> make Opcode.OpNotEqual [|  |] |> Ok
+    | ">" -> make Opcode.OpGreaterThan [|  |] |> Ok
+    // less than operator doesn't exist, code re-orders expression to use greater than instead
+    
+    | s -> Error $"'{operator}' is not a valid infix expression operator" 
+
+
+
 type Compiler =
     { Instructions: Instructions
       Constants: Object list }
@@ -28,54 +51,51 @@ with
         let newInstructions = Array.append (this.Instructions.GetBytes()) instruction
         let newCompiler = { this with Instructions = Instructions newInstructions }
         newCompiler, instruction.Length
-        
-    member private this.ProcessPrefixOperator(operator: string) =
-        match operator with
-        | "-" -> this.Emit(Opcode.OpMinus, [|  |]) |> Ok
-        | "!" -> this.Emit(Opcode.OpBang, [|  |]) |> Ok
-        | s -> Error $"'{operator}' is not a valid prefix expression operator" 
-        
-    member private this.ProcessInfixExprOperator(operator: string) =
-        match operator with
-        | "+" -> this.Emit(Opcode.OpAdd, [|  |]) |> Ok
-        | "-" -> this.Emit(Opcode.OpSub, [|  |]) |> Ok
-        | "*" -> this.Emit(Opcode.OpMul, [|  |]) |> Ok
-        | "/" -> this.Emit(Opcode.OpDiv, [|  |]) |> Ok
-        
-        | "==" -> this.Emit(Opcode.OpEqual, [|  |]) |> Ok
-        | "!=" -> this.Emit(Opcode.OpNotEqual, [|  |]) |> Ok
-        | ">" -> this.Emit(Opcode.OpGreaterThan, [|  |]) |> Ok
-        // less than operator doesn't exist, code re-orders expression to use greater than instead
-        
-        | s -> Error $"'{operator}' is not a valid infix expression operator" 
     // END Private members
+        
         
     member this.Compile(node: Node) : Result<Compiler, string> =
         match node with
-        | Statement statement -> this.CompileStatement(statement)
-        | Expression expression -> this.CompileExpression(expression)
+        | Statement statement ->
+            this.CompileStatement(statement)
+        | Expression expression ->
+            this.CompileExpression(expression)
+        |> Result.map (fun (compiler, byteArr) -> compiler.AddInstruction(byteArr)) 
+        |> Result.map fst
         
-    member private this.CompileStatement(statement: Statement) =
+
+    (*
+    The 'byte array' in 'Compiler * byte array' signifies the compiled byte instructions from the given statement or
+    expression. The 'Compiler' represents the 'new' compiler with an updated constant pool if the statement or expression
+    introduces constants.
+    
+    Adding the compiled insturctions to the compiler is delegated upwards to one of the caller methods.
+    *)
+        
+    member private this.CompileStatement(statement: Statement) : Result<Compiler * byte array, string> =
         match statement with
         | LetStatement letStatement -> failwith "todo"
         | ReturnStatement returnStatement -> failwith "todo"
         | ExpressionStatement expressionStatement ->
-            this.CompileExpression(expressionStatement.Expression)
-            |> Result.map (_.Emit(Opcode.OpPop, [|  |]))
-            |> Result.map fst
+            result {
+                let! newCompiler, exprBytes = this.CompileExpression(expressionStatement.Expression)
+                let opPopBytes = make Opcode.OpPop [|  |]
+                let exprStatementBytes = Array.concat [| exprBytes; opPopBytes |]
+                return newCompiler, exprStatementBytes
+            }
         | BlockStatement blockStatement -> failwith "todo"
         
-    member private this.CompileExpression(expression: Expression) =
+    member private this.CompileExpression(expression: Expression) : Result<Compiler * byte array, string> =
         match expression with
         | IntegerLiteral integerLiteral ->
             let integerObj = Object.IntegerType integerLiteral.Value
-            let newCompiler, constPos = this.AddConstant(integerObj)
-            let newCompiler, _ = newCompiler.Emit(Opcode.OpConstant, [| constPos |])
-            Ok newCompiler
+            let newCompiler, constIndex = this.AddConstant(integerObj)
+            let opConstantBytes = make Opcode.OpConstant [| constIndex |]
+            Ok (newCompiler, opConstantBytes)
         | BooleanLiteral booleanLiteral ->
             let opcodeToEmit = if booleanLiteral.Value then Opcode.OpTrue else Opcode.OpFalse
-            let newCompiler, _ = this.Emit(opcodeToEmit, [|  |])
-            Ok newCompiler
+            let booleanBytes = make opcodeToEmit [|  |]
+            Ok (this, booleanBytes)
         | StringLiteral stringLiteral -> failwith "todo"
         | Expression.FunctionLiteral functionLiteral -> failwith "todo"
         | ArrayLiteral arrayLiteral -> failwith "todo"
@@ -91,22 +111,27 @@ with
         | CallExpression callExpression -> failwith "todo"
         | IndexExpression indexExpression -> failwith "todo"
         
-    member private this.CompilePrefixExpression(prefixExpression: PrefixExpression) =
-        this.CompileExpression(prefixExpression.Right)
-        |> Result.bind (_.ProcessPrefixOperator(prefixExpression.Operator))
-        |> Result.map fst
+    member private this.CompilePrefixExpression(prefixExpression: PrefixExpression) : Result<Compiler * byte array, string> =
+        result {
+            let! newCompiler, rightExprBytes = this.CompileExpression(prefixExpression.Right)
+            let! prefixOperatorBytes = makePrefixOperator prefixExpression.Operator
+            let prefixExprBytes = Array.concat [| rightExprBytes; prefixOperatorBytes |]
+            return newCompiler, prefixExprBytes
+        }
         
-    member private this.CompileInfixExpression(infixExpression: InfixExpression) =
-        // We perform code re-ordering here
+    member private this.CompileInfixExpression(infixExpression: InfixExpression) : Result<Compiler * byte array, string> =
         let left, right, operator =
             match infixExpression.Operator with
             | "<" -> infixExpression.Right, infixExpression.Left, ">"
             | _ -> infixExpression.Left, infixExpression.Right, infixExpression.Operator
             
-        this.CompileExpression(left)
-        |> Result.bind (_.CompileExpression(right))
-        |> Result.bind (_.ProcessInfixExprOperator(operator))
-        |> Result.map fst
+        result {
+            let! newCompiler, leftBytes = this.CompileExpression(left)
+            let! newCompiler, rightBytes = newCompiler.CompileExpression(right)
+            let! infixOperatorBytes = makeInfixOperator operator
+            let infixExprBytes = Array.concat [| leftBytes; rightBytes; infixOperatorBytes |]
+            return newCompiler, infixExprBytes
+        }
         
         
     member this.Bytecode() : Bytecode =
