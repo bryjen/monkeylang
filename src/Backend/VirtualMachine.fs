@@ -54,6 +54,8 @@ with
                 match opcode with
                 | Opcode.OpConstant ->
                     _vm.HandleOpConstant(&i, asByteArr)
+                | Opcode.OpMinus | Opcode.OpBang ->
+                    _vm.HandlePrefixOperation(&i, opcode)
                 | Opcode.OpAdd | Opcode.OpSub | Opcode.OpMul | Opcode.OpDiv | Opcode.OpEqual | Opcode.OpNotEqual |
                   Opcode.OpGreaterThan ->
                     _vm.HandleInfixOperation(&i, opcode)
@@ -78,6 +80,20 @@ with
         let constIndex = readUInt16 arraySlice
         i <- i + 2
         this.Push(this.Constants[int constIndex])
+        
+    member private this.HandlePrefixOperation(i: byref<int>, operatorOpcode: Opcode) : Result<VM, string> =
+        result {
+            let fromOptionToResult opt = if Option.isSome opt then Ok opt.Value else Error VM.FailedPopMessage
+            let! newVm, expr = this.Pop() |> fromOptionToResult
+            
+            let! result =
+                match operatorOpcode, expr with
+                | Opcode.OpMinus, Object.IntegerType i -> -i |> Object.IntegerType |> Ok
+                | Opcode.OpBang, Object.BooleanType b -> b |> not |> getBoolObj |> Ok
+                | _ -> Error $"The operation [opcode: {operatorOpcode}, value: {expr}] is not valid."
+                
+            return! newVm.Push(result)
+        }
         
     member private this.HandleInfixOperation(i: byref<int>, operatorOpcode: Opcode) : Result<VM, string> =
         result {

@@ -15,15 +15,13 @@ type VMTestCase =
 
 type VirtualMachineTests() =
     
-    static member ``A: Test Basic Integer Arithmetic Case`` =
-        [|
+    static member ``A: Test Basic Integer Arithmetic Case`` = [|
             { Input = "1"; Expected = 1 }
             { Input = "2"; Expected = 2 }
             { Input = "1 + 2"; Expected = 3 }
-        |]
+    |]
         
-    static member ``B: Test Complex Integer Arithmetic Case 1`` =
-        [|
+    static member ``B: Test Complex Integer Arithmetic Case 1`` = [|
             { Input = "1 - 2"; Expected = -1 }
             { Input = "1 * 2"; Expected = 2 }
             { Input = "4 / 2"; Expected = 2 }
@@ -33,14 +31,10 @@ type VirtualMachineTests() =
             { Input = "5 * 2 + 10"; Expected = 20 }
             { Input = "5 + 2 * 10"; Expected = 25 }
             { Input = "5 * (2 + 10)"; Expected = 60 }
-        |]
+    |]
         
-    static member ``C: Test Complex Integer Arithmetic Case 2`` =
-        [|
+    static member ``C: Test Complex Integer Arithmetic Case 2`` = [|
             // TODO: Prefix operations needs to be parsed for the following to pass
-            // { Input = "-50 + 100 + -50"; Expected = 0 }
-            // { Input = "20 + 2 * -10"; Expected = 0 }
-            // { Input = "(5 + 10 * 2 + 15 / 3) * 2 + -10"; Expected = 50 }
             
             { Input = "5 * 2 + 10"; Expected = 20 }
             { Input = "5 + 2 * 10"; Expected = 25 }
@@ -48,16 +42,14 @@ type VirtualMachineTests() =
             { Input = "2 * (5 + 10)"; Expected = 30 }
             { Input = "3 * 3 * 3 + 10"; Expected = 37 }
             { Input = "3 * (3 * 3) + 10"; Expected = 37 }
-        |]
+    |]
         
-    static member ``D: Test Basic Boolean Evaluation`` =
-        [|
+    static member ``D: Test Basic Boolean Evaluation`` = [|
             { Input = "true"; Expected = true }
             { Input = "false"; Expected = false }
-        |]
+    |]
         
-    static member ``E: Test Boolean Evaluation`` =
-        [|
+    static member ``E: Test Boolean Evaluation`` = [|
             { Input = "1 < 2"; Expected = true }
             { Input = "1 > 2"; Expected = false }
             { Input = "1 < 1"; Expected = false }
@@ -77,7 +69,27 @@ type VirtualMachineTests() =
             { Input = "(1 < 2) == false"; Expected = false }
             { Input = "(1 > 2) == true"; Expected = false }
             { Input = "(1 > 2) == false"; Expected = true }
-        |]
+    |]
+        
+    static member ``F: Test Prefix Expression Evaluation`` = [|
+            { Input = "-5"; Expected = -5 }
+            { Input = "-10"; Expected = -10 }
+            { Input = "-50 + 100 + -50"; Expected = 0 }
+            { Input = "(5 + 10 * 2 + 15 / 3) * 2 + -10"; Expected = 50 }
+    |]
+        
+    static member ``G: Test Boolean Expression Evaluation`` = [|
+            { Input = "!true"; Expected = false }
+            { Input = "!false"; Expected = true }
+            { Input = "!!true"; Expected = true }
+            { Input = "!!false"; Expected = false }
+    |]
+    
+    static member ``H: Test Prefix and Infix Expression Evaluation`` = [|
+            { Input = "-50 + 100 + -50"; Expected = 0 }
+            { Input = "20 + 2 * -10"; Expected = 0 }
+            { Input = "(5 + 10 * 2 + 15 / 3) * 2 + -10"; Expected = 50 }
+    |]
         
         
     static member TestCasesToExecute = Array.concat [
@@ -86,6 +98,9 @@ type VirtualMachineTests() =
         VirtualMachineTests.``C: Test Complex Integer Arithmetic Case 2``
         VirtualMachineTests.``D: Test Basic Boolean Evaluation``
         VirtualMachineTests.``E: Test Boolean Evaluation``
+        VirtualMachineTests.``F: Test Prefix Expression Evaluation``
+        VirtualMachineTests.``G: Test Boolean Expression Evaluation``
+        VirtualMachineTests.``H: Test Prefix and Infix Expression Evaluation``
     ]
         
     [<TestCaseSource("TestCasesToExecute")>]

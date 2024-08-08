@@ -29,6 +29,12 @@ with
         let newCompiler = { this with Instructions = Instructions newInstructions }
         newCompiler, instruction.Length
         
+    member private this.ProcessPrefixOperator(operator: string) =
+        match operator with
+        | "-" -> this.Emit(Opcode.OpMinus, [|  |]) |> Ok
+        | "!" -> this.Emit(Opcode.OpBang, [|  |]) |> Ok
+        | s -> Error $"'{operator}' is not a valid prefix expression operator" 
+        
     member private this.ProcessInfixExprOperator(operator: string) =
         match operator with
         | "+" -> this.Emit(Opcode.OpAdd, [|  |]) |> Ok
@@ -77,21 +83,30 @@ with
         | MacroLiteral macroLiteral -> failwith "todo"
         | Expression.Identifier identifier -> failwith "todo"
         
-        | PrefixExpression prefixExpression -> failwith "todo"
+        | PrefixExpression prefixExpression ->
+            this.CompilePrefixExpression(prefixExpression)
         | InfixExpression infixExpression ->
-            // We perform code re-ordering here
-            let left, right, operator =
-                match infixExpression.Operator with
-                | "<" -> infixExpression.Right, infixExpression.Left, ">"
-                | _ -> infixExpression.Left, infixExpression.Right, infixExpression.Operator
-                
-            this.CompileExpression(left)
-            |> Result.bind (_.CompileExpression(right))
-            |> Result.bind (_.ProcessInfixExprOperator(operator))
-            |> Result.map fst
+            this.CompileInfixExpression(infixExpression)
         | IfExpression ifExpression -> failwith "todo"
         | CallExpression callExpression -> failwith "todo"
         | IndexExpression indexExpression -> failwith "todo"
+        
+    member private this.CompilePrefixExpression(prefixExpression: PrefixExpression) =
+        this.CompileExpression(prefixExpression.Right)
+        |> Result.bind (_.ProcessPrefixOperator(prefixExpression.Operator))
+        |> Result.map fst
+        
+    member private this.CompileInfixExpression(infixExpression: InfixExpression) =
+        // We perform code re-ordering here
+        let left, right, operator =
+            match infixExpression.Operator with
+            | "<" -> infixExpression.Right, infixExpression.Left, ">"
+            | _ -> infixExpression.Left, infixExpression.Right, infixExpression.Operator
+            
+        this.CompileExpression(left)
+        |> Result.bind (_.CompileExpression(right))
+        |> Result.bind (_.ProcessInfixExprOperator(operator))
+        |> Result.map fst
         
         
     member this.Bytecode() : Bytecode =

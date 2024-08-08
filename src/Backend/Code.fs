@@ -37,6 +37,9 @@ type Opcode =
     | OpEqual       = 0x08uy
     | OpNotEqual    = 0x09uy
     | OpGreaterThan = 0x0Auy
+    
+    | OpMinus       = 0x0Buy
+    | OpBang        = 0x0Cuy
 
 type Definition =
     { Name: string
@@ -47,20 +50,23 @@ type Definition =
 let private numberOfCases = Enum.GetValues(typeof<Opcode>).Length |> byte
 
 let private opcodeDefinitions = Map.ofList [
-    (Opcode.OpConstant,     { Name = "OpConstant"; OperandWidths = [| 2 |] })
-    (Opcode.OpAdd,          { Name = "OpAdd"; OperandWidths = [| |] })
-    (Opcode.OpPop,          { Name = "OpPop"; OperandWidths = [| |] })
+    (Opcode.OpConstant,      { Name = "OpConstant"; OperandWidths = [| 2 |] })
+    (Opcode.OpAdd,           { Name = "OpAdd"; OperandWidths = [| |] })
+    (Opcode.OpPop,           { Name = "OpPop"; OperandWidths = [| |] })
     
-    (Opcode.OpSub,          { Name = "OpSub"; OperandWidths = [| |] })
-    (Opcode.OpMul,          { Name = "OpMul"; OperandWidths = [| |] })
-    (Opcode.OpDiv,          { Name = "OpDiv"; OperandWidths = [| |] })
+    (Opcode.OpSub,           { Name = "OpSub"; OperandWidths = [| |] })
+    (Opcode.OpMul,           { Name = "OpMul"; OperandWidths = [| |] })
+    (Opcode.OpDiv,           { Name = "OpDiv"; OperandWidths = [| |] })
     
-    (Opcode.OpTrue,         { Name = "OpTrue"; OperandWidths = [| |] })
-    (Opcode.OpFalse,        { Name = "OpFalse"; OperandWidths = [| |] })
+    (Opcode.OpTrue,          { Name = "OpTrue"; OperandWidths = [| |] })
+    (Opcode.OpFalse,         { Name = "OpFalse"; OperandWidths = [| |] })
     
     (Opcode.OpEqual,         { Name = "OpEqual"; OperandWidths = [| |] })
     (Opcode.OpNotEqual,      { Name = "OpNotEqual"; OperandWidths = [| |] })
     (Opcode.OpGreaterThan,   { Name = "OpGreaterThan"; OperandWidths = [| |] })
+    
+    (Opcode.OpMinus,         { Name = "OpMinus"; OperandWidths = [| |] })
+    (Opcode.OpBang,          { Name = "OpBang"; OperandWidths = [| |] })
 ]
 
 

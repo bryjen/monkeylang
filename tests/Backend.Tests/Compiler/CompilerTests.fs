@@ -138,6 +138,23 @@ type CompilerTests() =
           |] |> Array.map Instructions }
     |]
         
+    static member ``D: Test Prefix Expr codegen`` = [|
+        { Input = "-1"
+          ExpectedConstants = [| 1 |]
+          ExpectedInstructions = [|
+              make Opcode.OpConstant [| 0 |]
+              make Opcode.OpMinus [| |]
+              make Opcode.OpPop [| |]
+          |] |> Array.map Instructions }
+        
+        { Input = "!true"
+          ExpectedConstants = [| |]
+          ExpectedInstructions = [|
+              make Opcode.OpTrue [| |]
+              make Opcode.OpBang [| |]
+              make Opcode.OpPop [| |]
+          |] |> Array.map Instructions }
+    |]
         
     static member TestCasesToExecute = Array.concat [
         CompilerTests.``A: Test Integer Arithmetic Case``
