@@ -7,6 +7,11 @@ open Monkey.Frontend.Eval.Object
 [<RequireQualifiedAccess>]
 module VMHelpers =
     
+    let assertObjectIsNullType (actual: Object) =
+        match actual with
+        | NullType -> Ok ()
+        | _ -> Error $"'actual' is not a 'NullType', got '{actual.Type()}'"
+    
     let testIntegerObject (expected: int64) (actual: Object) =
         result {
             let! asIntegerType = 
@@ -35,6 +40,7 @@ module VMHelpers =
         
     let testExpectedObject (expected: obj) (actual: Object) =
         match expected with
+        | null -> assertObjectIsNullType actual
         | :? int64 as value -> testIntegerObject value actual 
         | :? int as value -> testIntegerObject (int64 value) actual 
         | :? bool as value -> testBooleanObject value actual 

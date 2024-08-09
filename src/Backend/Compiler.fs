@@ -86,9 +86,10 @@ with
             }
         | BlockStatement blockStatement ->
             let rec compileMultipleStatements (compiler: Compiler) (statements: Statement list) (compiledInstructions: byte array) =
+                let isLastStatement = statements.Length <= 1
                 match statements with
                 | statement :: remaining ->
-                    match compiler.CompileStatement(not (statements.Length <= 1), statement) with
+                    match compiler.CompileStatement(not isLastStatement, statement) with
                     | Ok (newCompiler, bytes) ->
                         let newCompiledInstructions = Array.append compiledInstructions bytes 
                         compileMultipleStatements newCompiler remaining newCompiledInstructions 
@@ -153,26 +154,23 @@ with
             let! newCompiler, conditionBytes = this.CompileExpression(ifExpression.Condition)
             let! newCompiler, consequenceBytes = newCompiler.CompileStatement(false, Statement.BlockStatement ifExpression.Consequence)
             
+            let! newCompiler, alternateBytes =
+                match ifExpression.Alternative with
+                | Some altBlockStatement -> newCompiler.CompileStatement(false, Statement.BlockStatement altBlockStatement)
+                | None -> Ok (newCompiler, make Opcode.OpNull [| |])
+                
+                
             let jumpInstructionLen = 3
             let initialIndex = this.Instructions.GetBytes().Length
-            
-            match ifExpression.Alternative with
-            | Some altBlockStatement ->
-                let! newCompiler, alternateBytes = newCompiler.CompileStatement(false, Statement.BlockStatement altBlockStatement)
                 
-                let opJumpNotTrueAddress = initialIndex + conditionBytes.Length + consequenceBytes.Length + (2 * jumpInstructionLen)
-                let opJumpNotTrueBytes = make Opcode.OpJumpNotTrue [| opJumpNotTrueAddress |]
-                let opJumpAddress = initialIndex + conditionBytes.Length + consequenceBytes.Length + alternateBytes.Length + (2 * jumpInstructionLen)
-                let opJumpBytes = make Opcode.OpJump [| opJumpAddress |]
+            let opJumpWhenFalseAddress = initialIndex + conditionBytes.Length + consequenceBytes.Length + (2 * jumpInstructionLen)
+            let opJumpWhenFalseByte = make Opcode.OpJumpWhenFalse [| opJumpWhenFalseAddress |]
                 
-                let ifExprBytes = Array.concat [| conditionBytes; opJumpNotTrueBytes; consequenceBytes; opJumpBytes; alternateBytes |]
-                return (newCompiler, ifExprBytes)
-            | None ->
-                let opJumpNotTrueAddress = initialIndex + conditionBytes.Length + consequenceBytes.Length + jumpInstructionLen
-                let opJumpNotTrueBytes = make Opcode.OpJumpNotTrue [| opJumpNotTrueAddress |]
+            let opJumpAddress = initialIndex + conditionBytes.Length + consequenceBytes.Length + (2 * jumpInstructionLen) + alternateBytes.Length 
+            let opJumpBytes = make Opcode.OpJump [| opJumpAddress |]
                 
-                let ifExprBytes = Array.concat [| conditionBytes; opJumpNotTrueBytes; consequenceBytes |]
-                return (newCompiler, ifExprBytes)
+            let ifExprBytes = Array.concat [| conditionBytes; opJumpWhenFalseByte; consequenceBytes; opJumpBytes; alternateBytes |]
+            return (newCompiler, ifExprBytes)
         }
         
         

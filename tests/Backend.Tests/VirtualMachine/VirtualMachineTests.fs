@@ -90,6 +90,19 @@ type VirtualMachineTests() =
             { Input = "20 + 2 * -10"; Expected = 0 }
             { Input = "(5 + 10 * 2 + 15 / 3) * 2 + -10"; Expected = 50 }
     |]
+    
+    static member ``I: Test If Expression Evaluation`` = [|
+            { Input = "if (true) { 10 }"; Expected = 10 }
+            { Input = "if (true) { 10 } else { 20 }"; Expected = 10 }
+            { Input = "if (false) { 10 } else { 20 }"; Expected = 20 }
+            { Input = "if (1 < 2) { 10 }"; Expected = 10 }
+            { Input = "if (1 < 2) { 10 } else { 20 }"; Expected = 10 }
+            { Input = "if (1 > 2) { 10 } else { 20 }"; Expected = 20 }
+            { Input = "if ((if (false) { false } else { true })) { 10 } else { 20 }"; Expected = 20 }
+            
+            { Input = "if (1 > 2) { 10 }"; Expected = null }
+            { Input = "if (false) { 10 }"; Expected = null }
+    |]
         
         
     static member TestCasesToExecute = Array.concat [
@@ -101,6 +114,7 @@ type VirtualMachineTests() =
         VirtualMachineTests.``F: Test Prefix Expression Evaluation``
         VirtualMachineTests.``G: Test Boolean Expression Evaluation``
         VirtualMachineTests.``H: Test Prefix and Infix Expression Evaluation``
+        VirtualMachineTests.``I: Test If Expression Evaluation``
     ]
         
     [<TestCaseSource("TestCasesToExecute")>]

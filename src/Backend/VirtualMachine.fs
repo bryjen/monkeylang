@@ -10,6 +10,7 @@ open Monkey.Frontend.Eval.Object
 let private stackSize = 2048
 let private trueObj = Object.BooleanType true
 let private falseObj = Object.BooleanType false
+let private nullObj = Object.NullType
 
 let private getBoolObj boolValue = match boolValue with | true -> trueObj | false -> falseObj
 
@@ -52,19 +53,41 @@ with
             if i < asByteArr.Length then
                 let opcode = LanguagePrimitives.EnumOfValue<byte, Opcode> asByteArr[i] 
                 match opcode with
+                | Opcode.OpNull ->
+                    _vm.Push(nullObj)
                 | Opcode.OpConstant ->
                     _vm.HandleOpConstant(&i, asByteArr)
                 | Opcode.OpMinus | Opcode.OpBang ->
                     _vm.HandlePrefixOperation(&i, opcode)
-                | Opcode.OpAdd | Opcode.OpSub | Opcode.OpMul | Opcode.OpDiv | Opcode.OpEqual | Opcode.OpNotEqual |
-                  Opcode.OpGreaterThan ->
+                | Opcode.OpAdd | Opcode.OpSub | Opcode.OpMul | Opcode.OpDiv | Opcode.OpEqual | Opcode.OpNotEqual | Opcode.OpGreaterThan ->
                     _vm.HandleInfixOperation(&i, opcode)
                 | Opcode.OpTrue | Opcode.OpFalse ->
                     _vm.HandleBooleanOpcode(&i, opcode)
                 | Opcode.OpPop ->
                     match _vm.Pop() with
                     | None -> Ok _vm 
-                    | Some (newVm, _) -> Ok newVm 
+                    | Some (newVm, _) -> Ok newVm
+                | Opcode.OpJumpWhenFalse ->
+                    let arraySlice = asByteArr[i + 1 .. i + 2]
+                    let indexToJumpTo = arraySlice |> readUInt16 |> int
+                    
+                    match _vm.Peek() with
+                    | None -> failwith "todo"
+                    | Some obj ->
+                        match obj with
+                        | Object.BooleanType bool when bool = false ->
+                            i <- indexToJumpTo - 1  // -1 to step back from callback
+                            Ok _vm
+                        | Object.BooleanType _ ->
+                            i <- i + 2 
+                            Ok _vm
+                        | _ ->
+                            Error $"Expected a boolean object at the stack top, got {obj.Type()}."
+                | Opcode.OpJump -> 
+                    let arraySlice = asByteArr[i + 1 .. i + 2]
+                    let indexToJumpTo = arraySlice |> readUInt16 |> int
+                    i <- indexToJumpTo - 1  // -1 to step back from callback
+                    Ok _vm
                 | _ ->
                     failwith "unrecognized opcode"
                 |> Result.map (fun newVm -> callback (); newVm) // Call the callback
@@ -148,6 +171,18 @@ with
             this.Stack[this.StackPointer] <- ObjectWrapper object
             this.StackPointer <- this.StackPointer + 1
             Ok this
+            
+    member private this.Peek() : Object option =
+        match this.StackPointer >= stackSize with
+        | true -> None
+        | false ->
+            let i = this.StackPointer - 1
+            let objectWrapper = this.Stack[i]
+            
+            match isNull objectWrapper with
+            | true -> None 
+            | false ->
+                Some objectWrapper.Value
             
     member private this.Pop() : (VM * Object) option =
         match this.StackPointer >= stackSize with

@@ -41,8 +41,10 @@ type Opcode =
     | OpMinus          = 0x0Buy
     | OpBang           = 0x0Cuy
     
-    | OpJumpNotTrue    = 0x0Duy
+    | OpJumpWhenFalse  = 0x0Duy
     | OpJump           = 0x0Euy
+    
+    | OpNull           = 0x0Fuy
 
 type Definition =
     { Name: string
@@ -71,8 +73,10 @@ let private opcodeDefinitions = Map.ofList [
     (Opcode.OpMinus,         { Name = "OpMinus"; OperandWidths = [| |] })
     (Opcode.OpBang,          { Name = "OpBang"; OperandWidths = [| |] })
     
-    (Opcode.OpJumpNotTrue,   { Name = "OpJumpNotTrue"; OperandWidths = [| 2 |] })
+    (Opcode.OpJumpWhenFalse, { Name = "OpJumpWhenFalse"; OperandWidths = [| 2 |] })
     (Opcode.OpJump,          { Name = "OpJump"; OperandWidths = [| 2 |] })
+    
+    (Opcode.OpNull,          { Name = "OpNull"; OperandWidths = [| |] })
 ]
 
 

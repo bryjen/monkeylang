@@ -161,8 +161,10 @@ type CompilerTests() =
           ExpectedConstants = [| 10; 3333 |]
           ExpectedInstructions = [|
               make Opcode.OpTrue [| |]
-              make Opcode.OpJumpNotTrue [| 7 |]
+              make Opcode.OpJumpWhenFalse [| 10 |]
               make Opcode.OpConstant [| 0 |]
+              make Opcode.OpJump [| 11 |]
+              make Opcode.OpNull [| |]
               make Opcode.OpPop [| |]
               make Opcode.OpConstant [| 1 |]
               make Opcode.OpPop [| |]
@@ -172,7 +174,7 @@ type CompilerTests() =
           ExpectedConstants = [| 10; 20; 3333 |]
           ExpectedInstructions = [|
               make Opcode.OpTrue [| |]
-              make Opcode.OpJumpNotTrue [| 10 |]
+              make Opcode.OpJumpWhenFalse [| 10 |]
               make Opcode.OpConstant [| 0 |]
               make Opcode.OpJump [| 13 |]
               make Opcode.OpConstant [| 1 |]
