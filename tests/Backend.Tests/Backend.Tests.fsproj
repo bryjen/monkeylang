@@ -20,6 +20,8 @@
     <ItemGroup>
       <Compile Include="Code\Helpers.fs" />
       <Compile Include="Code\CodeTests.fs" />
+      <Compile Include="SymbolTable\SymbolTableTests.fs" />
+      <Compile Include="SymbolTable\Helpers.fs" />
       <Compile Include="Compiler\Helpers.fs" />
       <Compile Include="Compiler\CompilerTests.fs" />
       <Compile Include="VirtualMachine\Helpers.fs" />

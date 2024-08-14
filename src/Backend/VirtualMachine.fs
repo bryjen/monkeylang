@@ -1,13 +1,17 @@
 module Monkey.Backend.VirtualMachine
 
 
+open System
 open FsToolkit.ErrorHandling
 open Monkey.Backend.Code
 open Monkey.Backend.Compiler
 open Monkey.Backend.Helpers
+open Monkey.Frontend.Eval
 open Monkey.Frontend.Eval.Object
 
 let private stackSize = 2048
+let private globalsSize = UInt16.MaxValue |> int
+
 let private trueObj = Object.BooleanType true
 let private falseObj = Object.BooleanType false
 let private nullObj = Object.NullType
@@ -20,6 +24,7 @@ type VM =
     { Constants: Object array
       Instructions: Instructions
       
+      Globals: Object array
       Stack: ObjectWrapper array
       mutable StackPointer: int }
 with
@@ -27,6 +32,7 @@ with
         { Constants = byteCode.Constants
           Instructions = byteCode.Instructions
           
+          Globals = Array.zeroCreate<Object> globalsSize    // TODO: Check if obj type needs to be wrapped
           Stack = Array.zeroCreate<ObjectWrapper> stackSize
           StackPointer = 0 }
         
@@ -67,6 +73,10 @@ with
                     match _vm.Pop() with
                     | None -> Ok _vm 
                     | Some (newVm, _) -> Ok newVm
+                | Opcode.OpSetGlobal ->
+                    _vm.HandleSetGlobalOpcode(&i, asByteArr)
+                | Opcode.OpGetGlobal ->
+                    _vm.HandleGetGlobalOpcode(&i, asByteArr)
                 | Opcode.OpJumpWhenFalse ->
                     let arraySlice = asByteArr[i + 1 .. i + 2]
                     let indexToJumpTo = arraySlice |> readUInt16 |> int
@@ -126,32 +136,18 @@ with
             
             let! result =
                 match operatorOpcode, left, right with
-                // +
                 | Opcode.OpAdd, Object.IntegerType l, Object.IntegerType r -> (l + r) |> Object.IntegerType |> Ok 
                 | Opcode.OpAdd, Object.StringType l, Object.StringType r -> failwith "todo"
                 | Opcode.OpAdd, Object.IntegerType l, Object.StringType r -> failwith "todo"
                 | Opcode.OpAdd, Object.StringType l, Object.IntegerType r -> failwith "todo"
-                
-                // -
                 | Opcode.OpSub, Object.IntegerType l, Object.IntegerType r -> (l - r) |> Object.IntegerType |> Ok
-                
-                // *
                 | Opcode.OpMul, Object.IntegerType l, Object.IntegerType r -> (l * r) |> Object.IntegerType |> Ok
-                
-                // /
                 | Opcode.OpDiv, Object.IntegerType l, Object.IntegerType r -> (l / r) |> Object.IntegerType |> Ok
-                
-                // ==
                 | Opcode.OpEqual, Object.IntegerType l, Object.IntegerType r -> l = r |> getBoolObj |> Ok 
                 | Opcode.OpEqual, Object.BooleanType l, Object.BooleanType r -> l = r |> getBoolObj |> Ok
-                
-                // !=
                 | Opcode.OpNotEqual, Object.IntegerType l, Object.IntegerType r -> l <> r |> getBoolObj |> Ok 
                 | Opcode.OpNotEqual, Object.BooleanType l, Object.BooleanType r -> l <> r |> getBoolObj |> Ok
-                
-                // >
                 | Opcode.OpGreaterThan, Object.IntegerType l, Object.IntegerType r -> l > r |> getBoolObj |> Ok 
-                
                 | _ -> Error $"The operation left: \"{left.Type()}\" right: \"{right.Type()}\" opcode: {operatorOpcode} is not valid."
             
             return! newVm.Push(result)
@@ -162,6 +158,23 @@ with
         | Opcode.OpTrue -> this.Push(trueObj) 
         | Opcode.OpFalse -> this.Push(falseObj) 
         | _ -> Error $"Fatal: The \"{booleanOpcode}\" does not represent a boolean."
+        
+    member private this.HandleSetGlobalOpcode(i: byref<int>, byteArr: byte array) : Result<VM, string> =
+        let arraySlice = byteArr[i + 1 .. i + 2]
+        let globalIndex = arraySlice |> readUInt16 |> int
+        i <- i + 2
+        
+        this.Pop()
+        |> Option.map (fun (newVm, object) -> this.Globals[globalIndex] <- object; newVm)
+        |> function
+           | Some newVm -> Ok newVm
+           | None -> failwith "todo" 
+        
+    member private this.HandleGetGlobalOpcode(i: byref<int>, byteArr: byte array) : Result<VM, string> =
+        let arraySlice = byteArr[i + 1 .. i + 2]
+        let globalIndex = arraySlice |> readUInt16 |> int
+        i <- i + 2
+        this.Push(this.Globals[globalIndex])
         
     member private this.Push(object: Object) : Result<VM, string> =
         match this.StackPointer >= stackSize with

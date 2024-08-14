@@ -1,5 +1,6 @@
 namespace Monkey.Backend.Tests.Compiler
 
+open System.Net
 open NUnit.Framework
 open FsToolkit.ErrorHandling
 
@@ -183,6 +184,45 @@ type CompilerTests() =
               make Opcode.OpPop [| |]
           |] |> Array.map Instructions }
     |]
+    
+    
+    static member ``F: Test Let Statement codegen`` = [|
+        { Input =
+            "let one = 1;
+            let two = 2;"
+          ExpectedConstants = [| 1; 2 |]
+          ExpectedInstructions = [|
+              make Opcode.OpConstant [| 0 |]
+              make Opcode.OpSetGlobal [| 0 |]
+              make Opcode.OpConstant [| 1 |]
+              make Opcode.OpSetGlobal [| 1 |]
+          |] |> Array.map Instructions }
+        
+        { Input =
+            "let one = 1;
+            one;"
+          ExpectedConstants = [| 1 |]
+          ExpectedInstructions = [|
+              make Opcode.OpConstant [| 0 |]
+              make Opcode.OpSetGlobal [| 0 |]
+              make Opcode.OpGetGlobal [| 0 |]
+              make Opcode.OpPop [| |]
+          |] |> Array.map Instructions }
+        
+        { Input =
+            "let one = 1;
+            let two = one;
+            two;"
+          ExpectedConstants = [| 1 |]
+          ExpectedInstructions = [|
+              make Opcode.OpConstant [| 0 |]
+              make Opcode.OpSetGlobal [| 0 |]
+              make Opcode.OpGetGlobal [| 0 |]
+              make Opcode.OpSetGlobal [| 1 |]
+              make Opcode.OpGetGlobal [| 1 |]
+              make Opcode.OpPop [| |]
+          |] |> Array.map Instructions }
+    |]
         
     static member TestCasesToExecute = Array.concat [
         CompilerTests.``A: Test Integer Arithmetic Case``
@@ -190,6 +230,7 @@ type CompilerTests() =
         CompilerTests.``C: Test Boolean Expr codegen 2``
         CompilerTests.``D: Test Prefix Expr codegen``
         CompilerTests.``E: Test If Expr codegen``
+        CompilerTests.``F: Test Let Statement codegen``
     ]
     
     [<TestCaseSource("TestCasesToExecute")>]
@@ -202,11 +243,9 @@ type CompilerTests() =
             let nodes = programToNodes program
             
             let mutable compiler = Compiler.New
-            for node in nodes do
-                let! newCompiler = compiler.Compile(node)
-                compiler <- newCompiler
+            let! newCompiler = compiler.CompileNodes(nodes) 
+            let bytecode = newCompiler.Bytecode()
                 
-            let bytecode = compiler.Bytecode()
             
             let expectedInstructions = compilerTestCase.ExpectedInstructions
                                        |> Array.map (_.GetBytes())

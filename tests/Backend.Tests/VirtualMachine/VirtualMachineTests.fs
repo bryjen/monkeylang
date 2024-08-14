@@ -98,10 +98,16 @@ type VirtualMachineTests() =
             { Input = "if (1 < 2) { 10 }"; Expected = 10 }
             { Input = "if (1 < 2) { 10 } else { 20 }"; Expected = 10 }
             { Input = "if (1 > 2) { 10 } else { 20 }"; Expected = 20 }
-            { Input = "if ((if (false) { false } else { true })) { 10 } else { 20 }"; Expected = 20 }
+            { Input = "if ((if (false) { false } else { true })) { 10 } else { 20 }"; Expected = 10 }
             
             { Input = "if (1 > 2) { 10 }"; Expected = null }
             { Input = "if (false) { 10 }"; Expected = null }
+    |]
+    
+    static member ``J: Test Let Statement Evaluation`` = [|
+            { Input = "let one = 1; one;"; Expected = 1 }
+            { Input = "let one = 1; let two = 2; one + two;"; Expected = 3 }
+            { Input = "let one = 1; let two = one + one; one + two;"; Expected = 3 }
     |]
         
         
@@ -115,6 +121,7 @@ type VirtualMachineTests() =
         VirtualMachineTests.``G: Test Boolean Expression Evaluation``
         VirtualMachineTests.``H: Test Prefix and Infix Expression Evaluation``
         VirtualMachineTests.``I: Test If Expression Evaluation``
+        VirtualMachineTests.``J: Test Let Statement Evaluation``
     ]
         
     [<TestCaseSource("TestCasesToExecute")>]
@@ -123,13 +130,13 @@ type VirtualMachineTests() =
             let program = Parser.parseProgram vmTestCase.Input 
             let nodes = programToNodes program
             
-            let compiler = Compiler.New
-            let! newCompiler = compiler.Compile(nodes[0])
-            let byteCode = newCompiler.Bytecode()
+            let mutable compiler = Compiler.New
+            let! newCompiler = compiler.CompileNodes(nodes) 
+            let bytecode = newCompiler.Bytecode()
             
-            TestContext.WriteLine($"Got:\n{byteCode.Instructions.ToString()}")
+            TestContext.WriteLine($"Got:\n{bytecode.Instructions.ToString()}")
             
-            let vm = VM.FromByteCode(byteCode)
+            let vm = VM.FromByteCode(bytecode)
             let! newVm = VM.Run(vm)
             
             let resultOption = newVm.LastPoppedStackElement()

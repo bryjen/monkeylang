@@ -1,7 +1,8 @@
-module Monkey.Backend.Compiler
+module rec Monkey.Backend.Compiler
 
 open FsToolkit.ErrorHandling
 
+open Monkey.Backend.SymbolTable
 open Monkey.Frontend.Ast
 open Monkey.Frontend.Eval.Object
 open Monkey.Backend.Code
@@ -31,11 +32,13 @@ let private makeInfixOperator (operator: string) : Result<byte array, string> =
 
 type Compiler =
     { Instructions: Instructions
-      Constants: Object list }
+      Constants: Object list
+      SymbolTable: SymbolTable }
 with
     static member New : Compiler =
         { Instructions = Instructions [|  |]
-          Constants = [] }
+          Constants = []
+          SymbolTable = SymbolTable.New }
         
     // START Private members
     member private this.AddConstant(object: Object) =
@@ -52,9 +55,30 @@ with
         let newCompiler = { this with Instructions = Instructions newInstructions }
         newCompiler, instruction.Length
     // END Private members
-        
-        
-    member this.Compile(node: Node) : Result<Compiler, string> =
+    
+
+    // TODO: See if you can re-write this, looks like shit
+    member this.CompileNodes(nodes: Node array) : Result<Compiler, string> =
+        let rec something (compiler: Compiler) (currentIndex: int) =
+            match currentIndex with
+            | i when i < nodes.Length -> 
+                let node = nodes[currentIndex]
+                let compilationResult = 
+                    match node with
+                    | Statement statement -> compiler.CompileStatement(true, statement)
+                    | Expression expression -> compiler.CompileExpression(expression)
+                    
+                match compilationResult with
+                | Ok (newCompiler, compiledBytes) ->
+                    let newCompiler, _ = newCompiler.AddInstruction(compiledBytes)
+                    something newCompiler (currentIndex + 1)
+                | Error error -> failwith "todo"
+            | i ->
+                Ok compiler
+                
+        something this 0 
+            
+    member this.CompileNode(node: Node) =
         match node with
         | Statement statement ->
             this.CompileStatement(true, statement)
@@ -75,7 +99,15 @@ with
     // TODO: See if you can find a 'better' than using the 'generateOpPop' param
     member private this.CompileStatement(generateOpPop: bool, statement: Statement) : Result<Compiler * byte array, string> =
         match statement with
-        | LetStatement letStatement -> failwith "todo"
+        | LetStatement letStatement ->
+            result {
+                let! newCompiler, exprBytes = this.CompileExpression(letStatement.Value)
+                let newSymbolTable, symbol = this.SymbolTable.Define(letStatement.Name.Value)
+                
+                let varBindingBytes = make Opcode.OpSetGlobal [| symbol.Index |]
+                let bytes = Array.concat [| exprBytes; varBindingBytes |]
+                return ({ newCompiler with SymbolTable = newSymbolTable }, bytes)
+            }
         | ReturnStatement returnStatement -> failwith "todo"
         | ExpressionStatement expressionStatement ->
             result {
@@ -116,7 +148,8 @@ with
         | ArrayLiteral arrayLiteral -> failwith "todo"
         | HashLiteral hashLiteral -> failwith "todo"
         | MacroLiteral macroLiteral -> failwith "todo"
-        | Expression.Identifier identifier -> failwith "todo"
+        | Expression.Identifier identifier ->
+            this.CompileIdentifier identifier
         
         | PrefixExpression prefixExpression ->
             this.CompilePrefixExpression(prefixExpression)
@@ -126,6 +159,11 @@ with
             this.CompileIfExpression(ifExpression)
         | CallExpression callExpression -> failwith "todo"
         | IndexExpression indexExpression -> failwith "todo"
+        
+    member private this.CompileIdentifier(identifier: Identifier) : Result<Compiler * byte array, string> =
+        match this.SymbolTable.Resolve identifier.Value with
+        | Some symbol -> Ok (this, make Opcode.OpGetGlobal [| symbol.Index |])
+        | None -> Error $"Undefined variable \"{identifier.Value}\""
         
     member private this.CompilePrefixExpression(prefixExpression: PrefixExpression) : Result<Compiler * byte array, string> =
         result {

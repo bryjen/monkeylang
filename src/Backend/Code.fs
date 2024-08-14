@@ -45,6 +45,9 @@ type Opcode =
     | OpJump           = 0x0Euy
     
     | OpNull           = 0x0Fuy
+    
+    | OpSetGlobal      = 0x10uy
+    | OpGetGlobal      = 0x11uy
 
 type Definition =
     { Name: string
@@ -77,6 +80,9 @@ let private opcodeDefinitions = Map.ofList [
     (Opcode.OpJump,          { Name = "OpJump"; OperandWidths = [| 2 |] })
     
     (Opcode.OpNull,          { Name = "OpNull"; OperandWidths = [| |] })
+    
+    (Opcode.OpSetGlobal,     { Name = "OpSetGlobal"; OperandWidths = [| 2 |] })
+    (Opcode.OpGetGlobal,     { Name = "OpGetGlobal"; OperandWidths = [| 2 |] })
 ]
 
 
