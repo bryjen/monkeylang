@@ -12,7 +12,7 @@ module VMHelpers =
         | NullType -> Ok ()
         | _ -> Error $"'actual' is not a 'NullType', got '{actual.Type()}'"
     
-    let testIntegerObject (expected: int64) (actual: Object) =
+    let private testIntegerObject (expected: int64) (actual: Object) =
         result {
             let! asIntegerType = 
                 match actual with
@@ -25,7 +25,7 @@ module VMHelpers =
                 | false -> Error $"'actual' has wrong value, expected {expected}, but got {asIntegerType}."
         }
         
-    let testBooleanObject (expected: bool) (actual: Object) =
+    let private testBooleanObject (expected: bool) (actual: Object) =
         result {
             let! boolValue =
                 match actual with
@@ -38,10 +38,24 @@ module VMHelpers =
                 | false -> Error $"'actual' has wrong value, expected {expected}, but got {boolValue}."
         }
         
+    let private testStringObject (expected: string) (actual: Object) =
+        result {
+            let! stringValue =
+                match actual with
+                | Object.StringType stringValue -> Ok stringValue 
+                | _ -> Error $"'actual' is not an 'StringType', got '{actual.Type()}'."
+                
+            return! 
+                match stringValue = expected with
+                | true -> Ok () 
+                | false -> Error $"'actual' has wrong value, expected \"{expected}\", but got \"{stringValue}\"."
+        }
+        
     let testExpectedObject (expected: obj) (actual: Object) =
         match expected with
         | null -> assertObjectIsNullType actual
         | :? int64 as value -> testIntegerObject value actual 
         | :? int as value -> testIntegerObject (int64 value) actual 
         | :? bool as value -> testBooleanObject value actual 
+        | :? string as value -> testStringObject value actual 
         | _ -> failwith $"Test method does not handle expected type \"{expected.GetType()}\""

@@ -137,9 +137,9 @@ with
             let! result =
                 match operatorOpcode, left, right with
                 | Opcode.OpAdd, Object.IntegerType l, Object.IntegerType r -> (l + r) |> Object.IntegerType |> Ok 
-                | Opcode.OpAdd, Object.StringType l, Object.StringType r -> failwith "todo"
-                | Opcode.OpAdd, Object.IntegerType l, Object.StringType r -> failwith "todo"
-                | Opcode.OpAdd, Object.StringType l, Object.IntegerType r -> failwith "todo"
+                | Opcode.OpAdd, Object.StringType l, Object.StringType r -> $"{l}{r}" |> Object.StringType |> Ok
+                | Opcode.OpAdd, Object.IntegerType l, Object.StringType r -> $"{l}{r}" |> Object.StringType |> Ok
+                | Opcode.OpAdd, Object.StringType l, Object.IntegerType r -> $"{l}{r}" |> Object.StringType |> Ok
                 | Opcode.OpSub, Object.IntegerType l, Object.IntegerType r -> (l - r) |> Object.IntegerType |> Ok
                 | Opcode.OpMul, Object.IntegerType l, Object.IntegerType r -> (l * r) |> Object.IntegerType |> Ok
                 | Opcode.OpDiv, Object.IntegerType l, Object.IntegerType r -> (l / r) |> Object.IntegerType |> Ok

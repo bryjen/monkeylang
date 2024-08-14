@@ -88,6 +88,7 @@ module CompilerHelpers =
                     match expected with
                     | :? int as value -> testIntegerObject currentIndex (int64 value) actual
                     | :? int64 as value -> testIntegerObject currentIndex value actual
+                    | :? string as value -> testStringObject currentIndex value actual
                     | _ -> failwith "todo"
                 
                 return! processExpectedVsActual (currentIndex + 1) tail
@@ -102,4 +103,13 @@ module CompilerHelpers =
             | true -> Ok () 
             | false -> Error $"[Error] Object has wrong value at index {currentIndex}. Expected {expected}, got {value}." 
         | _ ->
-            Error $"[Error] Object at {currentIndex} is not an integer type, was {object.Type()}"
+            Error $"[Error] Object at {currentIndex} is not an \"integer\" type, was {object.Type()}"
+            
+    and private testStringObject (currentIndex: int) (expected: string) (object: Object) =
+        match object with
+        | Object.StringType value ->
+            match value = expected with
+            | true -> Ok () 
+            | false -> Error $"[Error] Object has wrong value at index {currentIndex}. Expected {expected}, got {value}." 
+        | _ ->
+            Error $"[Error] Object at {currentIndex} is not an \"string\" type, was {object.Type()}"

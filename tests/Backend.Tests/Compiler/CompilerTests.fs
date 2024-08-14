@@ -223,6 +223,24 @@ type CompilerTests() =
               make Opcode.OpPop [| |]
           |] |> Array.map Instructions }
     |]
+    
+    static member ``G: Test String literal codegen`` = [|
+        { Input = "\"monkey\""
+          ExpectedConstants = [| "monkey" |]
+          ExpectedInstructions = [|
+              make Opcode.OpConstant [| 0 |]
+              make Opcode.OpPop [| |]
+          |] |> Array.map Instructions }
+        
+        { Input = "\"mon\" + \"key\""
+          ExpectedConstants = [| "mon"; "key" |]
+          ExpectedInstructions = [|
+              make Opcode.OpConstant [| 0 |]
+              make Opcode.OpConstant [| 1 |]
+              make Opcode.OpAdd [| |]
+              make Opcode.OpPop [| |]
+          |] |> Array.map Instructions }
+    |]
         
     static member TestCasesToExecute = Array.concat [
         CompilerTests.``A: Test Integer Arithmetic Case``
@@ -231,6 +249,7 @@ type CompilerTests() =
         CompilerTests.``D: Test Prefix Expr codegen``
         CompilerTests.``E: Test If Expr codegen``
         CompilerTests.``F: Test Let Statement codegen``
+        CompilerTests.``G: Test String literal codegen``
     ]
     
     [<TestCaseSource("TestCasesToExecute")>]

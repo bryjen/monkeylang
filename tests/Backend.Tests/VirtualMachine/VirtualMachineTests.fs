@@ -109,6 +109,12 @@ type VirtualMachineTests() =
             { Input = "let one = 1; let two = 2; one + two;"; Expected = 3 }
             { Input = "let one = 1; let two = one + one; one + two;"; Expected = 3 }
     |]
+    
+    static member ``K: Test String Evaluation`` = [|
+            { Input = "\"monkey\";"; Expected = "monkey" }
+            { Input = "\"mon\" + \"key\";"; Expected = "monkey" }
+            { Input = "\"mon\" + \"key\" + \"banana\";"; Expected = "monkeybanana" }
+    |]
         
         
     static member TestCasesToExecute = Array.concat [
@@ -122,6 +128,7 @@ type VirtualMachineTests() =
         VirtualMachineTests.``H: Test Prefix and Infix Expression Evaluation``
         VirtualMachineTests.``I: Test If Expression Evaluation``
         VirtualMachineTests.``J: Test Let Statement Evaluation``
+        VirtualMachineTests.``K: Test String Evaluation``
     ]
         
     [<TestCaseSource("TestCasesToExecute")>]

@@ -143,7 +143,11 @@ with
             let opcodeToEmit = if booleanLiteral.Value then Opcode.OpTrue else Opcode.OpFalse
             let booleanBytes = make opcodeToEmit [|  |]
             Ok (this, booleanBytes)
-        | StringLiteral stringLiteral -> failwith "todo"
+        | StringLiteral stringLiteral ->
+            let stringObj = Object.StringType stringLiteral.Value
+            let newCompiler, constIndex = this.AddConstant(stringObj)
+            let opConstantBytes = make Opcode.OpConstant [| constIndex |]
+            Ok (newCompiler, opConstantBytes)
         | Expression.FunctionLiteral functionLiteral -> failwith "todo"
         | ArrayLiteral arrayLiteral -> failwith "todo"
         | HashLiteral hashLiteral -> failwith "todo"
