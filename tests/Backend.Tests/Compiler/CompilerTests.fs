@@ -272,6 +272,45 @@ type CompilerTests() =
               make Opcode.OpPop [| |]
           |] |> Array.map Instructions }
     |]
+    
+    // See if tests could fail due to the 'random' order that key value pairs could be returned when getting
+    // the key value pairs of the map.
+    static member ``I: Test Hash literal codegen`` = [|
+        { Input = "{}"
+          ExpectedConstants = [| |]
+          ExpectedInstructions = [|
+              make Opcode.OpHash [| 0 |]
+              make Opcode.OpPop [| |]
+          |] |> Array.map Instructions }
+        
+        { Input = "{1: 2, 3: 4, 5: 6}"
+          ExpectedConstants = [| 1; 2; 3; 4; 5; 6 |]
+          ExpectedInstructions = [|
+              make Opcode.OpConstant [| 0 |]
+              make Opcode.OpConstant [| 1 |]
+              make Opcode.OpConstant [| 2 |]
+              make Opcode.OpConstant [| 3 |]
+              make Opcode.OpConstant [| 4 |]
+              make Opcode.OpConstant [| 5 |]
+              make Opcode.OpHash [| 6 |]
+              make Opcode.OpPop [| |]
+          |] |> Array.map Instructions }
+        
+        { Input = "{1: 2 + 3, 4: 5 * 6}"
+          ExpectedConstants = [| 1; 2; 3; 4; 5; 6 |]
+          ExpectedInstructions = [|
+              make Opcode.OpConstant [| 0 |]
+              make Opcode.OpConstant [| 1 |]
+              make Opcode.OpConstant [| 2 |]
+              make Opcode.OpAdd [| |]
+              make Opcode.OpConstant [| 3 |]
+              make Opcode.OpConstant [| 4 |]
+              make Opcode.OpConstant [| 5 |]
+              make Opcode.OpMul [| |]
+              make Opcode.OpHash [| 4 |]
+              make Opcode.OpPop [| |]
+          |] |> Array.map Instructions }
+    |]
         
     static member TestCasesToExecute = Array.concat [
         CompilerTests.``A: Test Integer Arithmetic Case``
@@ -282,6 +321,7 @@ type CompilerTests() =
         CompilerTests.``F: Test Let Statement codegen``
         CompilerTests.``G: Test String literal codegen``
         CompilerTests.``H: Test Array literal codegen``
+        CompilerTests.``I: Test Hash literal codegen``
     ]
     
     [<TestCaseSource("TestCasesToExecute")>]

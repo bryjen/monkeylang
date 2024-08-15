@@ -26,8 +26,23 @@ let private makeInfixOperator (operator: string) : Result<byte array, string> =
     | ">" -> make Opcode.OpGreaterThan [|  |] |> Ok
     // less than operator doesn't exist, code re-orders expression to use greater than instead
     
-    | s -> Error $"'{operator}' is not a valid infix expression operator" 
-
+    | s -> Error $"'{operator}' is not a valid infix expression operator"
+    
+let private compileExprArr (compiler: Compiler) (exprArray: Expression array) =
+    let bytesList = Array.zeroCreate<byte array> exprArray.Length
+    
+    let rec helper (currentCompiler: Compiler) currentIndex =
+        match currentIndex with
+        | i when i >= 0 && i < exprArray.Length ->
+            match currentCompiler.CompileExpression(exprArray[i]) with
+            | Ok (newCompiler, compiledBytes) ->
+                bytesList[i] <- compiledBytes
+                helper newCompiler (currentIndex + 1)
+            | Error error -> Error error 
+        | _ ->
+            Ok (currentCompiler, Array.concat bytesList)
+    
+    helper compiler 0
 
 
 type Compiler =
@@ -132,7 +147,7 @@ with
                     
             compileMultipleStatements this blockStatement.Statements [| |]
         
-    member private this.CompileExpression(expression: Expression) : Result<Compiler * byte array, string> =
+    member internal this.CompileExpression(expression: Expression) : Result<Compiler * byte array, string> =
         match expression with
         | IntegerLiteral integerLiteral ->
             let integerObj = Object.IntegerType integerLiteral.Value
@@ -151,7 +166,8 @@ with
         | Expression.FunctionLiteral functionLiteral -> failwith "todo"
         | ArrayLiteral arrayLiteral ->
             this.CompileArrayLiteral(arrayLiteral)
-        | HashLiteral hashLiteral -> failwith "todo"
+        | HashLiteral hashLiteral ->
+            this.CompileHashLiteral(hashLiteral)
         | MacroLiteral macroLiteral -> failwith "todo"
         | Expression.Identifier identifier ->
             this.CompileIdentifier identifier
@@ -168,24 +184,17 @@ with
     member private this.CompileArrayLiteral(arrayLiteral: ArrayLiteral) =
         // TODO: Potential performance increase by using an array as the underlying type
         let exprsArray = Array.ofList arrayLiteral.Elements
-        let bytesList = Array.zeroCreate<byte array> exprsArray.Length
-        
-        let rec compileArrExprsHelper (currentIndex: int) (compiler: Compiler) =
-            match currentIndex with
-            | i when i < exprsArray.Length ->
-                match compiler.CompileExpression(exprsArray[i]) with
-                | Ok (newCompiler, compiledBytes) ->
-                    bytesList[i] <- compiledBytes
-                    compileArrExprsHelper (currentIndex + 1) newCompiler
-                | Error error -> Error error 
-            | _ -> Ok (compiler, Array.concat bytesList) 
-            
         let opArrayBytes = make Opcode.OpArray [| exprsArray.Length |]
         
-        compileArrExprsHelper 0 this
+        compileExprArr this exprsArray
         |> Result.map (fun (compiler, bytes) -> (compiler, Array.append bytes opArrayBytes))
         
+    member private this.CompileHashLiteral(hashLiteral: HashLiteral) =
+        let exprsArray = hashLiteral.Pairs |> Map.toArray |> Array.collect (fun (a, b) -> [| a; b |])
+        let opHashBytes = make Opcode.OpHash [| exprsArray.Length |]
         
+        compileExprArr this exprsArray
+        |> Result.map (fun (compiler, bytes) -> (compiler, Array.append bytes opHashBytes))
         
     member private this.CompileIdentifier(identifier: Identifier) =
         match this.SymbolTable.Resolve identifier.Value with

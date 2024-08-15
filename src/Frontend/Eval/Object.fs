@@ -38,7 +38,7 @@ and Object =
     | FunctionType of Function
     | ErrorType of ErrorType
     | ArrayType of Object list 
-    | HashType of Map<HashableObject, Object>
+    | HashType of Map<int, Object>  // uses F#'s builtin "hash" function to hash keys
 with
     member this.Type() =
         match this with
@@ -64,7 +64,7 @@ with
         | ArrayType arr ->
             let elementsString = String.concat ", " (arr |> List.map (_.ToString()))
             $"[{elementsString}]"
-        | HashType hashmap -> failwith "todo"
+        | HashType _ -> failwith "todo"
 
 
 
@@ -108,4 +108,10 @@ with
         | Object.IntegerType integerType -> integerType |> HashableObject.IntegerType |> Some 
         | Object.BooleanType booleanType -> booleanType |> HashableObject.BooleanType |> Some 
         | Object.StringType stringType -> stringType  |> HashableObject.StringType |> Some 
-        | _ -> None 
+        | _ -> None
+        
+    static member Hash (hashableObject: HashableObject) =
+        match hashableObject with
+        | HashableObject.IntegerType integerType -> hash integerType
+        | HashableObject.BooleanType booleanType -> hash booleanType 
+        | HashableObject.StringType stringType -> hash stringType 

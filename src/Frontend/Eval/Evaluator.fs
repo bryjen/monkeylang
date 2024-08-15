@@ -306,12 +306,12 @@ module Evaluator =
     and private indexHash environment index hash =
         result {
             let! _, evaluatedIndex = evalExpression environment index
-            let! asHashableObject =
+            let! hashedKey =
                 match HashableObject.FromObject evaluatedIndex with
-                | Some value -> Ok value
+                | Some value -> value |> HashableObject.Hash |> Ok
                 | None -> Error $"The index is not a hashable type, got {evaluatedIndex.Type()}"
                 
-            match Map.tryFind asHashableObject hash with
+            match Map.tryFind hashedKey hash with
             | Some value -> return value 
             | None -> return NullType 
         }
@@ -327,9 +327,12 @@ module Evaluator =
             let! filteredValueExprs = evaluatedValueExprs |> filterOkResults []
             
             // Filter only hashable keys
-            let! typeFilteredKeyExprs = filteredKeyExprs |> List.map HashableObject.FromObject |> filterSomeResults []
+            let! hashedKeys = filteredKeyExprs
+                              |> List.map HashableObject.FromObject
+                              |> filterSomeResults []
+                              |> Result.map (List.map HashableObject.Hash)
             
             // Zip can't error, component lists are guaranteed to be equal in length
-            return List.zip typeFilteredKeyExprs filteredValueExprs |> Map.ofList |> HashType
+            return List.zip hashedKeys filteredValueExprs |> Map.ofList |> HashType
         }
         

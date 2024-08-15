@@ -121,6 +121,12 @@ type VirtualMachineTests() =
             { Input = "[1, 2, 3];"; Expected = ([| 1L; 2L; 3L |] : int64 array) }
             { Input = "[1 + 2, 3 * 4, 5 + 6];"; Expected = ([| 3L; 12L; 11L |] : int64 array) }
     |]
+    
+    static member ``M: Test Hash Literal Evaluation`` = [|
+            { Input = "{};"; Expected = (Map.empty : Map<int, System.Object>) }
+            { Input = "{1: 2, 2: 3};"; Expected = (Map.ofList [ (1, 2L); (2, 3L) ] : Map<int, int64>) }
+            { Input = "{1 + 1: 2 * 2, 3 + 3: 4 * 4};"; Expected = (Map.ofList [ (2, 4); (6, 16) ] : Map<int, int64>) }
+    |]
         
         
     static member TestCasesToExecute = Array.concat [
@@ -136,6 +142,7 @@ type VirtualMachineTests() =
         VirtualMachineTests.``J: Test Let Statement Evaluation``
         VirtualMachineTests.``K: Test String Evaluation``
         VirtualMachineTests.``L: Test Array Literal Evaluation``
+        VirtualMachineTests.``M: Test Hash Literal Evaluation``
     ]
         
     [<TestCaseSource("TestCasesToExecute")>]

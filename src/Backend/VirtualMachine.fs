@@ -79,6 +79,8 @@ with
                     _vm.HandleGetGlobalOpcode(&i, asByteArr)
                 | Opcode.OpArray ->
                     _vm.HandleOpArray(&i, asByteArr)
+                | Opcode.OpHash ->
+                    _vm.HandleOpHash(&i, asByteArr)
                 | Opcode.OpJumpWhenFalse ->
                     let arraySlice = asByteArr[i + 1 .. i + 2]
                     let indexToJumpTo = arraySlice |> readUInt16 |> int
@@ -125,6 +127,33 @@ with
             elements[i - startIndex] <- this.Stack[i].Value  // TODO: Straight dereferencing, see if this is a bad idea
             
         elements |> List.ofArray |> ArrayType
+        
+        
+    member private this.HandleOpHash(i: byref<int>, byteArr: byte array) : Result<VM, string> =
+        let arraySlice = byteArr[i + 1 .. i + 2]
+        let numElements = arraySlice |> readUInt16 |> int
+        i <- i + 2
+        
+        let hash = this.BuildHash(this.StackPointer - numElements, numElements / 2)
+        let newVm = { this with StackPointer = this.StackPointer - numElements }
+        newVm.Push(hash)
+        
+    member private this.BuildHash(startIndex: int, numPairs: int) =
+        // TODO: Fix this
+        let hashKey object = object |> HashableObject.FromObject |> Option.get |> HashableObject.Hash
+        let pairs = Array.zeroCreate<int * Object> numPairs
+        
+        let mutable currentPair = 0
+        while currentPair < numPairs do
+            let i = startIndex + (2 * currentPair)
+            let key = this.Stack[i].Value
+            let hashedKey = hashKey key
+            let value = this.Stack[i + 1].Value
+            
+            pairs[currentPair] <- (hashedKey, value)
+            currentPair <- currentPair + 1
+            
+        Map.ofArray pairs |> HashType
         
     member private this.HandleOpConstant(i: byref<int>, byteArr: byte array) : Result<VM, string> =
         let arraySlice = byteArr[i + 1 .. i + 2]
