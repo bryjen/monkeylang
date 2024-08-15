@@ -363,10 +363,8 @@ type CompilerTests() =
             let program = Parser.parseProgram compilerTestCase.Input
             let nodes = programToNodes program
             
-            let mutable compiler = Compiler.New
-            let! newCompiler = compiler.CompileNodes(nodes) 
-            let bytecode = newCompiler.Bytecode()
-                
+            let! newCompiler = Compiler.compileNodes nodes (Compiler.createNew ()) 
+            let bytecode = Compiler.toByteCode newCompiler
             
             let expectedInstructions = compilerTestCase.ExpectedInstructions
                                        |> Array.map (_.GetBytes())

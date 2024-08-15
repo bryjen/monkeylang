@@ -17,11 +17,11 @@ let private getNameOfFunction () =
     let frame = stackTrace.GetFrame(1)  // this func is called by other functions in this module, so we go two 'levels' up
     $"[{frame.GetMethod().Name}]"
     
-let programToNodes (program: Program) : Node array =
+let programToNodes (program: Program) : Node list =
     let rec helper statements nodes =
         match statements with
         | head :: tail -> helper tail ((Node.Statement head) :: nodes)
-        | [ ] -> nodes |> List.rev |> List.toArray
+        | [ ] -> nodes |> List.rev
         
     helper program.Statements []
     
