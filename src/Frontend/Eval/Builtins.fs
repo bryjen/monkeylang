@@ -23,8 +23,8 @@ module private Functions =
         match object with
         | ArrayType array ->
             match array with
-            | head :: _ -> head
-            | [] -> NullType 
+            | [| |] -> NullType 
+            | _ -> array[0]
         | _ ->
             ErrorType $"Argument to 'head' not supported, got {object.Type()}" |> Object.ErrorType
             
@@ -32,15 +32,15 @@ module private Functions =
         match object with
         | ArrayType array ->
             match array with
-            | _ :: tail -> ArrayType tail
-            | [] -> ArrayType []
+            | [| |] -> object // return object, since its already an empty array type
+            | _ -> array[1..] |> ArrayType
         | _ ->
             ErrorType $"Argument to 'tail' not supported, got {object.Type()}" |> Object.ErrorType
             
     // Remark: '@' operator has log(n) complexity
     let push object toPush =
         match object with
-        | ArrayType array -> [toPush] @ array |> ArrayType
+        | ArrayType array -> (Array.append array [| toPush |]) |> ArrayType
         | _ -> ErrorType $"Argument to 'push' not supported, got {object.Type()}" |> Object.ErrorType
     
 

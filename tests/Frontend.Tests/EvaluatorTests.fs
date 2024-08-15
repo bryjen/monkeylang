@@ -70,8 +70,9 @@ module private TestHelpers =
     let assertEqualObjsList (expectedValues: obj list) (object: Object) =
         match object with
         | ArrayType array when array.Length = expectedValues.Length ->
-            let comparisonResults = List.zip expectedValues array |> List.map (fun (e, a) -> assertEqualObj e a) 
-            match (List.tryFind Result.isError comparisonResults) with
+            let expectedValuesArr = List.toArray expectedValues
+            let comparisonResults = Array.zip expectedValuesArr array |> Array.map (fun (e, a) -> assertEqualObj e a) 
+            match (Array.tryFind Result.isError comparisonResults) with
             | Some errorResult -> errorResult 
             | None -> Ok () 
         | ArrayType array ->

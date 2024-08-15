@@ -183,11 +183,9 @@ with
             this.CompileIfExpression(ifExpression)
         
     member private this.CompileArrayLiteral(arrayLiteral: ArrayLiteral) =
-        // TODO: Potential performance increase by using an array as the underlying type
-        let exprsArray = Array.ofList arrayLiteral.Elements
-        let opArrayBytes = make Opcode.OpArray [| exprsArray.Length |]
+        let opArrayBytes = make Opcode.OpArray [| arrayLiteral.Elements.Length |]
         
-        compileExprArr this exprsArray
+        compileExprArr this arrayLiteral.Elements 
         |> Result.map (fun (compiler, bytes) -> (compiler, Array.append bytes opArrayBytes))
         
     member private this.CompileHashLiteral(hashLiteral: HashLiteral) =

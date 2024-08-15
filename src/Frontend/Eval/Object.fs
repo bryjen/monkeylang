@@ -37,7 +37,7 @@ and Object =
     | StringType of string
     | FunctionType of Function
     | ErrorType of ErrorType
-    | ArrayType of Object list 
+    | ArrayType of Object array
     | HashType of Map<HashableObject, Object>
 with
     member this.Type() =
@@ -62,7 +62,7 @@ with
         | FunctionType _ -> failwith "todo" 
         | ErrorType _ -> failwith "todo" 
         | ArrayType arr ->
-            let elementsString = String.concat ", " (arr |> List.map (_.ToString()))
+            let elementsString = String.concat ", " (arr |> Array.map (_.ToString()))
             $"[{elementsString}]"
         | HashType _ -> failwith "todo"
 

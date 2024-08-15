@@ -128,7 +128,7 @@ with
         for i in startIndex .. (endIndex - 1) do
             elements[i - startIndex] <- this.Stack[i].Value  // TODO: Straight dereferencing, see if this is a bad idea
             
-        elements |> List.ofArray |> ArrayType
+        elements |> ArrayType
         
         
     member private this.HandleOpHash(i: byref<int>, byteArr: byte array) : Result<VM, string> =
@@ -173,10 +173,10 @@ with
         | HashType hash -> this.IndexHash(hash, index)
         | _ -> Error "Attempting to index a non-indexable type."
         
-    member private this.IndexArray(objects: Object list, index: Object) =
+    member private this.IndexArray(objects: Object array, index: Object) =
         match index with
         | Object.IntegerType i when i >= 0 && i < objects.Length ->
-            objects |> List.item (int i) |> Ok
+            objects[int i] |> Ok
         | Object.IntegerType _ ->
             NullType |> Ok
         | _ ->

@@ -266,9 +266,9 @@ module Evaluator =
     // END REGION evalCallExpression
     
     and internal evalArrayLiteral environment arrayLiteral =
-        let evaluatedExpressions = arrayLiteral.Elements |> List.map (evalExpression environment)
+        let evaluatedExpressions = arrayLiteral.Elements |> Array.toList |> List.map (evalExpression environment)
         match (processResults evaluatedExpressions [] []) with
-        | Ok evaluatedResults -> List.map snd evaluatedResults |> ArrayType |> Ok
+        | Ok evaluatedResults -> List.map snd evaluatedResults |> List.toArray |> ArrayType |> Ok
         | Error error -> Error error
         
     and internal evalIndexExpression environment indexExpression =
@@ -300,7 +300,8 @@ module Evaluator =
                 then Ok ()
                 else Error $"[evalIndexExpression] Index {indexAsInt} out of bounds."
                 
-            return (List.item (int indexAsInt) arr)
+            return arr[int indexAsInt]
+            // return (List.item (int indexAsInt) arr)
         }
         
     and private indexHash environment index hash =

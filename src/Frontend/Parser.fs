@@ -433,7 +433,7 @@ module rec Parser =
         result {
             match (queuePeekToken tokensQueue) with
             | Ok peekToken when peekToken.Type = RBRACKET ->
-                return (Queue.removeTop tokensQueue, List.rev exprList)
+                return (Queue.removeTop tokensQueue, exprList |> List.toArray |> Array.rev)
             | Ok _ ->
                 let! newTokensQueue, expr = tryParseExpression tokensQueue Precedence.LOWEST
                 let! newTokensQueue = assertNextTokenAndExecute arrayParsingFuncMap newTokensQueue

@@ -244,10 +244,10 @@ with
     
 type ArrayLiteral =
     { Token: Token
-      Elements: Expression list }
+      Elements: Expression array }
 with
 #if DEBUG
-    static member internal Default = { Token = Token.Default; Elements = [] }
+    static member internal Default = { Token = Token.Default; Elements = [| |] }
 #endif
     
     member this.GetTokenLiteral() = this.Token.Literal

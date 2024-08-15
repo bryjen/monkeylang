@@ -1019,9 +1019,9 @@ let y = 10;
                 then Ok ()
                 else Error $"callExpression.Elements.Length expected to be 3, got \"{arrayLiteral.Elements.Length}\""
                 
-            do! testLiteralExpression (List.item 0 arrayLiteral.Elements) 1
-            do! testInfixExpression (List.item 1 arrayLiteral.Elements) 2 "*" 2
-            do! testInfixExpression (List.item 2 arrayLiteral.Elements) 3 "+" 3
+            do! testLiteralExpression arrayLiteral.Elements[0] 1
+            do! testInfixExpression arrayLiteral.Elements[1] 2 "*" 2
+            do! testInfixExpression arrayLiteral.Elements[2] 3 "+" 3
         }
         |> function
            | Ok _ -> Assert.Pass()
@@ -1059,9 +1059,9 @@ let y = 10;
                 then Ok ()
                 else Error $"arrayLiteral.Elements.Length expected to be 3, got \"{arrayLiteral.Elements.Length}\""
                 
-            do! testLiteralExpression (List.item 0 arrayLiteral.Elements) 1
-            do! testInfixExpression (List.item 1 arrayLiteral.Elements) 2 "*" 2
-            do! testInfixExpression (List.item 2 arrayLiteral.Elements) 3 "+" 3
+            do! testLiteralExpression arrayLiteral.Elements[0] 1
+            do! testInfixExpression arrayLiteral.Elements[1] 2 "*" 2
+            do! testInfixExpression arrayLiteral.Elements[2] 3 "+" 3
             
             // Testing 'index' for infix expr
             let! _ = 

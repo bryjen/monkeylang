@@ -128,7 +128,6 @@ module VMHelpers =
             Ok () // Todo: fix sm with this
         | :? (int64 array) as expectedArray ->
             CastEvalObj.toArrayType actual
-            |> Result.map Array.ofList
             |> Result.bind (castArrayTypeIntoNativeArray CastEvalObj.toIntegerType)
             |> Result.bind (assertArraysAreEqual expectedArray)
             
