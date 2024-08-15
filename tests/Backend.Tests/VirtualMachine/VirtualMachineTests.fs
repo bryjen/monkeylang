@@ -116,6 +116,12 @@ type VirtualMachineTests() =
             { Input = "\"mon\" + \"key\" + \"banana\";"; Expected = "monkeybanana" }
     |]
         
+    static member ``L: Test Array Literal Evaluation`` = [|
+            { Input = "[];"; Expected = [| |] }
+            { Input = "[1, 2, 3];"; Expected = ([| 1L; 2L; 3L |] : int64 array) }
+            { Input = "[1 + 2, 3 * 4, 5 + 6];"; Expected = ([| 3L; 12L; 11L |] : int64 array) }
+    |]
+        
         
     static member TestCasesToExecute = Array.concat [
         VirtualMachineTests.``A: Test Basic Integer Arithmetic Case``
@@ -129,6 +135,7 @@ type VirtualMachineTests() =
         VirtualMachineTests.``I: Test If Expression Evaluation``
         VirtualMachineTests.``J: Test Let Statement Evaluation``
         VirtualMachineTests.``K: Test String Evaluation``
+        VirtualMachineTests.``L: Test Array Literal Evaluation``
     ]
         
     [<TestCaseSource("TestCasesToExecute")>]

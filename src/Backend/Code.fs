@@ -48,6 +48,8 @@ type Opcode =
     
     | OpSetGlobal      = 0x10uy
     | OpGetGlobal      = 0x11uy
+    
+    | OpArray          = 0x12uy
 
 type Definition =
     { Name: string
@@ -83,6 +85,8 @@ let private opcodeDefinitions = Map.ofList [
     
     (Opcode.OpSetGlobal,     { Name = "OpSetGlobal"; OperandWidths = [| 2 |] })
     (Opcode.OpGetGlobal,     { Name = "OpGetGlobal"; OperandWidths = [| 2 |] })
+    
+    (Opcode.OpArray,         { Name = "OpArray"; OperandWidths = [| 2 |] })
 ]
 
 

@@ -149,7 +149,8 @@ with
             let opConstantBytes = make Opcode.OpConstant [| constIndex |]
             Ok (newCompiler, opConstantBytes)
         | Expression.FunctionLiteral functionLiteral -> failwith "todo"
-        | ArrayLiteral arrayLiteral -> failwith "todo"
+        | ArrayLiteral arrayLiteral ->
+            this.CompileArrayLiteral(arrayLiteral)
         | HashLiteral hashLiteral -> failwith "todo"
         | MacroLiteral macroLiteral -> failwith "todo"
         | Expression.Identifier identifier ->
@@ -164,12 +165,34 @@ with
         | CallExpression callExpression -> failwith "todo"
         | IndexExpression indexExpression -> failwith "todo"
         
-    member private this.CompileIdentifier(identifier: Identifier) : Result<Compiler * byte array, string> =
+    member private this.CompileArrayLiteral(arrayLiteral: ArrayLiteral) =
+        // TODO: Potential performance increase by using an array as the underlying type
+        let exprsArray = Array.ofList arrayLiteral.Elements
+        let bytesList = Array.zeroCreate<byte array> exprsArray.Length
+        
+        let rec compileArrExprsHelper (currentIndex: int) (compiler: Compiler) =
+            match currentIndex with
+            | i when i < exprsArray.Length ->
+                match compiler.CompileExpression(exprsArray[i]) with
+                | Ok (newCompiler, compiledBytes) ->
+                    bytesList[i] <- compiledBytes
+                    compileArrExprsHelper (currentIndex + 1) newCompiler
+                | Error error -> Error error 
+            | _ -> Ok (compiler, Array.concat bytesList) 
+            
+        let opArrayBytes = make Opcode.OpArray [| exprsArray.Length |]
+        
+        compileArrExprsHelper 0 this
+        |> Result.map (fun (compiler, bytes) -> (compiler, Array.append bytes opArrayBytes))
+        
+        
+        
+    member private this.CompileIdentifier(identifier: Identifier) =
         match this.SymbolTable.Resolve identifier.Value with
         | Some symbol -> Ok (this, make Opcode.OpGetGlobal [| symbol.Index |])
         | None -> Error $"Undefined variable \"{identifier.Value}\""
         
-    member private this.CompilePrefixExpression(prefixExpression: PrefixExpression) : Result<Compiler * byte array, string> =
+    member private this.CompilePrefixExpression(prefixExpression: PrefixExpression) =
         result {
             let! newCompiler, rightExprBytes = this.CompileExpression(prefixExpression.Right)
             let! prefixOperatorBytes = makePrefixOperator prefixExpression.Operator
@@ -177,7 +200,7 @@ with
             return newCompiler, prefixExprBytes
         }
         
-    member private this.CompileInfixExpression(infixExpression: InfixExpression) : Result<Compiler * byte array, string> =
+    member private this.CompileInfixExpression(infixExpression: InfixExpression) =
         let left, right, operator =
             match infixExpression.Operator with
             | "<" -> infixExpression.Right, infixExpression.Left, ">"
@@ -191,7 +214,7 @@ with
             return newCompiler, infixExprBytes
         }
         
-    member private this.CompileIfExpression(ifExpression: IfExpression) : Result<Compiler * byte array, string> =
+    member private this.CompileIfExpression(ifExpression: IfExpression) =
         result {
             let! newCompiler, conditionBytes = this.CompileExpression(ifExpression.Condition)
             let! newCompiler, consequenceBytes = newCompiler.CompileStatement(false, Statement.BlockStatement ifExpression.Consequence)

@@ -77,6 +77,8 @@ with
                     _vm.HandleSetGlobalOpcode(&i, asByteArr)
                 | Opcode.OpGetGlobal ->
                     _vm.HandleGetGlobalOpcode(&i, asByteArr)
+                | Opcode.OpArray ->
+                    _vm.HandleOpArray(&i, asByteArr)
                 | Opcode.OpJumpWhenFalse ->
                     let arraySlice = asByteArr[i + 1 .. i + 2]
                     let indexToJumpTo = arraySlice |> readUInt16 |> int
@@ -107,6 +109,22 @@ with
             
         runHelper vm
         
+    member private this.HandleOpArray(i: byref<int>, byteArr: byte array) : Result<VM, string> =
+        let arraySlice = byteArr[i + 1 .. i + 2]
+        let numElements = arraySlice |> readUInt16 |> int
+        i <- i + 2
+        
+        let array = this.BuildArray(this.StackPointer - numElements, this.StackPointer)
+        let newVm = { this with StackPointer = this.StackPointer - numElements }
+        newVm.Push(array)
+        
+    member private this.BuildArray(startIndex: int, endIndex: int) =
+        let elements = Array.zeroCreate<Object> (endIndex - startIndex)
+        
+        for i in startIndex .. (endIndex - 1) do
+            elements[i - startIndex] <- this.Stack[i].Value  // TODO: Straight dereferencing, see if this is a bad idea
+            
+        elements |> List.ofArray |> ArrayType
         
     member private this.HandleOpConstant(i: byref<int>, byteArr: byte array) : Result<VM, string> =
         let arraySlice = byteArr[i + 1 .. i + 2]

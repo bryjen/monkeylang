@@ -241,6 +241,37 @@ type CompilerTests() =
               make Opcode.OpPop [| |]
           |] |> Array.map Instructions }
     |]
+    
+    static member ``H: Test Array literal codegen`` = [|
+        { Input = "[1, 2, 3]"
+          ExpectedConstants = [| 1; 2; 3 |]
+          ExpectedInstructions = [|
+              make Opcode.OpConstant [| 0 |]
+              make Opcode.OpConstant [| 1 |]
+              make Opcode.OpConstant [| 2 |]
+              make Opcode.OpArray [| 3 |]
+              make Opcode.OpPop [| |]
+          |] |> Array.map Instructions }
+        
+        { Input = "[1 + 2, 3 - 4, 5 * 6]"
+          ExpectedConstants = [| 1; 2; 3; 4; 5; 6 |]
+          ExpectedInstructions = [|
+              make Opcode.OpConstant [| 0 |]
+              make Opcode.OpConstant [| 1 |]
+              make Opcode.OpAdd [| |]
+              
+              make Opcode.OpConstant [| 2 |]
+              make Opcode.OpConstant [| 3 |]
+              make Opcode.OpSub [| |]
+              
+              make Opcode.OpConstant [| 4 |]
+              make Opcode.OpConstant [| 5 |]
+              make Opcode.OpMul [| |]
+              
+              make Opcode.OpArray [| 3 |]
+              make Opcode.OpPop [| |]
+          |] |> Array.map Instructions }
+    |]
         
     static member TestCasesToExecute = Array.concat [
         CompilerTests.``A: Test Integer Arithmetic Case``
@@ -250,6 +281,7 @@ type CompilerTests() =
         CompilerTests.``E: Test If Expr codegen``
         CompilerTests.``F: Test Let Statement codegen``
         CompilerTests.``G: Test String literal codegen``
+        CompilerTests.``H: Test Array literal codegen``
     ]
     
     [<TestCaseSource("TestCasesToExecute")>]
