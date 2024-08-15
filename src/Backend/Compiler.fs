@@ -164,10 +164,13 @@ with
             let opConstantBytes = make Opcode.OpConstant [| constIndex |]
             Ok (newCompiler, opConstantBytes)
         | Expression.FunctionLiteral functionLiteral -> failwith "todo"
+        | CallExpression callExpression -> failwith "todo"
         | ArrayLiteral arrayLiteral ->
             this.CompileArrayLiteral(arrayLiteral)
         | HashLiteral hashLiteral ->
             this.CompileHashLiteral(hashLiteral)
+        | IndexExpression indexExpression ->
+            this.CompileIndexExpression(indexExpression)
         | MacroLiteral macroLiteral -> failwith "todo"
         | Expression.Identifier identifier ->
             this.CompileIdentifier identifier
@@ -178,8 +181,6 @@ with
             this.CompileInfixExpression(infixExpression)
         | IfExpression ifExpression ->
             this.CompileIfExpression(ifExpression)
-        | CallExpression callExpression -> failwith "todo"
-        | IndexExpression indexExpression -> failwith "todo"
         
     member private this.CompileArrayLiteral(arrayLiteral: ArrayLiteral) =
         // TODO: Potential performance increase by using an array as the underlying type
@@ -195,6 +196,14 @@ with
         
         compileExprArr this exprsArray
         |> Result.map (fun (compiler, bytes) -> (compiler, Array.append bytes opHashBytes))
+        
+    member private this.CompileIndexExpression(indexExpression: IndexExpression) =
+        result {
+            let! newCompiler, exprBytes = this.CompileExpression(indexExpression.Left)
+            let! newCompiler, indexBytes = newCompiler.CompileExpression(indexExpression.Index)
+            let opIndexBytes = make Opcode.OpIndex [| |]
+            return (newCompiler, Array.concat [| exprBytes; indexBytes; opIndexBytes |])
+        }
         
     member private this.CompileIdentifier(identifier: Identifier) =
         match this.SymbolTable.Resolve identifier.Value with

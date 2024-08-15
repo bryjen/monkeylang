@@ -8,6 +8,15 @@ open Monkey.Frontend.Eval.Object
 [<RequireQualifiedAccess>]
 module VMHelpers =
     
+    [<AutoOpen>]
+    module Helpers =
+        let hashObjectCast (cast: Object -> Result<'a, string>) (hashableObject: HashableObject) =
+            match hashableObject with
+            | HashableObject.IntegerType integerType -> Object.IntegerType integerType 
+            | HashableObject.BooleanType booleanType -> Object.BooleanType booleanType
+            | HashableObject.StringType stringType -> Object.StringType stringType
+            |> cast
+    
     [<RequireQualifiedAccess>]
     module CastEvalObj =
         let toIntegerType object =
@@ -59,7 +68,24 @@ module VMHelpers =
                 
         helper 0
         
-    let private castMapValues (cast: Object -> Result<'a, string>) (map: Map<int, Object>) =
+    let private castMapKeys (cast: Object -> Result<'a, string>) (map: Map<HashableObject, 'b>) =
+        let updatedMap = map
+                         |> Map.toSeq
+                         |> Seq.map (fun (key, value) -> (hashObjectCast cast key, value))
+                         |> Map.ofSeq
+                         
+        match updatedMap |> Map.keys |> Seq.tryFind Result.isError with
+        | None ->
+            let forceGetOk result = match result with | Ok value -> value | Error _ -> failwith "FATAL: Found an error type."
+            updatedMap 
+            |> Map.toSeq
+            |> Seq.map (fun (key, value) -> (forceGetOk key, value))
+            |> Map.ofSeq
+            |> Ok
+        | Some error ->
+            error |> Result.map (fun _ -> Map.empty)
+        
+    let private castMapValues (cast: Object -> Result<'a, string>) (map: Map<'b, Object>) =
         let updatedMap = map |> Map.map (fun _ -> cast)
         
         match updatedMap |> Map.values |> Seq.tryFind Result.isError with
@@ -106,10 +132,12 @@ module VMHelpers =
             |> Result.bind (castArrayTypeIntoNativeArray CastEvalObj.toIntegerType)
             |> Result.bind (assertArraysAreEqual expectedArray)
             
-        | :? Map<int, System.Object> as _ ->
-            Ok () // Todo: fix sm with this
-        | :? Map<int, int64> as expectedMap ->
+        | :? Map<int64, int64> as expectedMap ->
             CastEvalObj.toHashType actual
+            |> Result.bind (castMapKeys CastEvalObj.toIntegerType)
             |> Result.bind (castMapValues CastEvalObj.toIntegerType)
             |> Result.bind (assertValuesAreEqual expectedMap)
+            
+        | :? Map<IComparable, obj> as _ ->
+            Ok () // Todo: fix sm with this
         | _ -> failwith $"Test method does not handle expected type \"{expected.GetType()}\""

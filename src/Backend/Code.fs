@@ -51,6 +51,7 @@ type Opcode =
     
     | OpArray          = 0x12uy
     | OpHash           = 0x13uy
+    | OpIndex          = 0x14uy
 
 type Definition =
     { Name: string
@@ -89,6 +90,7 @@ let private opcodeDefinitions = Map.ofList [
     
     (Opcode.OpArray,         { Name = "OpArray"; OperandWidths = [| 2 |] })
     (Opcode.OpHash,          { Name = "OpHash"; OperandWidths = [| 2 |] })
+    (Opcode.OpIndex,         { Name = "OpIndex"; OperandWidths = [| |] })
 ]
 
 

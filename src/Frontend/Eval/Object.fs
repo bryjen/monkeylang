@@ -38,7 +38,7 @@ and Object =
     | FunctionType of Function
     | ErrorType of ErrorType
     | ArrayType of Object list 
-    | HashType of Map<int, Object>  // uses F#'s builtin "hash" function to hash keys
+    | HashType of Map<HashableObject, Object>
 with
     member this.Type() =
         match this with

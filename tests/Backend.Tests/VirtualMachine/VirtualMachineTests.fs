@@ -123,9 +123,23 @@ type VirtualMachineTests() =
     |]
     
     static member ``M: Test Hash Literal Evaluation`` = [|
-            { Input = "{};"; Expected = (Map.empty : Map<int, System.Object>) }
-            { Input = "{1: 2, 2: 3};"; Expected = (Map.ofList [ (1, 2L); (2, 3L) ] : Map<int, int64>) }
-            { Input = "{1 + 1: 2 * 2, 3 + 3: 4 * 4};"; Expected = (Map.ofList [ (2, 4); (6, 16) ] : Map<int, int64>) }
+            { Input = "{};"; Expected = Map.empty }
+            { Input = "{1: 2, 2: 3};"; Expected = (Map.ofList [ (1, 2); (2, 3) ] : Map<int64, int64>) }
+            { Input = "{1 + 1: 2 * 2, 3 + 3: 4 * 4};"; Expected = (Map.ofList [ (2, 4); (6, 16) ] : Map<int64, int64>) }
+    |]
+    
+    static member ``N: Test Array & Hash Indexing Evaluation`` = [|
+            { Input = "[1, 2, 3][1];"; Expected = 2 }
+            { Input = "[1, 2, 3][0 + 2];"; Expected = 3 }
+            { Input = "[[1, 1, 1]][0][0];"; Expected = 1 }
+            { Input = "[][0];"; Expected = null }
+            { Input = "[1, 2, 3][99];"; Expected = null }
+            { Input = "[1][-1];"; Expected = null }
+            
+            { Input = "{1: 1, 2: 2}[1];"; Expected = 1 }
+            { Input = "{1: 1, 2: 2}[2];"; Expected = 2 }
+            { Input = "{1: 1}[0];"; Expected = null }
+            { Input = "{}[0];"; Expected = null }
     |]
         
         
@@ -143,6 +157,7 @@ type VirtualMachineTests() =
         VirtualMachineTests.``K: Test String Evaluation``
         VirtualMachineTests.``L: Test Array Literal Evaluation``
         VirtualMachineTests.``M: Test Hash Literal Evaluation``
+        VirtualMachineTests.``N: Test Array & Hash Indexing Evaluation``
     ]
         
     [<TestCaseSource("TestCasesToExecute")>]

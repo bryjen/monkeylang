@@ -81,6 +81,8 @@ with
                     _vm.HandleOpArray(&i, asByteArr)
                 | Opcode.OpHash ->
                     _vm.HandleOpHash(&i, asByteArr)
+                | Opcode.OpIndex ->
+                    _vm.HandleOpIndex(&i, asByteArr)
                 | Opcode.OpJumpWhenFalse ->
                     let arraySlice = asByteArr[i + 1 .. i + 2]
                     let indexToJumpTo = arraySlice |> readUInt16 |> int
@@ -139,21 +141,55 @@ with
         newVm.Push(hash)
         
     member private this.BuildHash(startIndex: int, numPairs: int) =
-        // TODO: Fix this
-        let hashKey object = object |> HashableObject.FromObject |> Option.get |> HashableObject.Hash
-        let pairs = Array.zeroCreate<int * Object> numPairs
+        let pairs = Array.zeroCreate<HashableObject * Object> numPairs
         
         let mutable currentPair = 0
         while currentPair < numPairs do
             let i = startIndex + (2 * currentPair)
-            let key = this.Stack[i].Value
-            let hashedKey = hashKey key
+            let key = this.Stack[i].Value |> HashableObject.FromObject |> Option.get  // TODO: See if this is safe
             let value = this.Stack[i + 1].Value
             
-            pairs[currentPair] <- (hashedKey, value)
+            pairs[currentPair] <- (key, value)
             currentPair <- currentPair + 1
             
         Map.ofArray pairs |> HashType
+        
+    member private this.HandleOpIndex(i: byref<int>, byteArr: byte array) : Result<VM, string> =
+        option {
+            let! newVm, index = this.Pop()
+            let! newVm, left = newVm.Pop()
+            return newVm, left, index 
+        }
+        |> function
+           | Some (vm, left, index) ->
+               vm.HandleIndexing(left, index)
+               |> Result.bind vm.Push
+           | None ->
+               Error "Stack top was empty while trying to get 'index' or 'left'."
+           
+    member private this.HandleIndexing(left: Object, index: Object) =
+        match left with
+        | ArrayType objects -> this.IndexArray(objects, index) 
+        | HashType hash -> this.IndexHash(hash, index)
+        | _ -> Error "Attempting to index a non-indexable type."
+        
+    member private this.IndexArray(objects: Object list, index: Object) =
+        match index with
+        | Object.IntegerType i when i >= 0 && i < objects.Length ->
+            objects |> List.item (int i) |> Ok
+        | Object.IntegerType _ ->
+            NullType |> Ok
+        | _ ->
+            Error $"Expected index to be an \"IntegerType\", got \"{index.Type()}\""
+        
+    member private this.IndexHash(hash: Map<HashableObject, Object>, index: Object) =
+        match HashableObject.FromObject index with
+        | Some key ->
+            match Map.tryFind key hash with
+            | None -> Ok NullType 
+            | Some value -> Ok value 
+        | None ->
+            Error $"Index \"{index}\" is not hashable"
         
     member private this.HandleOpConstant(i: byref<int>, byteArr: byte array) : Result<VM, string> =
         let arraySlice = byteArr[i + 1 .. i + 2]
