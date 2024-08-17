@@ -52,6 +52,10 @@ type Opcode =
     | OpArray          = 0x12uy
     | OpHash           = 0x13uy
     | OpIndex          = 0x14uy
+    
+    | OpCall           = 0x15uy
+    | OpReturnValue    = 0x16uy
+    | OpReturn         = 0x17uy
 
 type Definition =
     { Name: string
@@ -91,6 +95,10 @@ let private opcodeDefinitions = Map.ofList [
     (Opcode.OpArray,         { Name = "OpArray"; OperandWidths = [| 2 |] })
     (Opcode.OpHash,          { Name = "OpHash"; OperandWidths = [| 2 |] })
     (Opcode.OpIndex,         { Name = "OpIndex"; OperandWidths = [| |] })
+    
+    (Opcode.OpCall,          { Name = "OpCall"; OperandWidths = [| |] })
+    (Opcode.OpReturnValue,   { Name = "OpReturnValue"; OperandWidths = [| |] })
+    (Opcode.OpReturn,        { Name = "OpReturn"; OperandWidths = [| |] })
 ]
 
 

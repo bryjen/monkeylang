@@ -2,14 +2,17 @@
 module Monkey.Backend.Tests.Compiler.Helpers
 
 open System.Diagnostics
-open Monkey.Frontend.Eval.Object
 open NUnit.Framework
 open FsToolkit.ErrorHandling
 
+open Monkey.Backend.Code
+open Monkey.Backend.Operators
+open Monkey.Frontend.Ast
+
+open Monkey.Frontend.Eval.Object
+open Monkey.Backend.Tests.Helpers
 open Monkey.Backend.Tests.Code.Helpers
 
-open Monkey.Backend.Code
-open Monkey.Frontend.Ast
 
 
 let private getNameOfFunction () =
@@ -45,14 +48,20 @@ module Program =
             
 [<RequireQualifiedAccess>]
 module CompilerHelpers =
+    let inline collapseInstructionsArray (instructionsArray: Instructions array) =
+        instructionsArray |> Array.map (_.GetBytes()) |> Array.concat |> Instructions
+    
     let rec testInstructions (expected: Instructions array) (actual: Instructions) =
         result {
             let expectedBytes = expected |> Array.map (_.GetBytes()) |> Array.concat
             let actualBytes = actual.GetBytes()
             
+            
             do! if expectedBytes.Length = actualBytes.Length
                 then Ok ()
-                else Error $"[Error] Wrong instructions length, expected {expectedBytes.Length}, got {actualBytes.Length}."
+                else
+                    let expectedVsActualStr = $"\nExpected:\n{expected |> collapseInstructionsArray |> (_.ToString())}\n\nGot:\n{actual.ToString()}\n"
+                    Error $"[Error] Wrong instructions length, expected {expectedBytes.Length}, got {actualBytes.Length}.\n{expectedVsActualStr}"
                 
             do! processBytes 0 (Array.zip expectedBytes actualBytes |> Array.toList)
         }
@@ -69,47 +78,63 @@ module CompilerHelpers =
                 Error $"[Error] Wrong instruction at index {currentIndex}: {msg}"
         | [] ->
             Ok ()
-        
-    
-    let rec testConstants (expected: obj array) (actual: Object array) =
-        result {
-            do! if expected.Length = actual.Length
-                then Ok ()
-                else Error $"[Error] Wrong number of constants, expected {expected.Length}, got {actual.Length}."
-                
-            do! processExpectedVsActual 0 (Array.zip expected actual |> Array.toList)
-        }
-        
-    and private processExpectedVsActual currentIndex expectedAndActualPairs =
-        match expectedAndActualPairs with
-        | (expected, actual) :: tail ->
-            result {
-                do! 
-                    match expected with
-                    | :? int as value -> testIntegerObject currentIndex (int64 value) actual
-                    | :? int64 as value -> testIntegerObject currentIndex value actual
-                    | :? string as value -> testStringObject currentIndex value actual
-                    | _ -> failwith "todo"
-                
-                return! processExpectedVsActual (currentIndex + 1) tail
-            }
-        | [] ->
-            Ok ()
-
-    and private testIntegerObject (currentIndex: int) (expected: int64) (object: Object) =
-        match object with
-        | Object.IntegerType value ->
-            match value = expected with
-            | true -> Ok () 
-            | false -> Error $"[Error] Object has wrong value at index {currentIndex}. Expected {expected}, got {value}." 
-        | _ ->
-            Error $"[Error] Object at {currentIndex} is not an \"integer\" type, was {object.Type()}"
             
-    and private testStringObject (currentIndex: int) (expected: string) (object: Object) =
-        match object with
-        | Object.StringType value ->
-            match value = expected with
-            | true -> Ok () 
-            | false -> Error $"[Error] Object has wrong value at index {currentIndex}. Expected {expected}, got {value}." 
-        | _ ->
-            Error $"[Error] Object at {currentIndex} is not an \"string\" type, was {object.Type()}"
+            
+    [<AutoOpen>]
+    module ConstantPool =
+        let private testIntegerObject (currentIndex: int) (expected: int64) (object: Object) =
+            match object with
+            | Object.IntegerType value ->
+                match value = expected with
+                | true -> Ok () 
+                | false -> Error $"[Error] Object has wrong value at index {currentIndex}. Expected {expected}, got {value}." 
+            | _ ->
+                Error $"[Error] Object at {currentIndex} is not an \"integer\" type, was {object.Type()}"
+                
+        let private testStringObject (currentIndex: int) (expected: string) (object: Object) =
+            match object with
+            | Object.StringType value ->
+                match value = expected with
+                | true -> Ok () 
+                | false -> Error $"[Error] Object has wrong value at index {currentIndex}. Expected {expected}, got {value}." 
+            | _ ->
+                Error $"[Error] Object at {currentIndex} is not an \"string\" type, was {object.Type()}"
+                
+                
+                
+        let rec private processExpectedVsActual currentIndex (expectedAndActualPairs: (obj * Object) list) =
+            match expectedAndActualPairs with
+            | (expected, actual) :: tail ->
+                result {
+                    do! 
+                        match expected with
+                        | :? int as value -> testIntegerObject currentIndex (int64 value) actual
+                        | :? int64 as value -> testIntegerObject currentIndex value actual
+                        | :? string as value -> testStringObject currentIndex value actual
+                        
+                        | :? (byte array array) as value ->
+                            CastEvalObj.toCompiledFunctionType actual
+                            <!> (_.InstructionBytes)
+                            <!> Instructions
+                            >>= (testInstructions (Array.map Instructions value))
+                        | :? (Instructions array) as value ->
+                            CastEvalObj.toCompiledFunctionType actual
+                            <!> (_.InstructionBytes)
+                            <!> Instructions
+                            >>= (testInstructions value)
+                            
+                        | _ -> failwith "todo"
+                    
+                    return! processExpectedVsActual (currentIndex + 1) tail
+                }
+            | [] ->
+                Ok ()
+                
+        let rec testConstants (expected: obj array) (actual: Object array) =
+            result {
+                do! if expected.Length = actual.Length
+                    then Ok ()
+                    else Error $"[Error] Wrong number of constants, expected {expected.Length}, got {actual.Length}."
+                    
+                do! processExpectedVsActual 0 (Array.zip expected actual |> Array.toList)
+            }

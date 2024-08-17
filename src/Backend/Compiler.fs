@@ -1,17 +1,24 @@
 module Monkey.Backend.Compiler
 
 open FsToolkit.ErrorHandling
-open Monkey.Backend.SymbolTable
+
+open Monkey.Backend.Operators
+open Monkey.Backend.Code
 open Monkey.Frontend.Ast
 open Monkey.Frontend.Eval.Object
-open Monkey.Backend.Code
+open Monkey.Backend.SymbolTable
 
 
+type CompilationScope =
+    { Instructions: Instructions }
+with
+    static member New = { Instructions = Instructions [||] }
 
 type Compiler =
-    { Instructions: Instructions
-      Constants: Object list
-      SymbolTable: SymbolTable }
+    { Constants: Object list
+      SymbolTable: SymbolTable
+      
+      Scopes: CompilationScope list }
     
 type Bytecode =
     { Instructions: Instructions
@@ -24,11 +31,13 @@ module Compiler =
     
     [<AutoOpen>]
     module Utils = 
-        let inline (>>=) result func = Result.bind func result  // Alias for Result.bind
-        
-        let inline (<!>) result func = Result.map func result  // Alias for Result.map
-
         let inline appendBytes bytesToAppend (compiler, bytes) = (compiler, Array.append bytes bytesToAppend)
+        
+        let inline replaceHead list newHead =
+            match list with
+            | [] -> [ newHead ] 
+            | head :: tail -> newHead :: tail
+            
         
     [<AutoOpen>]
     module Make =
@@ -51,16 +60,32 @@ module Compiler =
             // less than operator doesn't exist, code re-orders expression to use greater than instead
             
             | _ -> Error $"'{operator}' is not a valid infix expression operator"
-        
+            
     [<AutoOpen>]
     module Compilation =
-        let addConstant (compiler: Compiler) (object: Object) =
+        let internal addConstant (compiler: Compiler) (object: Object) =
             let newCompiler = { compiler with Constants = object :: compiler.Constants }
             newCompiler, newCompiler.Constants.Length - 1   // will rev when converting to bytecode
             
-        let addInstruction (compiler: Compiler) (bytes: byte array) =
-            let newInstructions = Array.append (compiler.Instructions.GetBytes()) bytes 
-            let newCompiler = { compiler with Instructions = Instructions newInstructions }
+        let internal currentInstructions compiler = compiler.Scopes.Head.Instructions.GetBytes()
+        
+        let inline internal setCurrentInstructions compiler newInstructions =
+            let scopeWithUpdatedInstructions = { Instructions = Instructions newInstructions }
+            { compiler with Scopes = replaceHead compiler.Scopes scopeWithUpdatedInstructions }
+            
+        
+        let internal enterScope (compiler: Compiler) : Compiler =
+            let newScope = CompilationScope.New
+            { compiler with Scopes = newScope :: compiler.Scopes }
+            
+        let internal leaveScope (compiler: Compiler) : Compiler * byte array =
+            let instructions = currentInstructions compiler
+            let newCompiler = { compiler with Scopes = compiler.Scopes.Tail }
+            newCompiler, instructions
+            
+        let internal addInstruction (compiler: Compiler) (bytes: byte array) =
+            let newInstructions = Array.append (currentInstructions compiler) bytes
+            let newCompiler = setCurrentInstructions compiler newInstructions
             newCompiler, bytes.Length
         
         let rec compileExpression (compiler: Compiler) (expression: Expression) : Result<Compiler * byte array, string> =
@@ -78,6 +103,19 @@ module Compiler =
                     | _ ->
                         Ok (currentCompiler, Array.concat bytesList)
                 helper compiler 0
+                
+            let compileFunctionLiteral (functionLiteral: FunctionLiteral) =
+                result {
+                    let compiler_scoped = enterScope compiler
+                    let! newCompiler_scoped, body_bytes = compileStatement compiler_scoped true (BlockStatement functionLiteral.Body)
+                    let newCompiler_scoped, _ = addInstruction newCompiler_scoped body_bytes
+                    
+                    let compiler_unscoped, scoped_bytes = leaveScope newCompiler_scoped
+                    let compiledFunction = Object.CompiledFunctionType { InstructionBytes = scoped_bytes }
+                    
+                    let newCompiler, constIndex = addConstant compiler_unscoped compiledFunction
+                    return (newCompiler, make Opcode.OpConstant [| constIndex |])
+                }
                 
             let compileIndexExpression (indexExpression: IndexExpression) =
                 result {
@@ -123,7 +161,7 @@ module Compiler =
                         | None -> Ok (newCompiler, make Opcode.OpNull [| |])
                         
                     let jumpInstructionLen = 3
-                    let initialIndex = compiler.Instructions.GetBytes().Length  // getting 'this' compilers instructions length, to calcualte jump positions
+                    let initialIndex = compiler |> currentInstructions |> (_.Length)  // getting 'this' compilers instructions length, to calculate jump positions
                         
                     let opJumpWhenFalseAddress = initialIndex + conditionBytes.Length + consequenceBytes.Length + (2 * jumpInstructionLen)
                     let opJumpWhenFalseByte = make Opcode.OpJumpWhenFalse [| opJumpWhenFalseAddress |]
@@ -148,7 +186,7 @@ module Compiler =
                 let newCompiler, constIndex = addConstant compiler stringObj
                 Ok (newCompiler, make Opcode.OpConstant [| constIndex |])
             | Expression.FunctionLiteral functionLiteral ->
-                failwith "todo"
+                compileFunctionLiteral functionLiteral
             | CallExpression callExpression ->
                 failwith "todo"
             | ArrayLiteral arrayLiteral ->
@@ -173,8 +211,7 @@ module Compiler =
                 compileIfExpression ifExpression
             
         and compileStatement (compiler: Compiler) (generateOpPop: bool) (statement: Statement) : Result<Compiler * byte array, string> =
-            match statement with
-            | LetStatement letStatement ->
+            let compileLetStatement letStatement =  
                 result {
                     let! newCompiler, exprBytes = compileExpression compiler letStatement.Value
                     let newSymbolTable, symbol = newCompiler.SymbolTable.Define(letStatement.Name.Value)
@@ -183,17 +220,33 @@ module Compiler =
                     let bytes = Array.concat [| exprBytes; varBindingBytes |]
                     return ({ newCompiler with SymbolTable = newSymbolTable }, bytes)
                 }
-            | ExpressionStatement expressionStatement ->
+                
+            let compileExpressionStatement expressionStatement =
                 result {
                     let! newCompiler, exprBytes = compileExpression compiler expressionStatement.Expression
                     let opPopBytes = if generateOpPop then make Opcode.OpPop [|  |] else [| |]
                     let exprStatementBytes = Array.concat [| exprBytes; opPopBytes |]
                     return newCompiler, exprStatementBytes
                 }
+               
+            let compileBlockStatement blockStatement = compileMultipleStatements compiler blockStatement.Statements [| |]
+            
+            let compileReturnStatement returnStatement =
+                result {
+                    let! newCompiler, exprBytes = compileExpression compiler returnStatement.ReturnValue
+                    let returnOpCode = make Opcode.OpReturnValue [| |]
+                    return newCompiler, Array.concat [| exprBytes; returnOpCode |]
+                }
+                
+            match statement with
+            | LetStatement letStatement ->
+                compileLetStatement letStatement
+            | ExpressionStatement expressionStatement ->
+                compileExpressionStatement expressionStatement
             | BlockStatement blockStatement ->
-                compileMultipleStatements compiler blockStatement.Statements [| |]
+                compileBlockStatement blockStatement
             | ReturnStatement returnStatement ->
-                failwith "todo"
+                compileReturnStatement returnStatement
                 
         and compileMultipleStatements (compiler: Compiler) (statements: Statement list) (compiledInstructions: byte array) =
             let isLastStatement = statements.Length <= 1
@@ -210,13 +263,16 @@ module Compiler =
 
     
     
-    let inline createNew () = 
-        { Instructions = Instructions [|  |]
-          Constants = []
-          SymbolTable = SymbolTable.New }
+    let inline createNew () =
+        let mainScope = { Instructions = Instructions [| |] } 
+        
+        { Constants = []
+          SymbolTable = SymbolTable.New
+          
+          Scopes = [ mainScope ] }
     
     let rec compileNodes (nodes: Node list) (compiler: Compiler) : Result<Compiler, string> =
-        let inline addToCompiler (_compiler, bytes) = (addInstruction _compiler bytes) |> fst
+        let inline addToCompiler (_compiler, bytes) = (addInstruction _compiler bytes) |> fst 
         
         match nodes with
         | currentNode :: remaining ->
@@ -228,6 +284,6 @@ module Compiler =
         | [] ->
             Ok compiler
             
-    let inline toByteCode (compiler: Compiler) = 
-        { Instructions = compiler.Instructions 
+    let toByteCode (compiler: Compiler) =
+        { Instructions = compiler |> currentInstructions |> Instructions
           Constants = compiler.Constants |> List.toArray |> Array.rev }

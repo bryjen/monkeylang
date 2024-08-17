@@ -6,9 +6,11 @@ open FsToolkit.ErrorHandling
 
 open Monkey.Frontend.Parser
 
-open Monkey.Backend.Tests.Compiler.Helpers
 open Monkey.Backend.Compiler
 open Monkey.Backend.Code
+
+open Monkey.Backend.Tests.Compiler.Helpers
+
 
 type CompilerTestCase =
     { Input: string
@@ -340,8 +342,58 @@ type CompilerTests() =
               make Opcode.OpPop [| |]
           |] |> Array.map Instructions }
     |]
+    
+    static member ``K: Test Function codegen 1`` = [|
+        { Input = "fn() { return 5 + 10; };"
+          ExpectedConstants = [|
+              5
+              10
+              [|
+                  make Opcode.OpConstant [| 0 |]
+                  make Opcode.OpConstant [| 1 |]
+                  make Opcode.OpAdd [| |]
+                  make Opcode.OpReturnValue [| |]
+              |]
+          |]
+          ExpectedInstructions = [|
+              make Opcode.OpConstant [| 2 |]
+              make Opcode.OpPop [| |]
+          |] |> Array.map Instructions }
         
-    static member TestCasesToExecute = Array.concat [
+        { Input = "fn() { 5 + 10; };"
+          ExpectedConstants = [|
+              5
+              10
+              [|
+                  make Opcode.OpConstant [| 0 |]
+                  make Opcode.OpConstant [| 1 |]
+                  make Opcode.OpAdd [| |]
+                  make Opcode.OpReturnValue [| |]
+              |]
+          |]
+          ExpectedInstructions = [|
+              make Opcode.OpConstant [| 2 |]
+              make Opcode.OpPop [| |]
+          |] |> Array.map Instructions }
+        
+        { Input = "fn() { 1; 2; };"
+          ExpectedConstants = [|
+              1
+              2
+              [|
+                  make Opcode.OpConstant [| 0 |]
+                  make Opcode.OpPop [| |]
+                  make Opcode.OpConstant [| 1 |]
+                  make Opcode.OpReturnValue [| |]
+              |]
+          |]
+          ExpectedInstructions = [|
+              make Opcode.OpConstant [| 2 |]
+              make Opcode.OpPop [| |]
+          |] |> Array.map Instructions }
+    |]
+        
+    static member TestCasesToExecute1 = Array.concat [
         CompilerTests.``A: Test Integer Arithmetic Case``
         CompilerTests.``B: Test Boolean Expr codegen 1``
         CompilerTests.``C: Test Boolean Expr codegen 2``
@@ -354,9 +406,15 @@ type CompilerTests() =
         CompilerTests.``J: Test Index expression codegen``
     ]
     
-    [<TestCaseSource("TestCasesToExecute")>]
+    // Starting from 'K' and upwards, mainly more complex compilation patterns from fucntions
+    static member TestCasesToExecute2 = Array.concat [
+        CompilerTests.``K: Test Function codegen 1``
+    ]
+     
+     
+    // [<TestCaseSource("TestCasesToExecute1")>]
+    [<TestCaseSource("TestCasesToExecute2")>]
     member this.``Run Compiler Tests``(compilerTestCase: CompilerTestCase) =
-        // TestContext.WriteLine($"{testCaseName}")
         TestContext.WriteLine($"Input: \"{compilerTestCase.Input}\"")
         
         result {
@@ -366,17 +424,43 @@ type CompilerTests() =
             let! newCompiler = Compiler.compileNodes nodes (Compiler.createNew ()) 
             let bytecode = Compiler.toByteCode newCompiler
             
-            let expectedInstructions = compilerTestCase.ExpectedInstructions
-                                       |> Array.map (_.GetBytes())
-                                       |> Array.concat
-                                       |> Instructions
+            let expectedInstructions = CompilerHelpers.collapseInstructionsArray compilerTestCase.ExpectedInstructions
             TestContext.WriteLine($"\nExpected:\n{expectedInstructions.ToString()}\n")
             TestContext.WriteLine($"Got:\n{bytecode.Instructions.ToString()}\n")
             
             do! CompilerHelpers.testInstructions compilerTestCase.ExpectedInstructions bytecode.Instructions
+                |> Result.mapError (fun errorMsg -> $"[Testing Instructions] {errorMsg}")
             
-            do! CompilerHelpers.testConstants compilerTestCase.ExpectedConstants bytecode.Constants
+            do! CompilerHelpers.ConstantPool.testConstants compilerTestCase.ExpectedConstants bytecode.Constants
+                |> Result.mapError (fun errorMsg -> $"[Testing Constants] {errorMsg}")
         }
         |> function
            | Ok _ -> Assert.Pass("Passed")
            | Error errorMsg -> Assert.Fail(errorMsg)
+           
+    [<Test>]
+    member this.``Test Compiler Scope 1``() =
+        result {
+            let initCompiler = Compiler.createNew ()
+            
+            let compiler_scoped1 = Compiler.Compilation.enterScope initCompiler
+            let scopedBytes =
+                [|
+                      make Opcode.OpConstant [| 0 |]
+                      make Opcode.OpConstant [| 1 |]
+                      make Opcode.OpAdd [| |]
+                      make Opcode.OpReturnValue [| |]
+                |]
+            let newCompiler_scoped1, _ = Compiler.Compilation.addInstruction compiler_scoped1 (Array.concat scopedBytes)
+            let compiler_unscoped, returnedBytes = Compiler.Compilation.leaveScope newCompiler_scoped1
+            
+            TestContext.WriteLine("\nScoped:")
+            do! CompilerHelpers.testInstructions (Array.map Instructions scopedBytes) (Instructions returnedBytes)
+            
+            TestContext.WriteLine("\nUnscoped (Expected to be empty):")
+            do! CompilerHelpers.testInstructions [| |] (compiler_unscoped |> Compiler.Compilation.currentInstructions |> Instructions)
+            return ()
+        }
+        |> function
+           | Ok _ -> Assert.Pass("Passed")
+           | Error errorMsg -> Assert.Fail($"Failed with: {errorMsg}")

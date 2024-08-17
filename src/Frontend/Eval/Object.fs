@@ -39,6 +39,8 @@ and Object =
     | ErrorType of ErrorType
     | ArrayType of Object array
     | HashType of Map<HashableObject, Object>
+    
+    | CompiledFunctionType of CompiledFunction
 with
     member this.Type() =
         match this with
@@ -49,7 +51,9 @@ with
         | FunctionType _ -> "FUNCTION" 
         | ErrorType _ -> "ERROR" 
         | ArrayType _ -> "ARRAY" 
-        | HashType _ -> "HASH" 
+        | HashType _ -> "HASH"
+        
+        | CompiledFunctionType _ -> "COMPILED_FUNCTION" 
         
     member this.Inspect() = this.ToString()
         
@@ -65,8 +69,11 @@ with
             let elementsString = String.concat ", " (arr |> Array.map (_.ToString()))
             $"[{elementsString}]"
         | HashType _ -> failwith "todo"
+        
+        | CompiledFunctionType _ -> failwith "todo" 
 
-
+and CompiledFunction =
+    { InstructionBytes: byte array }
 
 and Function =
     | UserFunction of UserFunction

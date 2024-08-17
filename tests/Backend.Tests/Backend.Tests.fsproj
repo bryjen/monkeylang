@@ -18,6 +18,7 @@
     </ItemGroup>
 
     <ItemGroup>
+      <Compile Include="Helpers\Object.fs" />
       <Compile Include="Code\Helpers.fs" />
       <Compile Include="Code\CodeTests.fs" />
       <Compile Include="SymbolTable\SymbolTableTests.fs" />
