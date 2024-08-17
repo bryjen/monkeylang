@@ -391,6 +391,24 @@ type CompilerTests() =
               make Opcode.OpConstant [| 2 |]
               make Opcode.OpPop [| |]
           |] |> Array.map Instructions }
+        
+        { Input = "fn() { if (true) { 10 } else { 20 }; };"
+          ExpectedConstants = [|
+              10
+              20
+              [|
+                  make Opcode.OpTrue [| |]
+                  make Opcode.OpJumpWhenFalse [| 10 |]
+                  make Opcode.OpConstant [| 0 |]
+                  make Opcode.OpJump [| 13 |]
+                  make Opcode.OpConstant [| 1 |]
+                  make Opcode.OpReturnValue [| |]
+              |]
+          |]
+          ExpectedInstructions = [|
+              make Opcode.OpConstant [| 2 |]
+              make Opcode.OpPop [| |]
+          |] |> Array.map Instructions }
     |]
         
     static member TestCasesToExecute1 = Array.concat [

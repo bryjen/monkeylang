@@ -56,26 +56,26 @@ module CompilerHelpers =
             let expectedBytes = expected |> Array.map (_.GetBytes()) |> Array.concat
             let actualBytes = actual.GetBytes()
             
+            let expectedVsActualStr = $"\nExpected:\n{expected |> collapseInstructionsArray |> (_.ToString())}\n\nGot:\n{actual.ToString()}\n"
             
             do! if expectedBytes.Length = actualBytes.Length
                 then Ok ()
                 else
-                    let expectedVsActualStr = $"\nExpected:\n{expected |> collapseInstructionsArray |> (_.ToString())}\n\nGot:\n{actual.ToString()}\n"
-                    Error $"[Error] Wrong instructions length, expected {expectedBytes.Length}, got {actualBytes.Length}.\n{expectedVsActualStr}"
+                    Error $"[Error] Wrong instructions length, expected {expectedBytes.Length}, got {actualBytes.Length}.\n{expectedVsActualStr}."
                 
-            do! processBytes 0 (Array.zip expectedBytes actualBytes |> Array.toList)
+            do! processBytes expectedVsActualStr 0 (Array.zip expectedBytes actualBytes |> Array.toList)
         }
         
-    and private processBytes currentIndex expectedAndActualPairs =
+    and private processBytes errorMsg currentIndex expectedAndActualPairs =
         match expectedAndActualPairs with
         | (expected, actual) :: tail ->
             let msg = $"Expected {formatByteWithInt expected}, got {formatByteWithInt actual}"
             match expected = actual with
             | true ->
                 TestContext.WriteLine($"[Ok] {msg}")
-                processBytes (currentIndex + 1) tail 
+                processBytes errorMsg (currentIndex + 1) tail 
             | false ->
-                Error $"[Error] Wrong instruction at index {currentIndex}: {msg}"
+                Error $"[Error] Wrong instruction at index {currentIndex}: {msg}\n{errorMsg}"
         | [] ->
             Ok ()
             

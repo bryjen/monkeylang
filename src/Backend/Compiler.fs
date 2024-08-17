@@ -36,7 +36,7 @@ module Compiler =
         let inline replaceHead list newHead =
             match list with
             | [] -> [ newHead ] 
-            | head :: tail -> newHead :: tail
+            | _ :: tail -> newHead :: tail
             
         
     [<AutoOpen>]
@@ -86,7 +86,7 @@ module Compiler =
         let internal addInstruction (compiler: Compiler) (bytes: byte array) =
             let newInstructions = Array.append (currentInstructions compiler) bytes
             let newCompiler = setCurrentInstructions compiler newInstructions
-            newCompiler, bytes.Length
+            newCompiler, newInstructions.Length
         
         let rec compileExpression (compiler: Compiler) (expression: Expression) : Result<Compiler * byte array, string> =
             
@@ -104,10 +104,21 @@ module Compiler =
                         Ok (currentCompiler, Array.concat bytesList)
                 helper compiler 0
                 
+            let parsingCallback isLastStatement statement =
+                match isLastStatement, statement with
+                | true, ReturnStatement _ -> [| |]
+                | true, _ -> make Opcode.OpReturnValue [| |]
+                | false, ExpressionStatement _ -> make Opcode.OpPop [| |]
+                | _ -> [| |] 
+                
             let compileFunctionLiteral (functionLiteral: FunctionLiteral) =
                 result {
                     let compiler_scoped = enterScope compiler
-                    let! newCompiler_scoped, body_bytes = compileStatement compiler_scoped true (BlockStatement functionLiteral.Body)
+                    
+                    let! newCompiler_scoped, body_bytes = if functionLiteral.Body.Statements.IsEmpty
+                                                          then Ok (compiler_scoped, make Opcode.OpReturn [| |])
+                                                          else compileMultipleStatements compiler_scoped parsingCallback functionLiteral.Body.Statements
+                    
                     let newCompiler_scoped, _ = addInstruction newCompiler_scoped body_bytes
                     
                     let compiler_unscoped, scoped_bytes = leaveScope newCompiler_scoped
@@ -153,11 +164,11 @@ module Compiler =
             let rec compileIfExpression (ifExpression: IfExpression) =
                 result {
                     let! newCompiler, conditionBytes = compileExpression compiler ifExpression.Condition
-                    let! newCompiler, consequenceBytes = compileStatement newCompiler false (Statement.BlockStatement ifExpression.Consequence)
+                    let! newCompiler, consequenceBytes = compileStatement newCompiler (Statement.BlockStatement ifExpression.Consequence)
                     
                     let! newCompiler, alternateBytes =
                         match ifExpression.Alternative with
-                        | Some altBlockStatement -> compileStatement newCompiler false (Statement.BlockStatement altBlockStatement)
+                        | Some altBlockStatement -> compileStatement newCompiler (Statement.BlockStatement altBlockStatement)
                         | None -> Ok (newCompiler, make Opcode.OpNull [| |])
                         
                     let jumpInstructionLen = 3
@@ -209,58 +220,77 @@ module Compiler =
                 compileInfixExpression infixExpression
             | IfExpression ifExpression ->
                 compileIfExpression ifExpression
-            
-        and compileStatement (compiler: Compiler) (generateOpPop: bool) (statement: Statement) : Result<Compiler * byte array, string> =
-            let compileLetStatement letStatement =  
-                result {
-                    let! newCompiler, exprBytes = compileExpression compiler letStatement.Value
-                    let newSymbolTable, symbol = newCompiler.SymbolTable.Define(letStatement.Name.Value)
-                    
-                    let varBindingBytes = make Opcode.OpSetGlobal [| symbol.Index |]
-                    let bytes = Array.concat [| exprBytes; varBindingBytes |]
-                    return ({ newCompiler with SymbolTable = newSymbolTable }, bytes)
-                }
                 
-            let compileExpressionStatement expressionStatement =
-                result {
-                    let! newCompiler, exprBytes = compileExpression compiler expressionStatement.Expression
-                    let opPopBytes = if generateOpPop then make Opcode.OpPop [|  |] else [| |]
-                    let exprStatementBytes = Array.concat [| exprBytes; opPopBytes |]
-                    return newCompiler, exprStatementBytes
-                }
-               
-            let compileBlockStatement blockStatement = compileMultipleStatements compiler blockStatement.Statements [| |]
-            
-            let compileReturnStatement returnStatement =
-                result {
-                    let! newCompiler, exprBytes = compileExpression compiler returnStatement.ReturnValue
-                    let returnOpCode = make Opcode.OpReturnValue [| |]
-                    return newCompiler, Array.concat [| exprBytes; returnOpCode |]
-                }
+        and compileLetStatement compiler letStatement =  
+            result {
+                let! newCompiler, exprBytes = compileExpression compiler letStatement.Value
+                let newSymbolTable, symbol = newCompiler.SymbolTable.Define(letStatement.Name.Value)
                 
+                let varBindingBytes = make Opcode.OpSetGlobal [| symbol.Index |]
+                let bytes = Array.concat [| exprBytes; varBindingBytes |]
+                return ({ newCompiler with SymbolTable = newSymbolTable }, bytes)
+            }
+            
+        and compileExpressionStatement compiler expressionStatement =
+            result {
+                let! newCompiler, exprBytes = compileExpression compiler expressionStatement.Expression
+                return newCompiler, exprBytes 
+            }
+            
+        and compileReturnStatement compiler returnStatement =
+            result {
+                let! newCompiler, exprBytes = compileExpression compiler returnStatement.ReturnValue
+                let returnOpCode = make Opcode.OpReturnValue [| |]
+                return newCompiler, Array.concat [| exprBytes; returnOpCode |]
+            }
+            
+        and compileStatement (compiler: Compiler) (statement: Statement) : Result<Compiler * byte array, string> =
             match statement with
             | LetStatement letStatement ->
-                compileLetStatement letStatement
-            | ExpressionStatement expressionStatement ->
-                compileExpressionStatement expressionStatement
-            | BlockStatement blockStatement ->
-                compileBlockStatement blockStatement
+                compileLetStatement compiler letStatement
             | ReturnStatement returnStatement ->
-                compileReturnStatement returnStatement
+                compileReturnStatement compiler returnStatement
+            | ExpressionStatement expressionStatement ->
+                compileExpressionStatement compiler expressionStatement
+                <!> (fun (newCompiler, bytes) -> (newCompiler, Array.append bytes (make Opcode.OpPop [| |])))
+            | BlockStatement blockStatement ->
+                let parsingCallback isLastStatement statement =
+                    match isLastStatement, statement with
+                    | true, _ -> [| |]
+                    | false, _ -> make Opcode.OpPop [| |]
                 
-        and compileMultipleStatements (compiler: Compiler) (statements: Statement list) (compiledInstructions: byte array) =
-            let isLastStatement = statements.Length <= 1
-            match statements with
-            | statement :: remaining ->
-                match compileStatement compiler (not isLastStatement) statement with
-                | Ok (newCompiler, bytes) ->
-                    let newCompiledInstructions = Array.append compiledInstructions bytes 
-                    compileMultipleStatements newCompiler remaining newCompiledInstructions 
-                | Error error ->
-                    Error error
-            | [] ->
-                Ok (compiler, compiledInstructions)
+                compileMultipleStatements compiler parsingCallback blockStatement.Statements
+                
+        and compileMultipleStatements (compiler: Compiler) (callback: bool -> Statement -> byte array) (statements: Statement list) =
+            
+            // Compile statement that doesnt generate 'OpPop' after an expression statement
+            let compileStatementAlt (currentCompiler: Compiler) (statement: Statement) =
+                match statement with
+                | LetStatement letStatement -> compileLetStatement currentCompiler letStatement
+                | ReturnStatement returnStatement -> compileReturnStatement currentCompiler returnStatement
+                | ExpressionStatement expressionStatement -> compileExpressionStatement currentCompiler expressionStatement
+                | BlockStatement blockStatement -> compileMultipleStatements currentCompiler callback blockStatement.Statements 
+            
+            let rec helper (currentCompiler: Compiler) (currentStatements: Statement list) (compiledBytes: byte array) =
+                match currentStatements with
+                | [ ] ->
+                    Ok (currentCompiler, compiledBytes)
+                | [ lastStatement ] ->
+                    match compileStatementAlt currentCompiler lastStatement with
+                    | Ok (newCompiler, bytes) ->
+                        let newCompiledBytes = Array.concat [| compiledBytes; bytes; callback true lastStatement |]
+                        Ok (newCompiler, newCompiledBytes)
+                    | Error error ->
+                        Error error
+                | headStatement :: remaining -> 
+                    match compileStatementAlt currentCompiler headStatement with
+                    | Ok (newCompiler, bytes) ->
+                        let newCompiledBytes = Array.concat [| compiledBytes; bytes; callback false headStatement |]
+                        helper newCompiler remaining newCompiledBytes 
+                    | Error error ->
+                        Error error
 
+            helper compiler statements [| |]
     
     
     let inline createNew () =
@@ -277,7 +307,7 @@ module Compiler =
         match nodes with
         | currentNode :: remaining ->
             match currentNode with
-            | Statement statement -> compileStatement compiler true statement
+            | Statement statement -> compileStatement compiler statement
             | Expression expression -> compileExpression compiler expression
             <!> addToCompiler
             >>= compileNodes remaining
