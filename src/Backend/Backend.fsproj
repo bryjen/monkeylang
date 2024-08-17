@@ -12,6 +12,7 @@
         <Compile Include="Code.fs" />
         <Compile Include="SymbolTable.fs" />
         <Compile Include="Compiler.fs" />
+        <Compile Include="Frame.fs" />
         <Compile Include="VirtualMachine.fs" />
     </ItemGroup>
 

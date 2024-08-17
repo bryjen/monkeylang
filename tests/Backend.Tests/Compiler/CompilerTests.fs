@@ -410,6 +410,40 @@ type CompilerTests() =
               make Opcode.OpPop [| |]
           |] |> Array.map Instructions }
     |]
+    
+    static member ``L: Test Function Call codegen 1`` = [|
+        { Input = "fn() { 24; }();"
+          ExpectedConstants = [|
+              24
+              [|
+                  make Opcode.OpConstant [| 0 |]
+                  make Opcode.OpReturnValue [| |]
+              |]
+          |]
+          ExpectedInstructions = [|
+              make Opcode.OpConstant [| 1 |]
+              make Opcode.OpCall [| |]
+              make Opcode.OpPop [| |]
+          |] |> Array.map Instructions }
+        
+        { Input =
+            "let noArg = fn() { 24; };
+            noArg();"
+          ExpectedConstants = [|
+              24
+              [|
+                  make Opcode.OpConstant [| 0 |]
+                  make Opcode.OpReturnValue [| |]
+              |]
+          |]
+          ExpectedInstructions = [|
+              make Opcode.OpConstant [| 1 |]
+              make Opcode.OpSetGlobal [| 0 |]
+              make Opcode.OpGetGlobal [| 0 |]
+              make Opcode.OpCall [| |]
+              make Opcode.OpPop [| |]
+          |] |> Array.map Instructions }
+    |]
         
     static member TestCasesToExecute1 = Array.concat [
         CompilerTests.``A: Test Integer Arithmetic Case``
@@ -427,6 +461,7 @@ type CompilerTests() =
     // Starting from 'K' and upwards, mainly more complex compilation patterns from fucntions
     static member TestCasesToExecute2 = Array.concat [
         CompilerTests.``K: Test Function codegen 1``
+        CompilerTests.``L: Test Function Call codegen 1``
     ]
      
      

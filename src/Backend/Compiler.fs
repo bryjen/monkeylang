@@ -104,21 +104,26 @@ module Compiler =
                         Ok (currentCompiler, Array.concat bytesList)
                 helper compiler 0
                 
-            let parsingCallback isLastStatement statement =
-                match isLastStatement, statement with
-                | true, ReturnStatement _ -> [| |]
-                | true, _ -> make Opcode.OpReturnValue [| |]
-                | false, ExpressionStatement _ -> make Opcode.OpPop [| |]
-                | _ -> [| |] 
+                
+            let compileIdentifier (identifier: Identifier) =
+                match compiler.SymbolTable.Resolve identifier.Value with
+                | Some symbol -> Ok (compiler, make Opcode.OpGetGlobal [| symbol.Index |])
+                | None -> Error $"Undefined variable \"{identifier.Value}\""
                 
             let compileFunctionLiteral (functionLiteral: FunctionLiteral) =
+                let parsingCallback isLastStatement statement =
+                    match isLastStatement, statement with
+                    | true, ReturnStatement _ -> [| |]
+                    | true, _ -> make Opcode.OpReturnValue [| |]
+                    | false, ExpressionStatement _ -> make Opcode.OpPop [| |]
+                    | _ -> [| |]
+                    
                 result {
                     let compiler_scoped = enterScope compiler
                     
                     let! newCompiler_scoped, body_bytes = if functionLiteral.Body.Statements.IsEmpty
                                                           then Ok (compiler_scoped, make Opcode.OpReturn [| |])
                                                           else compileMultipleStatements compiler_scoped parsingCallback functionLiteral.Body.Statements
-                    
                     let newCompiler_scoped, _ = addInstruction newCompiler_scoped body_bytes
                     
                     let compiler_unscoped, scoped_bytes = leaveScope newCompiler_scoped
@@ -128,6 +133,14 @@ module Compiler =
                     return (newCompiler, make Opcode.OpConstant [| constIndex |])
                 }
                 
+            let rec compileCallExpression (callExpression: CallExpression) =
+                let appendOpCall (compiler, bytes) = (compiler, Array.concat [| bytes; make Opcode.OpCall [| |] |])
+                
+                match callExpression.Function with
+                | Identifier identifier -> compileIdentifier identifier
+                | FunctionLiteral functionLiteral -> compileFunctionLiteral functionLiteral
+                <!> appendOpCall
+                
             let compileIndexExpression (indexExpression: IndexExpression) =
                 result {
                     let opIndexBytes = make Opcode.OpIndex [| |]
@@ -135,11 +148,6 @@ module Compiler =
                     let! newCompiler, indexBytes = compileExpression newCompiler indexExpression.Index
                     return (newCompiler, Array.concat [| exprBytes; indexBytes; opIndexBytes |])
                 }
-                
-            let compileIdentifier (identifier: Identifier) =
-                match compiler.SymbolTable.Resolve identifier.Value with
-                | Some symbol -> Ok (compiler, make Opcode.OpGetGlobal [| symbol.Index |])
-                | None -> Error $"Undefined variable \"{identifier.Value}\""
                 
             let compilePrefixExpression (prefixExpression: PrefixExpression) =
                 result {
@@ -199,7 +207,7 @@ module Compiler =
             | Expression.FunctionLiteral functionLiteral ->
                 compileFunctionLiteral functionLiteral
             | CallExpression callExpression ->
-                failwith "todo"
+                compileCallExpression callExpression
             | ArrayLiteral arrayLiteral ->
                 let opArrayBytes = make Opcode.OpArray [| arrayLiteral.Elements.Length |]
                 compileExprArr arrayLiteral.Elements <!> appendBytes opArrayBytes
