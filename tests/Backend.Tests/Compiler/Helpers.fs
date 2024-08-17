@@ -114,13 +114,13 @@ module CompilerHelpers =
                         
                         | :? (byte array array) as value ->
                             CastEvalObj.toCompiledFunctionType actual
-                            <!> (_.InstructionBytes)
-                            <!> Instructions
+                            >> (_.InstructionBytes)
+                            >> Instructions
                             >>= (testInstructions (Array.map Instructions value))
                         | :? (Instructions array) as value ->
                             CastEvalObj.toCompiledFunctionType actual
-                            <!> (_.InstructionBytes)
-                            <!> Instructions
+                            >> (_.InstructionBytes)
+                            >> Instructions
                             >>= (testInstructions value)
                             
                         | _ -> failwith "todo"

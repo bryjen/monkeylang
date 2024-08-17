@@ -139,7 +139,7 @@ module Compiler =
                 match callExpression.Function with
                 | Identifier identifier -> compileIdentifier identifier
                 | FunctionLiteral functionLiteral -> compileFunctionLiteral functionLiteral
-                <!> appendOpCall
+                >> appendOpCall
                 
             let compileIndexExpression (indexExpression: IndexExpression) =
                 result {
@@ -210,11 +210,11 @@ module Compiler =
                 compileCallExpression callExpression
             | ArrayLiteral arrayLiteral ->
                 let opArrayBytes = make Opcode.OpArray [| arrayLiteral.Elements.Length |]
-                compileExprArr arrayLiteral.Elements <!> appendBytes opArrayBytes
+                compileExprArr arrayLiteral.Elements >> appendBytes opArrayBytes
             | HashLiteral hashLiteral ->
                 let exprsArray = hashLiteral.Pairs |> Map.toArray |> Array.collect (fun (a, b) -> [| a; b |])
                 let opHashBytes = make Opcode.OpHash [| exprsArray.Length |]
-                compileExprArr exprsArray <!> appendBytes opHashBytes
+                compileExprArr exprsArray >> appendBytes opHashBytes
             | IndexExpression indexExpression ->
                 compileIndexExpression indexExpression
             | MacroLiteral macroLiteral ->
@@ -260,7 +260,7 @@ module Compiler =
                 compileReturnStatement compiler returnStatement
             | ExpressionStatement expressionStatement ->
                 compileExpressionStatement compiler expressionStatement
-                <!> (fun (newCompiler, bytes) -> (newCompiler, Array.append bytes (make Opcode.OpPop [| |])))
+                >> (fun (newCompiler, bytes) -> (newCompiler, Array.append bytes (make Opcode.OpPop [| |])))
             | BlockStatement blockStatement ->
                 let parsingCallback isLastStatement statement =
                     match isLastStatement, statement with
@@ -317,7 +317,7 @@ module Compiler =
             match currentNode with
             | Statement statement -> compileStatement compiler statement
             | Expression expression -> compileExpression compiler expression
-            <!> addToCompiler
+            >> addToCompiler
             >>= compileNodes remaining
         | [] ->
             Ok compiler

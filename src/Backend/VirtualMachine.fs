@@ -3,11 +3,15 @@ module Monkey.Backend.VirtualMachine
 
 open System
 open FsToolkit.ErrorHandling
-open Monkey.Backend.Code
-open Monkey.Backend.Compiler
-open Monkey.Backend.Helpers
+
+open Microsoft.FSharp.Core
 open Monkey.Frontend.Eval
 open Monkey.Frontend.Eval.Object
+
+open Monkey.Backend.Code
+open Monkey.Backend.Helpers
+open Monkey.Backend.Compiler
+open Monkey.Backend.Operators
 
 let private stackSize = 2048
 let private globalsSize = UInt16.MaxValue |> int
@@ -26,270 +30,285 @@ type VM =
       
       Globals: Object array
       Stack: ObjectWrapper array
-      mutable StackPointer: int }
-with
-    static member FromByteCode(byteCode: Bytecode) =
+      StackPointer: int }
+    
+        
+[<RequireQualifiedAccess>]
+module VM =
+    [<AutoOpen>]
+    module internal Utils = 
+        let failedPopMsg = "Could not pop stack. Stack is empty."
+        
+        let fromOptionToResult opt = if Option.isSome opt then Ok opt.Value else Error failedPopMsg
+        
+        let toTuple2 a b = (b, a)
+        
+    
+    module internal Stack =
+        
+        let push vm object =
+            if vm.StackPointer >= stackSize then
+                Error "Stack Overflow"
+            else
+                vm.Stack[vm.StackPointer] <- ObjectWrapper object
+                Ok { vm with StackPointer = vm.StackPointer + 1 }
+                
+        let peek vm =
+            if vm.StackPointer >= stackSize then
+                None
+            else
+                let onStack = vm.Stack[vm.StackPointer - 1]
+                if not (isNull onStack) then Some onStack.Value else None
+                     
+        let pop vm =
+            match peek vm with
+            | Some value -> Some ({ vm with StackPointer = vm.StackPointer - 1 }, value)  
+            | None -> None
+            
+            
+    [<AutoOpen>]
+    module Opcode =
+        let handleOpConstant (vm: VM) (i: int) (byteArr: byte array) =
+            let constPoolIndex = readUInt16 byteArr[i + 1 .. i + 2]
+            Stack.push vm vm.Constants[int constPoolIndex]
+            >> toTuple2 (i + 2)
+            
+            
+        let handlePrefixOperation (vm: VM) (operatorOpcode: Opcode) =
+            result {
+                let! newVm, expr = vm |> Stack.pop |> fromOptionToResult
+                
+                let! result =
+                    match operatorOpcode, expr with
+                    | Opcode.OpMinus, Object.IntegerType i -> -i |> Object.IntegerType |> Ok
+                    | Opcode.OpBang, Object.BooleanType b -> b |> not |> getBoolObj |> Ok
+                    | _ -> Error $"The operation [opcode: {operatorOpcode}, value: {expr}] is not valid."
+                    
+                return! Stack.push newVm result
+            }
+            
+            
+        let handleInfixOperation (vm: VM) (operatorOpcode: Opcode) =
+            result {
+                let! newVm, right = Stack.pop vm |> fromOptionToResult
+                let! newVm, left = Stack.pop newVm |> fromOptionToResult
+                
+                let! result =
+                    match operatorOpcode, left, right with
+                    | Opcode.OpAdd, Object.IntegerType l, Object.IntegerType r -> (l + r) |> Object.IntegerType |> Ok 
+                    | Opcode.OpAdd, Object.StringType l, Object.StringType r -> $"{l}{r}" |> Object.StringType |> Ok
+                    | Opcode.OpAdd, Object.IntegerType l, Object.StringType r -> $"{l}{r}" |> Object.StringType |> Ok
+                    | Opcode.OpAdd, Object.StringType l, Object.IntegerType r -> $"{l}{r}" |> Object.StringType |> Ok
+                    | Opcode.OpSub, Object.IntegerType l, Object.IntegerType r -> (l - r) |> Object.IntegerType |> Ok
+                    | Opcode.OpMul, Object.IntegerType l, Object.IntegerType r -> (l * r) |> Object.IntegerType |> Ok
+                    | Opcode.OpDiv, Object.IntegerType l, Object.IntegerType r -> (l / r) |> Object.IntegerType |> Ok
+                    | Opcode.OpEqual, Object.IntegerType l, Object.IntegerType r -> l = r |> getBoolObj |> Ok 
+                    | Opcode.OpEqual, Object.BooleanType l, Object.BooleanType r -> l = r |> getBoolObj |> Ok
+                    | Opcode.OpNotEqual, Object.IntegerType l, Object.IntegerType r -> l <> r |> getBoolObj |> Ok 
+                    | Opcode.OpNotEqual, Object.BooleanType l, Object.BooleanType r -> l <> r |> getBoolObj |> Ok
+                    | Opcode.OpGreaterThan, Object.IntegerType l, Object.IntegerType r -> l > r |> getBoolObj |> Ok 
+                    | _ -> Error $"The operation left: \"{left.Type()}\" right: \"{right.Type()}\" opcode: {operatorOpcode} is not valid."
+                
+                return! Stack.push newVm result
+            }
+            
+            
+        let handleBooleanOpcode (vm: VM) (opcode: Opcode) =
+            match opcode with
+            | Opcode.OpTrue -> Stack.push vm trueObj
+            | Opcode.OpFalse -> Stack.push vm falseObj 
+            | _ -> Error $"Fatal: The \"{opcode}\" does not represent a boolean."
+            
+            
+        let handleSetGlobalOpcode (vm: VM) (i: int) (byteArr: byte array) =
+            let arraySlice = byteArr[i + 1 .. i + 2]
+            let globalIndex = arraySlice |> readUInt16 |> int
+            
+            Stack.pop vm
+            |> Option.map (fun (newVm, object) -> vm.Globals[globalIndex] <- object; newVm)
+            |> function
+               | Some newVm -> Ok (newVm, i + 2)
+               | None -> failwith "todo"
+               
+               
+        let handleGetGlobalOpcode (vm: VM) (i: int) (byteArr: byte array) =
+            let arraySlice = byteArr[i + 1 .. i + 2]
+            let globalIndex = arraySlice |> readUInt16 |> int
+            
+            Stack.push vm vm.Globals[globalIndex]
+            >> toTuple2 (i + 2)
+            
+            
+        let rec handleOpArray (vm: VM) (i: int) (byteArr: byte array) =
+            let arraySlice = byteArr[i + 1 .. i + 2]
+            let numElements = arraySlice |> readUInt16 |> int
+            
+            let array = buildArray vm (vm.StackPointer - numElements) (vm.StackPointer)
+            let newVm = { vm with StackPointer = vm.StackPointer - numElements }
+            Stack.push newVm array
+            >> toTuple2 (i + 2)
+            
+        and buildArray (vm: VM) (startIndex: int) (endIndex: int) =
+            let elements = Array.zeroCreate<Object> (endIndex - startIndex)
+            for i in startIndex .. (endIndex - 1) do
+                elements[i - startIndex] <- vm.Stack[i].Value  // TODO: Straight dereferencing, see if this is a bad idea
+            elements |> ArrayType
+            
+            
+        let rec handleOpHash (vm: VM) (i: int) (byteArr: byte array) =
+            let arraySlice = byteArr[i + 1 .. i + 2]
+            let numElements = arraySlice |> readUInt16 |> int
+            
+            let hash = buildHash vm (vm.StackPointer - numElements) (numElements / 2)
+            let newVm = { vm with StackPointer = vm.StackPointer - numElements }
+            Stack.push newVm hash >> toTuple2 (i + 2)
+            
+        and buildHash (vm: VM) (startIndex: int) (numPairs: int) =
+            let pairs = Array.zeroCreate<HashableObject * Object> numPairs
+            
+            let mutable currentPair = 0
+            while currentPair < numPairs do
+                let i = startIndex + (2 * currentPair)
+                let key = vm.Stack[i].Value |> HashableObject.FromObject |> Option.get  // TODO: See if this is safe
+                let value = vm.Stack[i + 1].Value
+                
+                pairs[currentPair] <- (key, value)
+                currentPair <- currentPair + 1
+                
+            Map.ofArray pairs |> HashType
+            
+            
+        let rec handleOpIndex (vm: VM) =
+            option {
+                let! newVm, index = Stack.pop vm
+                let! newVm, left = Stack.pop newVm 
+                return newVm, left, index 
+            }
+            |> function
+               | Some (vm, left, index) ->
+                   match left with
+                   | ArrayType objects -> indexArrayType objects index
+                   | HashType hash -> indexHashType hash index
+                   | _ -> Error "Attempting to index a non-indexable type."
+                   >>= (Stack.push vm) 
+               | None ->
+                   Error "Stack top was empty while trying to get 'index' or 'left'."
+        
+        and indexArrayType (objects: Object array) (index: Object) =
+            match index with
+            | Object.IntegerType i when i >= 0 && i < objects.Length ->
+                objects[int i] |> Ok
+            | Object.IntegerType _ ->
+                NullType |> Ok
+            | _ ->
+                Error $"Expected index to be an \"IntegerType\", got \"{index.Type()}\""
+            
+        and indexHashType (hash: Map<HashableObject, Object>) (index: Object) =
+            match HashableObject.FromObject index with
+            | Some key ->
+                match Map.tryFind key hash with
+                | None -> Ok NullType 
+                | Some value -> Ok value 
+            | None ->
+                Error $"Index \"{index}\" is not hashable"
+                
+                
+        let handleOpJump (vm: VM) (i: int) (byteArr: byte array) =
+            let arraySlice = byteArr[i + 1 .. i + 2]
+            let indexToJumpTo = arraySlice |> readUInt16 |> int
+            Ok (vm, indexToJumpTo - 1)  // -1 to step back from callback
+            
+        let handleOpJumpWhenFalse (vm: VM) (i: int) (byteArr: byte array) =
+            let arraySlice = byteArr[i + 1 .. i + 2]
+            let indexToJumpTo = arraySlice |> readUInt16 |> int
+            
+            match Stack.peek vm with
+            | None -> Error "'OpJumpWhenFalse' invalid, stack is empty." 
+            | Some obj ->
+                match obj with
+                | Object.BooleanType bool when bool = false ->
+                    Ok (vm, indexToJumpTo - 1)  // -1 to step back from callback
+                | Object.BooleanType _ ->
+                    Ok (vm, i + 2) 
+                | _ ->
+                    Error $"Expected a boolean object at the stack top, got {obj.Type()}."
+            
+            
+    let fromByteCode (byteCode: Bytecode) =
         { Constants = byteCode.Constants
           Instructions = byteCode.Instructions
           
           Globals = Array.zeroCreate<Object> globalsSize    // TODO: Check if obj type needs to be wrapped
           Stack = Array.zeroCreate<ObjectWrapper> stackSize
           StackPointer = 0 }
-        
-    static member private FailedPopMessage = "Could not pop stack. Stack is empty."
-        
-
-    member internal this.LastPoppedStackElement() =
-        match this.StackPointer with
+            
+    let getLastPoppedStackElement vm =
+        match vm.StackPointer with
         | sp when sp >= 0 && sp < stackSize ->
-            let peek = this.Stack[sp]
+            let peek = vm.Stack[sp]
             match System.Object.ReferenceEquals(peek, null) with
             | true -> None 
             | false -> Some peek.Value
-        | _ -> None
+        | _ -> None 
             
-    static member Run(vm: VM) : Result<VM, string> =
-        let asByteArr = vm.Instructions.GetBytes()
-        let mutable i = 0
+    let rec run vm =
+        let bytes = vm.Instructions.GetBytes()
+        runLoop bytes vm 0
+        >> fst
         
-        // Callback func called whenever a successful instruction slice has been processed
-        let callback () = i <- i + 1
+    and private runLoop (bytes: byte array) vm currentIndex : Result<VM * int, string> =
+        let callback i = i + 1 
         
-        let rec runHelper (_vm: VM) : Result<VM, string> =
-            if i < asByteArr.Length then
-                let opcode = LanguagePrimitives.EnumOfValue<byte, Opcode> asByteArr[i] 
-                match opcode with
-                | Opcode.OpNull ->
-                    _vm.Push(nullObj)
-                | Opcode.OpConstant ->
-                    _vm.HandleOpConstant(&i, asByteArr)
-                | Opcode.OpMinus | Opcode.OpBang ->
-                    _vm.HandlePrefixOperation(&i, opcode)
-                | Opcode.OpAdd | Opcode.OpSub | Opcode.OpMul | Opcode.OpDiv | Opcode.OpEqual | Opcode.OpNotEqual | Opcode.OpGreaterThan ->
-                    _vm.HandleInfixOperation(&i, opcode)
-                | Opcode.OpTrue | Opcode.OpFalse ->
-                    _vm.HandleBooleanOpcode(&i, opcode)
-                | Opcode.OpPop ->
-                    match _vm.Pop() with
-                    | None -> Ok _vm 
-                    | Some (newVm, _) -> Ok newVm
-                | Opcode.OpSetGlobal ->
-                    _vm.HandleSetGlobalOpcode(&i, asByteArr)
-                | Opcode.OpGetGlobal ->
-                    _vm.HandleGetGlobalOpcode(&i, asByteArr)
-                | Opcode.OpArray ->
-                    _vm.HandleOpArray(&i, asByteArr)
-                | Opcode.OpHash ->
-                    _vm.HandleOpHash(&i, asByteArr)
-                | Opcode.OpIndex ->
-                    _vm.HandleOpIndex(&i, asByteArr)
-                | Opcode.OpJumpWhenFalse ->
-                    let arraySlice = asByteArr[i + 1 .. i + 2]
-                    let indexToJumpTo = arraySlice |> readUInt16 |> int
-                    
-                    match _vm.Peek() with
-                    | None -> failwith "todo"
-                    | Some obj ->
-                        match obj with
-                        | Object.BooleanType bool when bool = false ->
-                            i <- indexToJumpTo - 1  // -1 to step back from callback
-                            Ok _vm
-                        | Object.BooleanType _ ->
-                            i <- i + 2 
-                            Ok _vm
-                        | _ ->
-                            Error $"Expected a boolean object at the stack top, got {obj.Type()}."
-                | Opcode.OpJump -> 
-                    let arraySlice = asByteArr[i + 1 .. i + 2]
-                    let indexToJumpTo = arraySlice |> readUInt16 |> int
-                    i <- indexToJumpTo - 1  // -1 to step back from callback
-                    Ok _vm
-                | _ ->
-                    failwith "unrecognized opcode"
-                |> Result.map (fun newVm -> callback (); newVm) // Call the callback
-                |> Result.bind runHelper
-            else
-                Ok _vm
-            
-        runHelper vm
-        
-    member private this.HandleOpArray(i: byref<int>, byteArr: byte array) : Result<VM, string> =
-        let arraySlice = byteArr[i + 1 .. i + 2]
-        let numElements = arraySlice |> readUInt16 |> int
-        i <- i + 2
-        
-        let array = this.BuildArray(this.StackPointer - numElements, this.StackPointer)
-        let newVm = { this with StackPointer = this.StackPointer - numElements }
-        newVm.Push(array)
-        
-    member private this.BuildArray(startIndex: int, endIndex: int) =
-        let elements = Array.zeroCreate<Object> (endIndex - startIndex)
-        
-        for i in startIndex .. (endIndex - 1) do
-            elements[i - startIndex] <- this.Stack[i].Value  // TODO: Straight dereferencing, see if this is a bad idea
-            
-        elements |> ArrayType
-        
-        
-    member private this.HandleOpHash(i: byref<int>, byteArr: byte array) : Result<VM, string> =
-        let arraySlice = byteArr[i + 1 .. i + 2]
-        let numElements = arraySlice |> readUInt16 |> int
-        i <- i + 2
-        
-        let hash = this.BuildHash(this.StackPointer - numElements, numElements / 2)
-        let newVm = { this with StackPointer = this.StackPointer - numElements }
-        newVm.Push(hash)
-        
-    member private this.BuildHash(startIndex: int, numPairs: int) =
-        let pairs = Array.zeroCreate<HashableObject * Object> numPairs
-        
-        let mutable currentPair = 0
-        while currentPair < numPairs do
-            let i = startIndex + (2 * currentPair)
-            let key = this.Stack[i].Value |> HashableObject.FromObject |> Option.get  // TODO: See if this is safe
-            let value = this.Stack[i + 1].Value
-            
-            pairs[currentPair] <- (key, value)
-            currentPair <- currentPair + 1
-            
-        Map.ofArray pairs |> HashType
-        
-    member private this.HandleOpIndex(i: byref<int>, byteArr: byte array) : Result<VM, string> =
-        option {
-            let! newVm, index = this.Pop()
-            let! newVm, left = newVm.Pop()
-            return newVm, left, index 
-        }
-        |> function
-           | Some (vm, left, index) ->
-               vm.HandleIndexing(left, index)
-               |> Result.bind vm.Push
-           | None ->
-               Error "Stack top was empty while trying to get 'index' or 'left'."
-           
-    member private this.HandleIndexing(left: Object, index: Object) =
-        match left with
-        | ArrayType objects -> this.IndexArray(objects, index) 
-        | HashType hash -> this.IndexHash(hash, index)
-        | _ -> Error "Attempting to index a non-indexable type."
-        
-    member private this.IndexArray(objects: Object array, index: Object) =
-        match index with
-        | Object.IntegerType i when i >= 0 && i < objects.Length ->
-            objects[int i] |> Ok
-        | Object.IntegerType _ ->
-            NullType |> Ok
-        | _ ->
-            Error $"Expected index to be an \"IntegerType\", got \"{index.Type()}\""
-        
-    member private this.IndexHash(hash: Map<HashableObject, Object>, index: Object) =
-        match HashableObject.FromObject index with
-        | Some key ->
-            match Map.tryFind key hash with
-            | None -> Ok NullType 
-            | Some value -> Ok value 
-        | None ->
-            Error $"Index \"{index}\" is not hashable"
-        
-    member private this.HandleOpConstant(i: byref<int>, byteArr: byte array) : Result<VM, string> =
-        let arraySlice = byteArr[i + 1 .. i + 2]
-        let constIndex = readUInt16 arraySlice
-        i <- i + 2
-        this.Push(this.Constants[int constIndex])
-        
-    member private this.HandlePrefixOperation(i: byref<int>, operatorOpcode: Opcode) : Result<VM, string> =
-        result {
-            let fromOptionToResult opt = if Option.isSome opt then Ok opt.Value else Error VM.FailedPopMessage
-            let! newVm, expr = this.Pop() |> fromOptionToResult
-            
-            let! result =
-                match operatorOpcode, expr with
-                | Opcode.OpMinus, Object.IntegerType i -> -i |> Object.IntegerType |> Ok
-                | Opcode.OpBang, Object.BooleanType b -> b |> not |> getBoolObj |> Ok
-                | _ -> Error $"The operation [opcode: {operatorOpcode}, value: {expr}] is not valid."
+        if currentIndex < bytes.Length then
+            let opcode = LanguagePrimitives.EnumOfValue<byte, Opcode> bytes[currentIndex]
+            match opcode with
+            // opcodes that push to stack
+            | Opcode.OpNull ->
+                Stack.push vm nullObj
+                >> toTuple2 currentIndex
+            | Opcode.OpConstant ->
+                handleOpConstant vm currentIndex bytes
+            | Opcode.OpGetGlobal ->
+                handleGetGlobalOpcode vm currentIndex bytes
+            | Opcode.OpTrue | Opcode.OpFalse ->
+                let something = handleBooleanOpcode vm opcode
+                something >> toTuple2 currentIndex
+            | Opcode.OpArray ->
+                handleOpArray vm currentIndex bytes
+            | Opcode.OpHash ->
+                handleOpHash vm currentIndex bytes
                 
-            return! newVm.Push(result)
-        }
-        
-    member private this.HandleInfixOperation(i: byref<int>, operatorOpcode: Opcode) : Result<VM, string> =
-        result {
-            let fromOptionToResult opt = if Option.isSome opt then Ok opt.Value else Error VM.FailedPopMessage
-            let! newVm, right = this.Pop() |> fromOptionToResult
-            let! newVm, left = newVm.Pop() |> fromOptionToResult
+            // opcodes that operate
+            | Opcode.OpMinus | Opcode.OpBang ->
+                handlePrefixOperation vm opcode
+                >> toTuple2 currentIndex
+            | Opcode.OpAdd | Opcode.OpSub | Opcode.OpMul | Opcode.OpDiv | Opcode.OpEqual | Opcode.OpNotEqual | Opcode.OpGreaterThan ->
+                handleInfixOperation vm opcode
+                >> toTuple2 currentIndex
+            | Opcode.OpIndex ->
+                handleOpIndex vm
+                >> toTuple2 currentIndex
+                
+            // jump opcodes 
+            | Opcode.OpJump ->
+                handleOpJump vm currentIndex bytes
+            | Opcode.OpJumpWhenFalse ->
+                handleOpJumpWhenFalse vm currentIndex bytes
+                
+            // other
+            | Opcode.OpPop ->
+                match Stack.pop vm with
+                | None -> Ok vm 
+                | Some (newVm, _) -> Ok newVm 
+                >> toTuple2 currentIndex
+            | Opcode.OpSetGlobal ->
+                handleSetGlobalOpcode vm currentIndex bytes
+                
+            | _ ->
+                Error "unrecognized opcode"
             
-            let! result =
-                match operatorOpcode, left, right with
-                | Opcode.OpAdd, Object.IntegerType l, Object.IntegerType r -> (l + r) |> Object.IntegerType |> Ok 
-                | Opcode.OpAdd, Object.StringType l, Object.StringType r -> $"{l}{r}" |> Object.StringType |> Ok
-                | Opcode.OpAdd, Object.IntegerType l, Object.StringType r -> $"{l}{r}" |> Object.StringType |> Ok
-                | Opcode.OpAdd, Object.StringType l, Object.IntegerType r -> $"{l}{r}" |> Object.StringType |> Ok
-                | Opcode.OpSub, Object.IntegerType l, Object.IntegerType r -> (l - r) |> Object.IntegerType |> Ok
-                | Opcode.OpMul, Object.IntegerType l, Object.IntegerType r -> (l * r) |> Object.IntegerType |> Ok
-                | Opcode.OpDiv, Object.IntegerType l, Object.IntegerType r -> (l / r) |> Object.IntegerType |> Ok
-                | Opcode.OpEqual, Object.IntegerType l, Object.IntegerType r -> l = r |> getBoolObj |> Ok 
-                | Opcode.OpEqual, Object.BooleanType l, Object.BooleanType r -> l = r |> getBoolObj |> Ok
-                | Opcode.OpNotEqual, Object.IntegerType l, Object.IntegerType r -> l <> r |> getBoolObj |> Ok 
-                | Opcode.OpNotEqual, Object.BooleanType l, Object.BooleanType r -> l <> r |> getBoolObj |> Ok
-                | Opcode.OpGreaterThan, Object.IntegerType l, Object.IntegerType r -> l > r |> getBoolObj |> Ok 
-                | _ -> Error $"The operation left: \"{left.Type()}\" right: \"{right.Type()}\" opcode: {operatorOpcode} is not valid."
-            
-            return! newVm.Push(result)
-        }
-        
-    member private this.HandleBooleanOpcode(i: byref<int>, booleanOpcode: Opcode) : Result<VM, string> =
-        match booleanOpcode with
-        | Opcode.OpTrue -> this.Push(trueObj) 
-        | Opcode.OpFalse -> this.Push(falseObj) 
-        | _ -> Error $"Fatal: The \"{booleanOpcode}\" does not represent a boolean."
-        
-    member private this.HandleSetGlobalOpcode(i: byref<int>, byteArr: byte array) : Result<VM, string> =
-        let arraySlice = byteArr[i + 1 .. i + 2]
-        let globalIndex = arraySlice |> readUInt16 |> int
-        i <- i + 2
-        
-        this.Pop()
-        |> Option.map (fun (newVm, object) -> this.Globals[globalIndex] <- object; newVm)
-        |> function
-           | Some newVm -> Ok newVm
-           | None -> failwith "todo" 
-        
-    member private this.HandleGetGlobalOpcode(i: byref<int>, byteArr: byte array) : Result<VM, string> =
-        let arraySlice = byteArr[i + 1 .. i + 2]
-        let globalIndex = arraySlice |> readUInt16 |> int
-        i <- i + 2
-        this.Push(this.Globals[globalIndex])
-        
-    member private this.Push(object: Object) : Result<VM, string> =
-        match this.StackPointer >= stackSize with
-        | true ->
-            Error "Stack Overflow"
-        | false ->
-            this.Stack[this.StackPointer] <- ObjectWrapper object
-            this.StackPointer <- this.StackPointer + 1
-            Ok this
-            
-    member private this.Peek() : Object option =
-        match this.StackPointer >= stackSize with
-        | true -> None
-        | false ->
-            let i = this.StackPointer - 1
-            let objectWrapper = this.Stack[i]
-            
-            match isNull objectWrapper with
-            | true -> None 
-            | false ->
-                Some objectWrapper.Value
-            
-    member private this.Pop() : (VM * Object) option =
-        match this.StackPointer >= stackSize with
-        | true -> None
-        | false ->
-            let i = this.StackPointer - 1
-            let objectWrapper = this.Stack[i]
-            // this.Stack[i] <- null
-            
-            match isNull objectWrapper with
-            | true -> None 
-            | false ->
-                this.StackPointer <- this.StackPointer - 1
-                Some (this, objectWrapper.Value) 
+            |> function
+                | Ok (newVm, newIndex) -> runLoop bytes newVm (callback newIndex)
+                | Error error -> Error error
+        else
+            Ok (vm, currentIndex) 

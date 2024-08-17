@@ -171,10 +171,10 @@ type VirtualMachineTests() =
             
             TestContext.WriteLine($"Got:\n{bytecode.Instructions.ToString()}")
             
-            let vm = VM.FromByteCode(bytecode)
-            let! newVm = VM.Run(vm)
+            let vm = VM.fromByteCode bytecode
+            let! newVm = VM.run vm
             
-            let resultOption = newVm.LastPoppedStackElement()
+            let resultOption = VM.getLastPoppedStackElement newVm
             return! 
                 match resultOption with
                 | None -> Error "Stack top is empty" 
