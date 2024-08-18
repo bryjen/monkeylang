@@ -4,6 +4,7 @@ module Monkey.Backend.Tests.VirtualMachine.Helpers
 open System
 open FsToolkit.ErrorHandling
 open Monkey.Backend.Tests.Helpers
+open Monkey.Frontend.Ast
 open Monkey.Frontend.Eval.Object
 
 [<RequireQualifiedAccess>]
@@ -17,7 +18,13 @@ module VMHelpers =
             | HashableObject.BooleanType booleanType -> Object.BooleanType booleanType
             | HashableObject.StringType stringType -> Object.StringType stringType
             |> cast
-    
+        
+    let assertProgramHasNoErrors (program: Program) =
+        if program.Errors.Length = 0 then
+            Ok ()
+        else
+            let errorsListStr = program.Errors |> List.map (fun str -> $"\n- {str}") |> String.concat ""
+            Error $"Program couldn't parse with errors:\n{errorsListStr}"
     
     let private assertObjectIsNullType (actual: Object) =
         match actual with

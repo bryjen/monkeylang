@@ -5,7 +5,7 @@ open Monkey.Frontend.Eval.Object
 
 type Frame =
     { Function: CompiledFunction
-      InsPointer: int  // instruction pointer
+      mutable InsPointer: int  // instruction pointer
        }
     
 module Frame =

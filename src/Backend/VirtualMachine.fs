@@ -5,6 +5,7 @@ open System
 open FsToolkit.ErrorHandling
 
 open Microsoft.FSharp.Core
+open Monkey.Backend.Frame
 open Monkey.Frontend.Eval
 open Monkey.Frontend.Eval.Object
 
@@ -14,6 +15,7 @@ open Monkey.Backend.Compiler
 open Monkey.Backend.Operators
 
 let private stackSize = 2048
+let private maxFrames = 1024
 let private globalsSize = UInt16.MaxValue |> int
 
 let private trueObj = Object.BooleanType true
@@ -26,11 +28,13 @@ let private getBoolObj boolValue = match boolValue with | true -> trueObj | fals
 
 type VM =
     { Constants: Object array
-      Instructions: Instructions
-      
       Globals: Object array
+      
       Stack: ObjectWrapper array
-      StackPointer: int }
+      StackPointer: int
+      
+      Frames: Frame array
+      FramePointer: int }
     
         
 [<RequireQualifiedAccess>]
@@ -39,13 +43,20 @@ module VM =
     module internal Utils = 
         let failedPopMsg = "Could not pop stack. Stack is empty."
         
-        let fromOptionToResult opt = if Option.isSome opt then Ok opt.Value else Error failedPopMsg
+        let inline fromOptionToResult opt = if Option.isSome opt then Ok opt.Value else Error failedPopMsg
         
-        let toTuple2 a b = (b, a)
+        let inline toTuple2 a b = (b, a)
+        
+        let getCompiledFunctionFromOption objectOption =
+            match objectOption with
+            | Some object ->
+                match object with
+                | Object.CompiledFunctionType compiledFunction -> Ok compiledFunction
+                | _ -> Error $"Expected type of object to be \"CompiledFunctionType\", got \"{object.Type()}\"."
+            | None -> Error "Stack is empty."
         
     
     module internal Stack =
-        
         let push vm object =
             if vm.StackPointer >= stackSize then
                 Error "Stack Overflow"
@@ -64,6 +75,21 @@ module VM =
             match peek vm with
             | Some value -> Some ({ vm with StackPointer = vm.StackPointer - 1 }, value)  
             | None -> None
+            
+            
+    module internal FrameControl =
+        let inline currentFrame vm = vm.Frames[vm.FramePointer - 1]
+        
+        let pushFrame vm newFrame =
+            vm.Frames[vm.FramePointer] <- newFrame
+            { vm with FramePointer = vm.FramePointer + 1 }
+            
+        let inline popFrame vm = { vm with FramePointer = vm.FramePointer - 1 }, vm.Frames[vm.FramePointer - 1]
+        
+        let attachCurrentFrameInsPointer vm =
+            let insPointer = vm |> currentFrame |> (_.InsPointer)
+            (vm, insPointer)
+            
             
             
     [<AutoOpen>]
@@ -232,15 +258,52 @@ module VM =
                     Ok (vm, i + 2) 
                 | _ ->
                     Error $"Expected a boolean object at the stack top, got {obj.Type()}."
+                    
+        let handleOpCall vm = 
+            result {
+                let! compiledFunction = vm |> Stack.peek |> getCompiledFunctionFromOption
+                let newFrame = Frame.createNewFrame compiledFunction
+                let newVm = FrameControl.pushFrame vm newFrame
+                return (newVm, -1)  // -1 to step back from ins pointer increment
+            }
+            
+        let handleOpReturnValue vm =
+            option {
+                let! newVm, returnValue = Stack.pop vm
+                let newVm, _ = FrameControl.popFrame newVm
+                let! newVm, _ = Stack.pop newVm
+                return Stack.push newVm returnValue
+            }
+            |> function
+                | Some newVmResult -> newVmResult >> FrameControl.attachCurrentFrameInsPointer
+                | None -> Error "Stack is empty."
+                
+        let handleOpReturn vm =
+            option {
+                let newVm, _ = FrameControl.popFrame vm 
+                let! newVm, _ = Stack.pop newVm
+                return Stack.push newVm nullObj 
+            }
+            |> function
+                | Some newVmResult -> newVmResult >> FrameControl.attachCurrentFrameInsPointer
+                | None -> Error "Stack is empty."
             
             
     let fromByteCode (byteCode: Bytecode) =
+        let mainFn: CompiledFunction = { InstructionBytes = byteCode.Instructions.GetBytes() }
+        let mainFrame = Frame.createNewFrame mainFn
+        
+        let frames = Array.zeroCreate<Frame> maxFrames
+        frames[0] <- mainFrame
+        
         { Constants = byteCode.Constants
-          Instructions = byteCode.Instructions
-          
           Globals = Array.zeroCreate<Object> globalsSize    // TODO: Check if obj type needs to be wrapped
+          
           Stack = Array.zeroCreate<ObjectWrapper> stackSize
-          StackPointer = 0 }
+          StackPointer = 0
+          
+          Frames = frames 
+          FramePointer = 1 }
             
     let getLastPoppedStackElement vm =
         match vm.StackPointer with
@@ -251,64 +314,76 @@ module VM =
             | false -> Some peek.Value
         | _ -> None 
             
-    let rec run vm =
-        let bytes = vm.Instructions.GetBytes()
-        runLoop bytes vm 0
-        >> fst
+    let rec run (vm: VM) =
+        let bytes = vm |> FrameControl.currentFrame |> (_.Function) |> (_.InstructionBytes)
+        runLoop vm
         
-    and private runLoop (bytes: byte array) vm currentIndex : Result<VM * int, string> =
-        let callback i = i + 1 
+    and private runLoop vm : Result<VM, string> =
+        let currentFrame = FrameControl.currentFrame vm
+        let bytes = currentFrame.Function.InstructionBytes
+        let insPointer = currentFrame.InsPointer 
         
-        if currentIndex < bytes.Length then
-            let opcode = LanguagePrimitives.EnumOfValue<byte, Opcode> bytes[currentIndex]
+        if insPointer < bytes.Length then
+            let opcode = LanguagePrimitives.EnumOfValue<byte, Opcode> bytes[insPointer]
             match opcode with
             // opcodes that push to stack
             | Opcode.OpNull ->
                 Stack.push vm nullObj
-                >> toTuple2 currentIndex
+                >> toTuple2 insPointer 
             | Opcode.OpConstant ->
-                handleOpConstant vm currentIndex bytes
+                handleOpConstant vm insPointer bytes
             | Opcode.OpGetGlobal ->
-                handleGetGlobalOpcode vm currentIndex bytes
+                handleGetGlobalOpcode vm insPointer bytes
             | Opcode.OpTrue | Opcode.OpFalse ->
                 let something = handleBooleanOpcode vm opcode
-                something >> toTuple2 currentIndex
+                something >> toTuple2 insPointer
             | Opcode.OpArray ->
-                handleOpArray vm currentIndex bytes
+                handleOpArray vm insPointer bytes
             | Opcode.OpHash ->
-                handleOpHash vm currentIndex bytes
+                handleOpHash vm insPointer bytes
                 
             // opcodes that operate
             | Opcode.OpMinus | Opcode.OpBang ->
                 handlePrefixOperation vm opcode
-                >> toTuple2 currentIndex
+                >> toTuple2 insPointer
             | Opcode.OpAdd | Opcode.OpSub | Opcode.OpMul | Opcode.OpDiv | Opcode.OpEqual | Opcode.OpNotEqual | Opcode.OpGreaterThan ->
                 handleInfixOperation vm opcode
-                >> toTuple2 currentIndex
+                >> toTuple2 insPointer
             | Opcode.OpIndex ->
                 handleOpIndex vm
-                >> toTuple2 currentIndex
+                >> toTuple2 insPointer
                 
             // jump opcodes 
             | Opcode.OpJump ->
-                handleOpJump vm currentIndex bytes
+                handleOpJump vm insPointer bytes
             | Opcode.OpJumpWhenFalse ->
-                handleOpJumpWhenFalse vm currentIndex bytes
+                handleOpJumpWhenFalse vm insPointer bytes
+                
+            // opcodes for functions
+            | Opcode.OpCall ->
+                handleOpCall vm
+            | Opcode.OpReturnValue ->
+                handleOpReturnValue vm
+            | Opcode.OpReturn ->
+                handleOpReturn vm
                 
             // other
             | Opcode.OpPop ->
                 match Stack.pop vm with
                 | None -> Ok vm 
                 | Some (newVm, _) -> Ok newVm 
-                >> toTuple2 currentIndex
+                >> toTuple2 insPointer 
             | Opcode.OpSetGlobal ->
-                handleSetGlobalOpcode vm currentIndex bytes
+                handleSetGlobalOpcode vm insPointer bytes
                 
             | _ ->
                 Error "unrecognized opcode"
             
             |> function
-                | Ok (newVm, newIndex) -> runLoop bytes newVm (callback newIndex)
+                | Ok (newVm, newIndex) ->
+                    let currentFrame = FrameControl.currentFrame newVm
+                    currentFrame.InsPointer <- newIndex + 1
+                    runLoop newVm 
                 | Error error -> Error error
         else
-            Ok (vm, currentIndex) 
+            Ok vm

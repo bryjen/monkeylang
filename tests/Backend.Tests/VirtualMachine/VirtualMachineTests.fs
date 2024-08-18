@@ -141,7 +141,56 @@ type VirtualMachineTests() =
             { Input = "{1: 1}[0];"; Expected = null }
             { Input = "{}[0];"; Expected = null }
     |]
+    
+    static member ``O: Test Function Call evaluation - without arguments - 1 `` = [|
+            // Implicit returns
+            { Input =
+                    "let fivePlusTen = fn() { 5 + 10; };
+                    fivePlusTen();"
+              Expected = 15 }
+            { Input =
+                    "let one = fn() { 1; };
+                    let two = fn() { 2; };
+                    one() + two();"
+              Expected = 3 }
+            { Input =
+                    "let a = fn () { 1; };
+                    let b = fn() { a() + 1 };
+                    let c = fn() { b() + 1};
+                    c();"
+              Expected = 3 }
+            
+            // Explicit returns
+            { Input =
+                    "let earlyExit = fn() { return 99; 100; };
+                    earlyExit();"
+              Expected = 99 }
+            { Input =
+                    "let earlyExit = fn() { return 99; return 100; };
+                    earlyExit();"
+              Expected = 99 }
+            
+            // Empty functions
+            { Input =
+                    "let noReturn = fn() { };
+                    noReturn();"
+              Expected = null }
+            { Input =
+                    "let noReturn = fn() { };
+                    let noReturnTwo = fn() { noReturn(); };
+                    noReturn();
+                    noReturnTwo();"
+              Expected = null }
+    |]
         
+    static member ``P: Test Higher Function Call evaluation - without arguments`` = [|
+            { Input =
+                    "let returnsOne = fn() { 1; };
+                    let returnsOneReturner = fn() { returnsOne; };
+                    returnsOneReturner()();"
+              Expected = 1 }
+    |]
+    
         
     static member TestCasesToExecute = Array.concat [
         VirtualMachineTests.``A: Test Basic Integer Arithmetic Case``
@@ -158,12 +207,16 @@ type VirtualMachineTests() =
         VirtualMachineTests.``L: Test Array Literal Evaluation``
         VirtualMachineTests.``M: Test Hash Literal Evaluation``
         VirtualMachineTests.``N: Test Array & Hash Indexing Evaluation``
+        
+        VirtualMachineTests.``O: Test Function Call evaluation - without arguments - 1 ``
+        VirtualMachineTests.``P: Test Higher Function Call evaluation - without arguments``
     ]
         
     [<TestCaseSource("TestCasesToExecute")>]
     member this.``Run VM Tests``(vmTestCase: VMTestCase) =
         result {
-            let program = Parser.parseProgram vmTestCase.Input 
+            let program = Parser.parseProgram vmTestCase.Input
+            do! VMHelpers.assertProgramHasNoErrors program
             let nodes = programToNodes program
             
             let! newCompiler = Compiler.compileNodes nodes (Compiler.createNew ()) 
