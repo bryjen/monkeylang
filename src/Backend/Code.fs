@@ -56,6 +56,9 @@ type Opcode =
     | OpCall           = 0x15uy
     | OpReturnValue    = 0x16uy
     | OpReturn         = 0x17uy
+    
+    | OpSetLocal       = 0x18uy
+    | OpGetLocal       = 0x19uy
 
 type Definition =
     { Name: string
@@ -99,6 +102,9 @@ let private opcodeDefinitions = Map.ofList [
     (Opcode.OpCall,          { Name = "OpCall"; OperandWidths = [| |] })
     (Opcode.OpReturnValue,   { Name = "OpReturnValue"; OperandWidths = [| |] })
     (Opcode.OpReturn,        { Name = "OpReturn"; OperandWidths = [| |] })
+    
+    (Opcode.OpSetLocal,      { Name = "OpSetLocal"; OperandWidths = [| 1 |] })
+    (Opcode.OpGetLocal,      { Name = "OpGetLocal"; OperandWidths = [| 1 |] })
 ]
 
 
