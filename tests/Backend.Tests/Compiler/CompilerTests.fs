@@ -444,6 +444,72 @@ type CompilerTests() =
               make Opcode.OpPop [| |]
           |] |> Array.map Instructions }
     |]
+    
+    static member ``M: Test Local Statement scope codegen 1`` = [|
+        // Case #1: "We assert that accessing a global binding from a function results in a 'OpGetGlobal' instruction."
+        { Input =
+            "let num = 55;
+            fn() { num; };"
+          ExpectedConstants = [|
+              55
+              [|
+                  make Opcode.OpGetGlobal [| 0 |]
+                  make Opcode.OpReturnValue [| |]
+              |]
+          |]
+          ExpectedInstructions = [|
+              make Opcode.OpConstant [| 0 |]
+              make Opcode.OpSetGlobal [| 0 |]
+              make Opcode.OpConstant [| 1 |]
+              make Opcode.OpPop [| |]
+          |] |> Array.map Instructions }
+        
+        // Case #2: "We assert that creating and accessing a local binding results in a 'OpSetLocal' and 'OpGetLocal' insctructions."
+        { Input =
+            "fn() {
+                let num = 55;
+                num
+            };"
+          ExpectedConstants = [|
+              55
+              [|
+                  make Opcode.OpConstant [| 0 |]
+                  make Opcode.OpSetLocal [| 0 |]
+                  make Opcode.OpGetLocal [| 0 |]
+                  make Opcode.OpReturnValue [| |]
+              |]
+          |]
+          ExpectedInstructions = [|
+              make Opcode.OpConstant [| 1 |]
+              make Opcode.OpPop [| |]
+          |] |> Array.map Instructions }
+        
+        // Case #3: "We assert that multiple local bindings in the same scope work."
+        { Input =
+            "fn() {
+                let a = 55;
+                let b = 77;
+                a + b;
+            };"
+          ExpectedConstants = [|
+              55
+              77
+              [|
+                  make Opcode.OpConstant [| 0 |]
+                  make Opcode.OpSetLocal [| 0 |]
+                  make Opcode.OpConstant [| 1 |]
+                  make Opcode.OpSetLocal [| 1 |]
+                  make Opcode.OpGetLocal [| 0 |]
+                  make Opcode.OpGetLocal [| 1 |]
+                  make Opcode.OpAdd [| |]
+                  make Opcode.OpReturnValue [| |]
+              |]
+          |]
+          ExpectedInstructions = [|
+              make Opcode.OpConstant [| 2 |]
+              make Opcode.OpPop [| |]
+          |] |> Array.map Instructions }
+    |]
         
     static member TestCasesToExecute1 = Array.concat [
         CompilerTests.``A: Test Integer Arithmetic Case``
@@ -496,7 +562,7 @@ type CompilerTests() =
         result {
             let initCompiler = Compiler.createNew ()
             
-            let compiler_scoped1 = Compiler.Compilation.enterScope initCompiler
+            let compiler_scoped1 = Compiler.Scope.enterScope initCompiler
             let scopedBytes =
                 [|
                       make Opcode.OpConstant [| 0 |]
@@ -505,13 +571,13 @@ type CompilerTests() =
                       make Opcode.OpReturnValue [| |]
                 |]
             let newCompiler_scoped1, _ = Compiler.Compilation.addInstruction compiler_scoped1 (Array.concat scopedBytes)
-            let compiler_unscoped, returnedBytes = Compiler.Compilation.leaveScope newCompiler_scoped1
+            let compiler_unscoped, returnedBytes = Compiler.Scope.leaveScope newCompiler_scoped1
             
             TestContext.WriteLine("\nScoped:")
             do! CompilerHelpers.testInstructions (Array.map Instructions scopedBytes) (Instructions returnedBytes)
             
             TestContext.WriteLine("\nUnscoped (Expected to be empty):")
-            do! CompilerHelpers.testInstructions [| |] (compiler_unscoped |> Compiler.Compilation.currentInstructions |> Instructions)
+            do! CompilerHelpers.testInstructions [| |] (compiler_unscoped |> Compiler.Scope.currentInstructions |> Instructions)
             return ()
         }
         |> function

@@ -1,28 +1,57 @@
 module Monkey.Backend.SymbolTable
 
 type SymbolScope =
+    | LocalScope
     | GlobalScope
 with
     override this.ToString() =
         match this with
-        | GlobalScope -> "GlobalScope"
+        | LocalScope -> "LOCAL"
+        | GlobalScope -> "GLOBAL"
         
 type Symbol =
     { Name: string
       Scope: SymbolScope
       Index: int }
     
+    
 type SymbolTable =
-    { Store: Map<string, Symbol>
+    { Outer: SymbolTable option
+      
+      Store: Map<string, Symbol>
       Count: int }
-with
-    static member New =
-        { Store = Map.empty<string, Symbol>
+    
+    
+[<RequireQualifiedAccess>]
+module SymbolTable =
+    let createNew () =
+        { Outer = None
+          
+          Store = Map.empty<string, Symbol>
           Count = 0 }
         
-    member this.Define(name: string) =
-        let symbol = { Name = name; Scope = GlobalScope; Index = this.Count }
-        let newSymbolTable = { this with Store = this.Store.Add (name, symbol); Count = this.Count + 1 }
-        newSymbolTable, symbol
+    let createNewEnclosed symbolTable =
+        { Outer = Some symbolTable 
+          
+          Store = Map.empty<string, Symbol>
+          Count = 0 }
         
-    member this.Resolve(name: string) = this.Store.TryFind name
+    let isGlobalScope symbolTable = Option.isNone symbolTable.Outer
+
+    let define symbolTable name =
+        let scope =
+            match symbolTable.Outer with
+            | Some _ -> SymbolScope.LocalScope 
+            | None -> SymbolScope.GlobalScope 
+        
+        let symbol = { Name = name; Scope = scope; Index = symbolTable.Count }
+        let newSymbolTable = { symbolTable with Store = symbolTable.Store.Add (name, symbol); Count = symbolTable.Count + 1 }
+        newSymbolTable, symbol
+
+    let rec resolve symbolTable name =
+        match symbolTable.Store.TryFind name with
+        | Some symbol -> Some symbol
+        | None ->
+            match symbolTable.Outer with
+            | Some outer -> resolve outer name 
+            | None -> None 

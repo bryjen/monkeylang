@@ -139,6 +139,8 @@ let rec make (opcode: Opcode) (operands: int array) =
             let operandAsBytesBE = [| operandAsBytes[1]; operandAsBytes[0] |]
             
             match width with
+            | w when w = 1 ->
+                instruction[offset] <- byte operand 
             | w when w = 2 ->
                 Array.blit operandAsBytesBE 0 instruction offset operandAsBytesBE.Length
             | _ -> failwith "todo"
@@ -186,6 +188,8 @@ and readOperands byteArray definition initialOffset : int array =
         match width with
         | w when w = 0 ->
             ()
+        | w when w = 1 ->
+            operands[i] <- byteArray[offset] |> readUInt8 |> int
         | w when w = 2 ->
             operands[i] <- byteArray[offset..(offset + width - 1)] |> readUInt16 |> int
         | _ ->
@@ -198,3 +202,6 @@ and readOperands byteArray definition initialOffset : int array =
 and readUInt16 byteArr =
     let reversedByteArr = Array.rev byteArr
     BitConverter.ToUInt16(reversedByteArr, 0)
+    
+and readUInt8 byteArr = int byteArr
+    

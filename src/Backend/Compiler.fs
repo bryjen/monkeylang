@@ -62,26 +62,32 @@ module Compiler =
             | _ -> Error $"'{operator}' is not a valid infix expression operator"
             
     [<AutoOpen>]
+    module Scope =
+        let internal currentInstructions compiler = compiler.Scopes.Head.Instructions.GetBytes()
+        
+        let internal enterScope (compiler: Compiler) : Compiler =
+            { compiler with
+                Scopes = CompilationScope.New :: compiler.Scopes
+                SymbolTable = SymbolTable.createNewEnclosed compiler.SymbolTable }
+            
+        let internal leaveScope (compiler: Compiler) : Compiler * byte array =
+            let outer = compiler.SymbolTable.Outer
+            let outerST = if Option.isSome outer then Option.get outer else failwith "FATAL: Attempting to leave the global scope."
+            
+            let newCompiler = { compiler with
+                                    Scopes = compiler.Scopes.Tail
+                                    SymbolTable = outerST }
+            newCompiler, currentInstructions compiler
+            
+    [<AutoOpen>]
     module Compilation =
         let internal addConstant (compiler: Compiler) (object: Object) =
             let newCompiler = { compiler with Constants = object :: compiler.Constants }
             newCompiler, newCompiler.Constants.Length - 1   // will rev when converting to bytecode
-            
-        let internal currentInstructions compiler = compiler.Scopes.Head.Instructions.GetBytes()
         
         let inline internal setCurrentInstructions compiler newInstructions =
             let scopeWithUpdatedInstructions = { Instructions = Instructions newInstructions }
             { compiler with Scopes = replaceHead compiler.Scopes scopeWithUpdatedInstructions }
-            
-        
-        let internal enterScope (compiler: Compiler) : Compiler =
-            let newScope = CompilationScope.New
-            { compiler with Scopes = newScope :: compiler.Scopes }
-            
-        let internal leaveScope (compiler: Compiler) : Compiler * byte array =
-            let instructions = currentInstructions compiler
-            let newCompiler = { compiler with Scopes = compiler.Scopes.Tail }
-            newCompiler, instructions
             
         let internal addInstruction (compiler: Compiler) (bytes: byte array) =
             let newInstructions = Array.append (currentInstructions compiler) bytes
@@ -106,9 +112,14 @@ module Compiler =
                 
                 
             let compileIdentifier (identifier: Identifier) =
-                match compiler.SymbolTable.Resolve identifier.Value with
-                | Some symbol -> Ok (compiler, make Opcode.OpGetGlobal [| symbol.Index |])
-                | None -> Error $"Undefined variable \"{identifier.Value}\""
+                match SymbolTable.resolve compiler.SymbolTable identifier.Value with
+                | Some symbol ->
+                    let varGetOpcode = match symbol.Scope with
+                                       | LocalScope -> Opcode.OpGetLocal
+                                       | GlobalScope -> Opcode.OpGetGlobal 
+                    Ok (compiler, make varGetOpcode [| symbol.Index |])
+                | None ->
+                    Error $"Undefined variable \"{identifier.Value}\""
                 
             let compileFunctionLiteral (functionLiteral: FunctionLiteral) =
                 let parsingCallback isLastStatement statement =
@@ -232,10 +243,12 @@ module Compiler =
         and compileLetStatement compiler letStatement =  
             result {
                 let! newCompiler, exprBytes = compileExpression compiler letStatement.Value
-                let newSymbolTable, symbol = newCompiler.SymbolTable.Define(letStatement.Name.Value)
+                let newSymbolTable, symbol = SymbolTable.define newCompiler.SymbolTable letStatement.Name.Value
                 
-                let varBindingBytes = make Opcode.OpSetGlobal [| symbol.Index |]
+                let varBindingOpcode = if SymbolTable.isGlobalScope newSymbolTable then Opcode.OpSetGlobal else Opcode.OpSetLocal
+                let varBindingBytes = make varBindingOpcode [| symbol.Index |]
                 let bytes = Array.concat [| exprBytes; varBindingBytes |]
+                
                 return ({ newCompiler with SymbolTable = newSymbolTable }, bytes)
             }
             
@@ -305,7 +318,7 @@ module Compiler =
         let mainScope = { Instructions = Instructions [| |] } 
         
         { Constants = []
-          SymbolTable = SymbolTable.New
+          SymbolTable = SymbolTable.createNew ()
           
           Scopes = [ mainScope ] }
     

@@ -26,6 +26,7 @@ type OpcodeTests() =
     member private this.``B: Test cases`` = [
         (Opcode.OpConstant, [| 65534 |], [| byte Opcode.OpConstant; 255uy; 254uy |])
         (Opcode.OpAdd, [| |], [| byte Opcode.OpAdd |])
+        (Opcode.OpGetLocal, [| 255 |], [| byte Opcode.OpAdd; 255uy |])
     ]
             
     [<TestCase(0)>]
@@ -92,6 +93,17 @@ type OpcodeTests() =
          """0000 OpAdd 
 0001 OpConstant 2
 0004 OpConstant 65535""")
+        
+        ([|
+            make Opcode.OpAdd [| |]
+            make Opcode.OpGetLocal [| 1 |]
+            make Opcode.OpConstant [| 2 |]
+            make Opcode.OpConstant [| 65535 |]
+        |],
+         """0000 OpAdd 
+0001 OpGetLocal 1
+0003 OpConstant 2
+0006 OpConstant 65535""")
     |]
         
            
