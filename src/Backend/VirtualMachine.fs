@@ -76,6 +76,13 @@ module VM =
             | Some value -> Some ({ vm with StackPointer = vm.StackPointer - 1 }, value)  
             | None -> None
             
+        let unsafeIndex vm index =
+            let objWrapper = vm.Stack[index]
+            if not (isNull objWrapper) then
+                objWrapper.Value
+            else
+                failwith "FATAL: 'OpGetLocal' getting a value that doesn't exist."
+            
             
     module internal FrameControl =
         let inline currentFrame vm = vm.Frames[vm.FramePointer - 1]
@@ -261,18 +268,24 @@ module VM =
                     
         let handleOpCall vm = 
             result {
+                // Creating new frame
                 let! compiledFunction = vm |> Stack.peek |> getCompiledFunctionFromOption
-                let newFrame = Frame.createNewFrame compiledFunction
+                let newFrame = Frame.createNewFrame compiledFunction vm.StackPointer
                 let newVm = FrameControl.pushFrame vm newFrame
+                
+                // Allocating space on stack for locals
+                let newVm = { newVm with StackPointer = newVm.StackPointer + compiledFunction.NumLocals }
+                
+                
                 return (newVm, -1)  // -1 to step back from ins pointer increment
             }
             
         let handleOpReturnValue vm =
             option {
                 let! newVm, returnValue = Stack.pop vm
-                let newVm, _ = FrameControl.popFrame newVm
-                let! newVm, _ = Stack.pop newVm
-                return Stack.push newVm returnValue
+                let newVm, poppedFrame = FrameControl.popFrame newVm
+                let cleanedVm = { newVm with StackPointer = poppedFrame.BasePointer - 1 }
+                return Stack.push cleanedVm returnValue
             }
             |> function
                 | Some newVmResult -> newVmResult >> FrameControl.attachCurrentFrameInsPointer
@@ -280,9 +293,9 @@ module VM =
                 
         let handleOpReturn vm =
             option {
-                let newVm, _ = FrameControl.popFrame vm 
-                let! newVm, _ = Stack.pop newVm
-                return Stack.push newVm nullObj 
+                let newVm, poppedFrame = FrameControl.popFrame vm 
+                let cleanedVm = { newVm with StackPointer = poppedFrame.BasePointer - 1 }
+                return Stack.push cleanedVm nullObj 
             }
             |> function
                 | Some newVmResult -> newVmResult >> FrameControl.attachCurrentFrameInsPointer
@@ -290,8 +303,8 @@ module VM =
             
             
     let fromByteCode (byteCode: Bytecode) =
-        let mainFn: CompiledFunction = { InstructionBytes = byteCode.Instructions.GetBytes() }
-        let mainFrame = Frame.createNewFrame mainFn
+        let mainFn: CompiledFunction = { InstructionBytes = byteCode.Instructions.GetBytes(); NumLocals = 0 }
+        let mainFrame = Frame.createNewFrame mainFn 0
         
         let frames = Array.zeroCreate<Frame> maxFrames
         frames[0] <- mainFrame
@@ -332,8 +345,6 @@ module VM =
                 >> toTuple2 insPointer 
             | Opcode.OpConstant ->
                 handleOpConstant vm insPointer bytes
-            | Opcode.OpGetGlobal ->
-                handleGetGlobalOpcode vm insPointer bytes
             | Opcode.OpTrue | Opcode.OpFalse ->
                 let something = handleBooleanOpcode vm opcode
                 something >> toTuple2 insPointer
@@ -372,9 +383,32 @@ module VM =
                 match Stack.pop vm with
                 | None -> Ok vm 
                 | Some (newVm, _) -> Ok newVm 
-                >> toTuple2 insPointer 
+                >> toTuple2 insPointer
+                
+            // variables
             | Opcode.OpSetGlobal ->
                 handleSetGlobalOpcode vm insPointer bytes
+            | Opcode.OpGetGlobal ->
+                handleGetGlobalOpcode vm insPointer bytes
+                
+            | Opcode.OpSetLocal ->
+                match Stack.pop vm with
+                | Some (newVm, obj) ->
+                    let localIndex = bytes[insPointer + 1] |> readUInt8
+                    let basePtr = newVm |> FrameControl.currentFrame |> (_.BasePointer)
+                    vm.Stack[basePtr + localIndex] <- ObjectWrapper obj
+                    Ok (newVm, insPointer + 1)
+                | None -> failwith "todo"
+                
+            | Opcode.OpGetLocal ->
+                result {
+                    let localIndex = bytes[insPointer + 1] |> readUInt8
+                    
+                    let basePtr = vm |> FrameControl.currentFrame |> (_.BasePointer)
+                    let obj = Stack.unsafeIndex vm (basePtr + localIndex)
+                    let! newVm = Stack.push vm obj
+                    return (newVm, insPointer + 1)
+                }
                 
             | _ ->
                 Error "unrecognized opcode"

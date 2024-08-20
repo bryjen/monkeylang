@@ -73,7 +73,8 @@ with
         | CompiledFunctionType _ -> failwith "todo" 
 
 and CompiledFunction =
-    { InstructionBytes: byte array }
+    { InstructionBytes: byte array
+      NumLocals: int }
 
 and Function =
     | UserFunction of UserFunction

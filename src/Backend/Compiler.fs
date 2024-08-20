@@ -137,8 +137,9 @@ module Compiler =
                                                           else compileMultipleStatements compiler_scoped parsingCallback functionLiteral.Body.Statements
                     let newCompiler_scoped, _ = addInstruction newCompiler_scoped body_bytes
                     
+                    let numLocals = newCompiler_scoped.SymbolTable.Count
                     let compiler_unscoped, scoped_bytes = leaveScope newCompiler_scoped
-                    let compiledFunction = Object.CompiledFunctionType { InstructionBytes = scoped_bytes }
+                    let compiledFunction = Object.CompiledFunctionType { InstructionBytes = scoped_bytes; NumLocals = numLocals }
                     
                     let newCompiler, constIndex = addConstant compiler_unscoped compiledFunction
                     return (newCompiler, make Opcode.OpConstant [| constIndex |])

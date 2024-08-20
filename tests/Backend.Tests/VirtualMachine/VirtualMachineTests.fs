@@ -189,6 +189,49 @@ type VirtualMachineTests() =
           Expected = 1 }
     |]
     
+    static member ``Q: Test Local Variable Binding evaluation - without arguments - 1`` = [|
+        { Input =  // Asserts that local binding works at all
+                "let one = fn() { let one = 1; one; };
+                one();"
+          Expected = 1 }
+        { Input =  // Tests that multiple local bindings work within the same function
+                "let oneAndTwo = fn() { let one = 1; let two = 2; one + two; };
+                oneAndTwo();"
+          Expected = 3 }
+        { Input =  // Tests multiple local bindings within different functions
+                "let oneAndTwo = fn() { let one = 1; let two = 2; one + two; };
+                let threeAndFour = fn() { let three = 3; let four = 4; three + four; };
+                oneAndTwo() + threeAndFour();"
+          Expected = 10 }
+        { Input =  // Asserts that local bindings with the same name in different functions do not cause problems
+                "let firstFoobar = fn() { let foobar = 50; foobar; };
+                let secondFoobar = fn() { let foobar = 100; foobar; };
+                firstFoobar() + secondFoobar();"
+          Expected = 150 }
+        { Input =
+                "let globalSeed = 50;
+                let minusOne = fn() {
+                    let num = 1;
+                    globalSeed - num;
+                };
+                let minusTwo = fn() {
+                    let num = 2;
+                    globalSeed - num;
+                };
+                minusOne() + minusTwo();"
+          Expected = 97 }
+    |]
+    
+    static member ``R: Test first class function evaluation`` = [|
+        { Input =
+                "let returnsOneReturner = fn() {
+                    let returnsOne = fn() { 1; };
+                    returnsOne;
+                };
+                (returnsOneReturner())();"
+          Expected = 1 }
+    |]
+    
         
     static member TestCasesToExecute = Array.concat [
         VirtualMachineTests.``A: Test Basic Integer Arithmetic Case``
@@ -207,8 +250,10 @@ type VirtualMachineTests() =
         VirtualMachineTests.``N: Test Array & Hash Indexing Evaluation``
         
         VirtualMachineTests.``O: Test Function Call evaluation - without arguments - 1 ``
-            // Ignored because parser does not parse 'stacked calls' in a single statement
-            // VirtualMachineTests.``P: Test Higher Function Call evaluation - without arguments``
+        // Ignored because parser does not parse 'stacked calls' in a single statement
+        // VirtualMachineTests.``P: Test Higher Function Call evaluation - without arguments``
+        // VirtualMachineTests.``R: Test first class function evaluation``
+        VirtualMachineTests.``Q: Test Local Variable Binding evaluation - without arguments - 1``
     ]
             
     [<TestCaseSource("TestCasesToExecute")>]
