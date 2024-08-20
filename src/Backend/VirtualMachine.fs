@@ -47,6 +47,7 @@ module VM =
         
         let inline toTuple2 a b = (b, a)
         
+        [<Obsolete>]
         let getCompiledFunctionFromOption objectOption =
             match objectOption with
             | Some object ->
@@ -54,6 +55,16 @@ module VM =
                 | Object.CompiledFunctionType compiledFunction -> Ok compiledFunction
                 | _ -> Error $"Expected type of object to be \"CompiledFunctionType\", got \"{object.Type()}\"."
             | None -> Error "Stack is empty."
+            
+        let tryGetCompiledFunction (objectWrapper: ObjectWrapper) =
+            if not (isNull objectWrapper) then
+                match objectWrapper.Value with
+                | Object.CompiledFunctionType compiledFunction -> Ok compiledFunction
+                | object -> Error $"Expected type of object to be \"CompiledFunctionType\", got \"{object.Type()}\"."
+            else
+                Error "Stack is empty."
+                
+            
         
     
     module internal Stack =
@@ -266,19 +277,33 @@ module VM =
                 | _ ->
                     Error $"Expected a boolean object at the stack top, got {obj.Type()}."
                     
-        let handleOpCall vm = 
+        let rec handleOpCall vm i (byteArr: byte array) = 
             result {
+                let noArgs = readUInt8 byteArr[i + 1]
+                let! compiledFunction = vm.Stack[vm.StackPointer - 1 - noArgs] |> tryGetCompiledFunction
+                do! assertCorrectNumberOfArguments compiledFunction.NumParameters noArgs
+                
                 // Creating new frame
-                let! compiledFunction = vm |> Stack.peek |> getCompiledFunctionFromOption
-                let newFrame = Frame.createNewFrame compiledFunction vm.StackPointer
+                let basePtr = vm.StackPointer - noArgs
+                let newFrame = Frame.createNewFrame compiledFunction basePtr
                 let newVm = FrameControl.pushFrame vm newFrame
                 
-                // Allocating space on stack for locals
+                // Allocating space on stack for arguments and locals
                 let newVm = { newVm with StackPointer = newVm.StackPointer + compiledFunction.NumLocals }
                 
                 
                 return (newVm, -1)  // -1 to step back from ins pointer increment
             }
+            
+        and assertCorrectNumberOfArguments expectedNoArgs actualNoArgs =
+            if expectedNoArgs <> actualNoArgs then
+                Error $"Incorrect number of arguments: expected {expectedNoArgs}, got {actualNoArgs}."
+            else
+                Ok ()
+            
+        let private attachIncrementedInsPointer vm =
+            let currentFrameInsPtr = vm |> FrameControl.currentFrame |> (_.InsPointer)
+            (vm, currentFrameInsPtr + 1)
             
         let handleOpReturnValue vm =
             option {
@@ -288,7 +313,7 @@ module VM =
                 return Stack.push cleanedVm returnValue
             }
             |> function
-                | Some newVmResult -> newVmResult >> FrameControl.attachCurrentFrameInsPointer
+                | Some newVmResult -> newVmResult >> attachIncrementedInsPointer
                 | None -> Error "Stack is empty."
                 
         let handleOpReturn vm =
@@ -298,12 +323,14 @@ module VM =
                 return Stack.push cleanedVm nullObj 
             }
             |> function
-                | Some newVmResult -> newVmResult >> FrameControl.attachCurrentFrameInsPointer
+                | Some newVmResult -> newVmResult >> attachIncrementedInsPointer 
                 | None -> Error "Stack is empty."
             
             
     let fromByteCode (byteCode: Bytecode) =
-        let mainFn: CompiledFunction = { InstructionBytes = byteCode.Instructions.GetBytes(); NumLocals = 0 }
+        let mainFn: CompiledFunction = { InstructionBytes = byteCode.Instructions.GetBytes()
+                                         NumLocals = 0
+                                         NumParameters = 0 }
         let mainFrame = Frame.createNewFrame mainFn 0
         
         let frames = Array.zeroCreate<Frame> maxFrames
@@ -372,7 +399,7 @@ module VM =
                 
             // opcodes for functions
             | Opcode.OpCall ->
-                handleOpCall vm
+                handleOpCall vm insPointer bytes
             | Opcode.OpReturnValue ->
                 handleOpReturnValue vm
             | Opcode.OpReturn ->

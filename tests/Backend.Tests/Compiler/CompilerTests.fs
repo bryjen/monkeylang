@@ -422,7 +422,7 @@ type CompilerTests() =
           |]
           ExpectedInstructions = [|
               make Opcode.OpConstant [| 1 |]
-              make Opcode.OpCall [| |]
+              make Opcode.OpCall [| 0 |]
               make Opcode.OpPop [| |]
           |] |> Array.map Instructions }
         
@@ -440,7 +440,7 @@ type CompilerTests() =
               make Opcode.OpConstant [| 1 |]
               make Opcode.OpSetGlobal [| 0 |]
               make Opcode.OpGetGlobal [| 0 |]
-              make Opcode.OpCall [| |]
+              make Opcode.OpCall [| 0 |]
               make Opcode.OpPop [| |]
           |] |> Array.map Instructions }
     |]
@@ -510,6 +510,94 @@ type CompilerTests() =
               make Opcode.OpPop [| |]
           |] |> Array.map Instructions }
     |]
+    
+    static member ``M: Test Function with args codegen`` = [|
+        { Input =
+            "let oneArg = fn(a) { };
+            oneArg(24);"
+          ExpectedConstants = [|
+              [|
+                  make Opcode.OpReturn [| |]
+              |]
+              24
+          |]
+          ExpectedInstructions = [|
+              make Opcode.OpConstant [| 0 |]
+              make Opcode.OpSetGlobal [| 0 |]
+              make Opcode.OpGetGlobal [| 0 |]
+              make Opcode.OpConstant [| 1 |]
+              make Opcode.OpCall [| 1 |]
+              make Opcode.OpPop [| |]
+          |] |> Array.map Instructions }
+        
+        { Input =
+            "let manyArg = fn(a, b, c) { };
+            manyArg(24, 25, 26);"
+          ExpectedConstants = [|
+              [|
+                  make Opcode.OpReturn [| |]
+              |]
+              24
+              25
+              26
+          |]
+          ExpectedInstructions = [|
+              make Opcode.OpConstant [| 0 |]
+              make Opcode.OpSetGlobal [| 0 |]
+              make Opcode.OpGetGlobal [| 0 |]
+              make Opcode.OpConstant [| 1 |]
+              make Opcode.OpConstant [| 2 |]
+              make Opcode.OpConstant [| 3 |]
+              make Opcode.OpCall [| 3 |]
+              make Opcode.OpPop [| |]
+          |] |> Array.map Instructions }
+        
+        { Input =
+            "let oneArg = fn(a) { a; };
+            oneArg(24);"
+          ExpectedConstants = [|
+              [|
+                  make Opcode.OpGetLocal [| 0 |]
+                  make Opcode.OpReturnValue [| |]
+              |]
+              24
+          |]
+          ExpectedInstructions = [|
+              make Opcode.OpConstant [| 0 |]
+              make Opcode.OpSetGlobal [| 0 |]
+              make Opcode.OpGetGlobal [| 0 |]
+              make Opcode.OpConstant [| 1 |]
+              make Opcode.OpCall [| 1 |]
+              make Opcode.OpPop [| |]
+          |] |> Array.map Instructions }
+        
+        { Input =
+            "let manyArg = fn(a, b, c) { a; b; c; };
+            manyArg(24, 25, 26);"
+          ExpectedConstants = [|
+              [|
+                  make Opcode.OpGetLocal [| 0 |]
+                  make Opcode.OpPop [| |]
+                  make Opcode.OpGetLocal [| 1 |]
+                  make Opcode.OpPop [| |]
+                  make Opcode.OpGetLocal [| 2 |]
+                  make Opcode.OpReturnValue [| |]
+              |]
+              24
+              25
+              26
+          |]
+          ExpectedInstructions = [|
+              make Opcode.OpConstant [| 0 |]
+              make Opcode.OpSetGlobal [| 0 |]
+              make Opcode.OpGetGlobal [| 0 |]
+              make Opcode.OpConstant [| 1 |]
+              make Opcode.OpConstant [| 2 |]
+              make Opcode.OpConstant [| 3 |]
+              make Opcode.OpCall [| 3 |]
+              make Opcode.OpPop [| |]
+          |] |> Array.map Instructions }
+    |]
         
     static member TestCasesToExecute1 = Array.concat [
         CompilerTests.``A: Test Integer Arithmetic Case``
@@ -528,6 +616,7 @@ type CompilerTests() =
     static member TestCasesToExecute2 = Array.concat [
         CompilerTests.``K: Test Function codegen 1``
         CompilerTests.``L: Test Function Call codegen 1``
+        CompilerTests.``M: Test Function with args codegen``
     ]
      
      

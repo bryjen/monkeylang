@@ -99,7 +99,7 @@ let private opcodeDefinitions = Map.ofList [
     (Opcode.OpHash,          { Name = "OpHash"; OperandWidths = [| 2 |] })
     (Opcode.OpIndex,         { Name = "OpIndex"; OperandWidths = [| |] })
     
-    (Opcode.OpCall,          { Name = "OpCall"; OperandWidths = [| |] })
+    (Opcode.OpCall,          { Name = "OpCall"; OperandWidths = [| 1 |] })
     (Opcode.OpReturnValue,   { Name = "OpReturnValue"; OperandWidths = [| |] })
     (Opcode.OpReturn,        { Name = "OpReturn"; OperandWidths = [| |] })
     

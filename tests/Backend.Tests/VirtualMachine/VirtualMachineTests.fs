@@ -232,6 +232,54 @@ type VirtualMachineTests() =
           Expected = 1 }
     |]
     
+    static member ``S: Test Function CAll evaluation - with arguments - 1`` = [|
+        { Input =
+                "let identity = fn(a) { a; };
+                identity(4);"
+          Expected = 4 }
+        { Input =
+                "let sum = fn(a, b) { a + b; };
+                sum(1, 2);"
+          Expected = 3 }
+        { Input =
+                "let sum = fn(a, b) {
+                    let c = a + b;
+                    c;
+                };
+                sum(1, 2);"
+          Expected = 3 }
+        { Input =
+                "let sum = fn(a, b) {
+                    let c = a + b;
+                    c;
+                };
+                sum(1, 2) + sum(3, 4);"
+          Expected = 10 }
+        { Input =
+                "let sum = fn(a, b) {
+                    let c = a + b;
+                    c;
+                };
+                let outer = fn() {
+                    sum(1, 2) + sum(3, 4);
+                };
+                outer();"
+          Expected = 10 }
+        { Input =
+                "let globalNum = 10;
+                let sum = fn(a, b) {
+                    let c = a + b;
+                    c + globalNum;
+                };
+                
+                let outer = fn() {
+                    sum(1, 2) + sum(3, 4) + globalNum;
+                };
+                
+                outer() + globalNum;"
+          Expected = 50 }
+    |]
+    
         
     static member TestCasesToExecute = Array.concat [
         VirtualMachineTests.``A: Test Basic Integer Arithmetic Case``
@@ -254,6 +302,7 @@ type VirtualMachineTests() =
         // VirtualMachineTests.``P: Test Higher Function Call evaluation - without arguments``
         // VirtualMachineTests.``R: Test first class function evaluation``
         VirtualMachineTests.``Q: Test Local Variable Binding evaluation - without arguments - 1``
+        VirtualMachineTests.``S: Test Function CAll evaluation - with arguments - 1``
     ]
             
     [<TestCaseSource("TestCasesToExecute")>]
@@ -280,3 +329,25 @@ type VirtualMachineTests() =
         |> function
            | Ok _ -> Assert.Pass("Passed\n")
            | Error errorMsg -> Assert.Fail(errorMsg)
+
+    
+    [<TestCase("fn() { 1; }(1);")>]
+    [<TestCase("fn(a) { a; }();")>]
+    [<TestCase("fn(a, b) { a + b; }(1);")>]
+    member this.``Assert Errors with invalid number of arguments passed``(input: string) =
+        result {
+            let program = Parser.parseProgram input
+            let nodes = programToNodes program
+            
+            let! newCompiler = Compiler.compileNodes nodes (Compiler.createNew ()) 
+            let bytecode = Compiler.toByteCode newCompiler
+            
+            TestContext.WriteLine($"Got:\n{bytecode.Instructions.ToString()}")
+            
+            let vm = VM.fromByteCode bytecode
+            return! (VM.run vm)
+        }
+        |> function
+            | Ok _ -> Assert.Fail("Failed. Expected the program to error, but did not.\n") 
+            | Error error -> Assert.Pass($"Passed. Program failed to evaluate with the message: \n\t\"{error}\"\n") 
+        

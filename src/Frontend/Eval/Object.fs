@@ -74,7 +74,8 @@ with
 
 and CompiledFunction =
     { InstructionBytes: byte array
-      NumLocals: int }
+      NumLocals: int
+      NumParameters: int }
 
 and Function =
     | UserFunction of UserFunction

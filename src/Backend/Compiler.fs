@@ -121,7 +121,7 @@ module Compiler =
                 | None ->
                     Error $"Undefined variable \"{identifier.Value}\""
                 
-            let compileFunctionLiteral (functionLiteral: FunctionLiteral) =
+            let rec compileFunctionLiteral (functionLiteral: FunctionLiteral) =
                 let parsingCallback isLastStatement statement =
                     match isLastStatement, statement with
                     | true, ReturnStatement _ -> [| |]
@@ -132,26 +132,64 @@ module Compiler =
                 result {
                     let compiler_scoped = enterScope compiler
                     
+                    // update symbol table for parameters
+                    let newSymbolTable = defineFunctionParams compiler_scoped.SymbolTable functionLiteral.Parameters
+                    let newCompiler_scoped = { compiler_scoped with SymbolTable = newSymbolTable }
+                    
+                    // parse function body
                     let! newCompiler_scoped, body_bytes = if functionLiteral.Body.Statements.IsEmpty
-                                                          then Ok (compiler_scoped, make Opcode.OpReturn [| |])
-                                                          else compileMultipleStatements compiler_scoped parsingCallback functionLiteral.Body.Statements
+                                                          then Ok (newCompiler_scoped, make Opcode.OpReturn [| |])
+                                                          else compileMultipleStatements newCompiler_scoped parsingCallback functionLiteral.Body.Statements
                     let newCompiler_scoped, _ = addInstruction newCompiler_scoped body_bytes
                     
+                    // leave scope & push compiled func to stack
                     let numLocals = newCompiler_scoped.SymbolTable.Count
                     let compiler_unscoped, scoped_bytes = leaveScope newCompiler_scoped
-                    let compiledFunction = Object.CompiledFunctionType { InstructionBytes = scoped_bytes; NumLocals = numLocals }
-                    
+                    let compiledFunction = { InstructionBytes = scoped_bytes
+                                             NumLocals = numLocals
+                                             NumParameters = functionLiteral.Parameters.Length }
+                                           |> Object.CompiledFunctionType
                     let newCompiler, constIndex = addConstant compiler_unscoped compiledFunction
+                    
                     return (newCompiler, make Opcode.OpConstant [| constIndex |])
                 }
                 
-            let rec compileCallExpression (callExpression: CallExpression) =
-                let appendOpCall (compiler, bytes) = (compiler, Array.concat [| bytes; make Opcode.OpCall [| |] |])
+            and defineFunctionParams currentSymbolTable paramsList =
+                match paramsList with
+                | param :: remainingParams ->
+                    let newSymbolTable, _ = SymbolTable.define currentSymbolTable param.Value
+                    defineFunctionParams newSymbolTable remainingParams
+                | [] -> currentSymbolTable 
                 
-                match callExpression.Function with
-                | Identifier identifier -> compileIdentifier identifier
-                | FunctionLiteral functionLiteral -> compileFunctionLiteral functionLiteral
-                >> appendOpCall
+            let rec compileCallExpression (callExpression: CallExpression) =
+                let callExprAsExpr = 
+                    match callExpression.Function with
+                    | CallExpr.Identifier identifier -> Expression.Identifier identifier 
+                    | CallExpr.FunctionLiteral functionLiteral -> Expression.FunctionLiteral functionLiteral 
+                
+                result {
+                    let! newCompiler, argBytes = compileArgs compiler callExpression.Arguments []
+                    let! newCompiler, funcBytes = compileExpression newCompiler callExprAsExpr
+                    
+                    let bytes = Array.concat [|
+                        funcBytes
+                        argBytes
+                        make Opcode.OpCall [| callExpression.Arguments.Length |]
+                    |]
+                        
+                    return (newCompiler, bytes) 
+                }
+                
+            and compileArgs currentCompiler expressionsToParse compiledBytes =
+                match expressionsToParse with
+                | headExpr :: remaining ->
+                    match compileExpression currentCompiler headExpr with
+                    | Ok (newCompiler, bytes) -> compileArgs newCompiler remaining (bytes :: compiledBytes)
+                    | Error error -> Error error 
+                | [] ->
+                    let combinedBytes = compiledBytes |> List.toArray |> Array.rev |> Array.concat
+                    Ok (currentCompiler, combinedBytes)
+                    
                 
             let compileIndexExpression (indexExpression: IndexExpression) =
                 result {
