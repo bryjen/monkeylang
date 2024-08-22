@@ -232,7 +232,7 @@ module Evaluator =
         | Ok func -> 
             match func with
             | UserFunction userFunction -> userFunction.Parameters.Length |> Ok 
-            | BuiltinFunction builtinFunction -> builtinFunction.ParametersLength |> Ok
+            | BuiltinFunction builtinFunction -> builtinFunction.NumParameters |> Ok
         | Error error ->
             Error error
         
@@ -260,9 +260,15 @@ module Evaluator =
         evalStatement updatedFunc.Env (Statement.BlockStatement updatedFunc.Body)
         
     and private applyBuiltinFunction environment builtinFunc evaluatedArguments =
+        (*
         match builtinFunc.Fn evaluatedArguments with
         | Object.ErrorType error -> Result.Error error.GetMsg
         | returnObject -> Ok (environment, returnObject)
+        *)
+        match builtinFunc.Fn evaluatedArguments with
+        | Ok (Some returnValue) -> Ok (environment, returnValue)
+        | Ok (None) -> Ok (environment, NullType)
+        | Error errorValue -> Error errorValue 
     // END REGION evalCallExpression
     
     and internal evalArrayLiteral environment arrayLiteral =

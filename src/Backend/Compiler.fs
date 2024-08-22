@@ -1,10 +1,12 @@
 module Monkey.Backend.Compiler
 
+open System.Collections.Generic
 open FsToolkit.ErrorHandling
 
 open Monkey.Backend.Operators
 open Monkey.Backend.Code
 open Monkey.Frontend.Ast
+open Monkey.Frontend.Eval
 open Monkey.Frontend.Eval.Object
 open Monkey.Backend.SymbolTable
 
@@ -37,6 +39,8 @@ module Compiler =
             match list with
             | [] -> [ newHead ] 
             | _ :: tail -> newHead :: tail
+            
+        let getBuiltinIndexByName builtinName = Array.findIndex (fun (name, _) -> name = builtinName) Builtins.builtinsArray
             
         
     [<AutoOpen>]
@@ -111,15 +115,29 @@ module Compiler =
                 helper compiler 0
                 
                 
-            let compileIdentifier (identifier: Identifier) =
+            let rec compileIdentifier (identifier: Identifier) =
                 match SymbolTable.resolve compiler.SymbolTable identifier.Value with
                 | Some symbol ->
                     let varGetOpcode = match symbol.Scope with
                                        | LocalScope -> Opcode.OpGetLocal
                                        | GlobalScope -> Opcode.OpGetGlobal 
+                                       | BuiltinScope -> Opcode.OpGetBuiltin 
                     Ok (compiler, make varGetOpcode [| symbol.Index |])
                 | None ->
                     Error $"Undefined variable \"{identifier.Value}\""
+                    
+(*
+                    tryResolveAsBuiltin identifier
+                    
+            and tryResolveAsBuiltin identifier =
+                try
+                    let builtinIndex = getBuiltinIndexByName identifier.Value
+                    Ok (compiler, make Opcode.OpGetBuiltin [| builtinIndex |])
+                with
+                | :? KeyNotFoundException as _ ->
+                    Error $"Undefined variable \"{identifier.Value}\""  // identifier is not a defined variable or a builtin
+*)
+                
                 
             let rec compileFunctionLiteral (functionLiteral: FunctionLiteral) =
                 let parsingCallback isLastStatement statement =

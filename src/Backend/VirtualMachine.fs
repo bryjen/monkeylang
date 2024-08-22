@@ -56,6 +56,7 @@ module VM =
                 | _ -> Error $"Expected type of object to be \"CompiledFunctionType\", got \"{object.Type()}\"."
             | None -> Error "Stack is empty."
             
+        [<Obsolete>]
         let tryGetCompiledFunction (objectWrapper: ObjectWrapper) =
             if not (isNull objectWrapper) then
                 match objectWrapper.Value with
@@ -63,6 +64,13 @@ module VM =
                 | object -> Error $"Expected type of object to be \"CompiledFunctionType\", got \"{object.Type()}\"."
             else
                 Error "Stack is empty."
+                
+        let tryGetObject (objectWrapper: ObjectWrapper) =
+            if not (isNull objectWrapper) then
+                Ok objectWrapper.Value
+            else
+                Error "Stack is empty."
+            
                 
             
         
@@ -280,7 +288,20 @@ module VM =
         let rec handleOpCall vm i (byteArr: byte array) = 
             result {
                 let noArgs = readUInt8 byteArr[i + 1]
-                let! compiledFunction = vm.Stack[vm.StackPointer - 1 - noArgs] |> tryGetCompiledFunction
+                let! object = vm.Stack[vm.StackPointer - 1 - noArgs] |> tryGetObject
+               
+                return!
+                    match object with
+                    | FunctionType f ->
+                        match f with
+                        | UserFunction _ -> failwith "FATAL"
+                        | BuiltinFunction builtinFunction -> handleBuiltinFunctionCall vm i noArgs builtinFunction 
+                    | CompiledFunctionType compiledFunction -> handleCompiledFunctionCall vm noArgs compiledFunction 
+                    | _ -> Error $"Expected type of object to either be \"CompiledFunctionType\" or \"BuiltinFunction\", got \"{object.Type()}\"."
+            }
+
+        and handleCompiledFunctionCall vm noArgs compiledFunction =
+            result {
                 do! assertCorrectNumberOfArguments compiledFunction.NumParameters noArgs
                 
                 // Creating new frame
@@ -291,8 +312,25 @@ module VM =
                 // Allocating space on stack for arguments and locals
                 let newVm = { newVm with StackPointer = newVm.StackPointer + compiledFunction.NumLocals }
                 
-                
                 return (newVm, -1)  // -1 to step back from ins pointer increment
+            }
+            
+        and handleBuiltinFunctionCall vm i actualNoArgs builtinFunction =
+            result {
+                do! assertCorrectNumberOfArguments builtinFunction.NumParameters actualNoArgs 
+                
+                let args = vm.Stack[(vm.StackPointer - builtinFunction.NumParameters) .. (vm.StackPointer - 1)]
+                           |> Array.map (_.Value)  // BUG: Potential null de-referencing here in case of inappropriate usage
+                           |> Array.toList
+                
+                let! objOption = builtinFunction.Fn args
+                let object = if Option.isNone objOption then nullObj else Option.get objOption
+                
+                // readjust the stack pointer
+                let newVm = { vm with StackPointer = vm.StackPointer - builtinFunction.NumParameters - 1 }
+                
+                let! newNewVm = Stack.push newVm object
+                return (newNewVm, i + 1)
             }
             
         and assertCorrectNumberOfArguments expectedNoArgs actualNoArgs =
@@ -300,6 +338,8 @@ module VM =
                 Error $"Incorrect number of arguments: expected {expectedNoArgs}, got {actualNoArgs}."
             else
                 Ok ()
+            
+                
             
         let private attachIncrementedInsPointer vm =
             let currentFrameInsPtr = vm |> FrameControl.currentFrame |> (_.InsPointer)
@@ -413,6 +453,14 @@ module VM =
                 >> toTuple2 insPointer
                 
             // variables
+            | Opcode.OpGetBuiltin ->
+                result {
+                    let builtinIndex = bytes[insPointer + 1] |> readUInt8
+                    let _, builtinFnObj = Builtins.builtinsArray[builtinIndex]
+                    let! newVm = Stack.push vm builtinFnObj
+                    return (newVm, insPointer + 1)
+                }
+            
             | Opcode.OpSetGlobal ->
                 handleSetGlobalOpcode vm insPointer bytes
             | Opcode.OpGetGlobal ->

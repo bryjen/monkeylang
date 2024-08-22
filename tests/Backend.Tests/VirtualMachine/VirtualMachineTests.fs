@@ -232,7 +232,7 @@ type VirtualMachineTests() =
           Expected = 1 }
     |]
     
-    static member ``S: Test Function CAll evaluation - with arguments - 1`` = [|
+    static member ``S: Test Function Call evaluation - with arguments - 1`` = [|
         { Input =
                 "let identity = fn(a) { a; };
                 identity(4);"
@@ -280,6 +280,27 @@ type VirtualMachineTests() =
           Expected = 50 }
     |]
     
+    static member ``T: Test builtin function evaluation 1`` = [|
+        { Input = """len("");"""; Expected = 0 }
+        { Input = """len("four");"""; Expected = 4 }
+        { Input = """len("hello world");"""; Expected = 11 }
+        { Input = "len([1, 2, 3]);"; Expected = 3 }
+        { Input = "len([]);"; Expected = 0 }
+        
+        { Input = """println("Hello World");"""; Expected = null }
+        
+        { Input = "head([1, 2, 3]);"; Expected = 1 }
+        { Input = "head([]);"; Expected = null }
+        
+        { Input = "last([1, 2, 3]);"; Expected = 3 }
+        { Input = "last([]);"; Expected = null }
+        
+        { Input = "tail([1, 2, 3]);"; Expected = ([| 2; 3 |] : int64 array) }
+        { Input = "tail([]);"; Expected = ([| |] : int64 array) }
+        
+        { Input = "push([], 1);"; Expected = ([| 1 |] : int64 array) }
+    |]
+    
         
     static member TestCasesToExecute = Array.concat [
         VirtualMachineTests.``A: Test Basic Integer Arithmetic Case``
@@ -302,7 +323,8 @@ type VirtualMachineTests() =
         // VirtualMachineTests.``P: Test Higher Function Call evaluation - without arguments``
         // VirtualMachineTests.``R: Test first class function evaluation``
         VirtualMachineTests.``Q: Test Local Variable Binding evaluation - without arguments - 1``
-        VirtualMachineTests.``S: Test Function CAll evaluation - with arguments - 1``
+        VirtualMachineTests.``S: Test Function Call evaluation - with arguments - 1``
+        VirtualMachineTests.``T: Test builtin function evaluation 1``
     ]
             
     [<TestCaseSource("TestCasesToExecute")>]
@@ -331,9 +353,17 @@ type VirtualMachineTests() =
            | Error errorMsg -> Assert.Fail(errorMsg)
 
     
+    // Normal Functions
     [<TestCase("fn() { 1; }(1);")>]
     [<TestCase("fn(a) { a; }();")>]
     [<TestCase("fn(a, b) { a + b; }(1);")>]
+    
+    // Builtin Functions
+    [<TestCase("len(1);")>]
+    [<TestCase("""len("one", "two");""")>]
+    [<TestCase("head(1);")>]
+    [<TestCase("last(1);")>]
+    [<TestCase("push(1, 1);")>]
     member this.``Assert Errors with invalid number of arguments passed``(input: string) =
         result {
             let program = Parser.parseProgram input

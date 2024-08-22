@@ -598,6 +598,66 @@ type CompilerTests() =
               make Opcode.OpPop [| |]
           |] |> Array.map Instructions }
     |]
+    
+    // NOTE: Changing the order of items in 'Monkey.Frontend.Builtins.builtinsArray' changes the values of the opcodes
+    // for 'OpGetBuiltin'
+    static member ``N: Test Builtin Function codegen`` = [|
+        { Input =
+            "len([]);
+            push([], 1);"
+          ExpectedConstants = [| 1 |]
+          ExpectedInstructions = [|
+              make Opcode.OpGetBuiltin [| 0 |]
+              make Opcode.OpArray [| 0 |]
+              make Opcode.OpCall [| 1 |]
+              make Opcode.OpPop [| |]
+              make Opcode.OpGetBuiltin [| 5 |]
+              make Opcode.OpArray [| 0 |]
+              make Opcode.OpConstant [| 0 |]
+              make Opcode.OpCall [| 2 |]
+              make Opcode.OpPop [| |]
+          |] |> Array.map Instructions }
+        
+        { Input =
+            "fn() { len([]); };"
+          ExpectedConstants = [|
+              [|
+                  make Opcode.OpGetBuiltin [| 0 |]
+                  make Opcode.OpArray [| 0 |]
+                  make Opcode.OpCall [| 1 |]
+                  make Opcode.OpReturnValue [| |]
+              |]
+          |]
+          ExpectedInstructions = [|
+              make Opcode.OpConstant [| 0 |]
+              make Opcode.OpPop [| |]
+          |] |> Array.map Instructions }
+        
+        // Asserts that we can override builtin functions 
+        { Input =
+            "let something = fn() {
+                let len = 10;
+                len;
+            };
+            something();"
+            
+          ExpectedConstants = [|
+              10
+              [|
+                  make Opcode.OpConstant [| 0 |]
+                  make Opcode.OpSetLocal [| |]
+                  make Opcode.OpGetLocal [| |]
+                  make Opcode.OpReturnValue [| |]
+              |]
+          |]
+          ExpectedInstructions = [|
+              make Opcode.OpConstant [| 1 |]
+              make Opcode.OpSetGlobal [| 0 |]
+              make Opcode.OpGetGlobal [| 0 |]
+              make Opcode.OpCall [| 0 |]
+              make Opcode.OpPop [| |]
+          |] |> Array.map Instructions }
+    |]
         
     static member TestCasesToExecute1 = Array.concat [
         CompilerTests.``A: Test Integer Arithmetic Case``
@@ -612,11 +672,12 @@ type CompilerTests() =
         CompilerTests.``J: Test Index expression codegen``
     ]
     
-    // Starting from 'K' and upwards, mainly more complex compilation patterns from fucntions
+    // Starting from 'K' and upwards, mainly more complex compilation patterns from functions 
     static member TestCasesToExecute2 = Array.concat [
         CompilerTests.``K: Test Function codegen 1``
         CompilerTests.``L: Test Function Call codegen 1``
         CompilerTests.``M: Test Function with args codegen``
+        CompilerTests.``N: Test Builtin Function codegen``
     ]
      
      

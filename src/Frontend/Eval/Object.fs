@@ -95,8 +95,8 @@ with
         $"fn ({commaSeparatedParameters}) {{ {this.Body.ToString()} }}" 
 
 and BuiltinFunction =
-    { Fn: Object list -> Object
-      ParametersLength: int }
+    { Fn: Object list -> Result<Object option, string>
+      NumParameters: int }
 
 
 and ErrorType = ErrorType of string

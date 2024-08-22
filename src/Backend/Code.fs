@@ -59,6 +59,8 @@ type Opcode =
     
     | OpSetLocal       = 0x18uy
     | OpGetLocal       = 0x19uy
+    
+    | OpGetBuiltin     = 0x1Auy
 
 type Definition =
     { Name: string
@@ -105,6 +107,8 @@ let private opcodeDefinitions = Map.ofList [
     
     (Opcode.OpSetLocal,      { Name = "OpSetLocal"; OperandWidths = [| 1 |] })
     (Opcode.OpGetLocal,      { Name = "OpGetLocal"; OperandWidths = [| 1 |] })
+    
+    (Opcode.OpGetBuiltin,    { Name = "OpGetBuiltin"; OperandWidths = [| 1 |] })
 ]
 
 

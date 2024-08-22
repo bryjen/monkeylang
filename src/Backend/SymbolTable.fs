@@ -1,13 +1,17 @@
 module Monkey.Backend.SymbolTable
 
+open Monkey.Frontend.Eval
+
 type SymbolScope =
     | LocalScope
     | GlobalScope
+    | BuiltinScope 
 with
     override this.ToString() =
         match this with
         | LocalScope -> "LOCAL"
         | GlobalScope -> "GLOBAL"
+        | BuiltinScope -> "BUILTIN"
         
 type Symbol =
     { Name: string
@@ -24,11 +28,20 @@ type SymbolTable =
     
 [<RequireQualifiedAccess>]
 module SymbolTable =
-    let createNew () =
+    let rec createNew () =
         { Outer = None
           
-          Store = Map.empty<string, Symbol>
+          Store = initializeWithBuiltins ()
           Count = 0 }
+        
+    and private initializeWithBuiltins () =
+        let getNameSymbolPair index =
+            let name, _ = Builtins.builtinsArray[index]
+            (name, { Name = name; Scope = BuiltinScope; Index = index })
+        
+        [| 0 .. (Builtins.builtinsArray.Length - 1) |]
+        |> Array.map getNameSymbolPair
+        |> Map.ofArray
         
     let createNewEnclosed symbolTable =
         { Outer = Some symbolTable 
