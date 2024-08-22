@@ -1,5 +1,6 @@
 namespace Monkey.Backend.Tests.Helpers
 
+open Monkey.Frontend.Eval
 open Monkey.Frontend.Eval.Object
 
 
@@ -30,8 +31,12 @@ module CastEvalObj =
         | Object.HashType hashType -> Ok hashType 
         | _ -> Error $"'object' is not an 'Object.HashType', got '{object.Type()}'."
         
-    let toCompiledFunctionType object =
+    let toCompiledFunctionType (object: Object) =
+        let errorMsg = $"'object' is not an 'Object.CompiledFunctionType', got '{object.Type()}'."
         match object with
-        | Object.CompiledFunctionType compiledFunction -> Ok compiledFunction 
-        | _ -> Error $"'object' is not an 'Object.CompiledFunctionType', got '{object.Type()}'."
+        | Object.FunctionType funcType ->
+            match funcType with
+            | CompiledFunction compiledFunction -> Ok compiledFunction 
+            | _ -> Error errorMsg
+        | _ -> Error errorMsg
         

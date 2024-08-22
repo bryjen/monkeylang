@@ -29,7 +29,8 @@ with
             None
           
           
-
+          
+///
 and Object =
     | IntegerType of Int64
     | BooleanType of bool
@@ -40,7 +41,6 @@ and Object =
     | ArrayType of Object array
     | HashType of Map<HashableObject, Object>
     
-    | CompiledFunctionType of CompiledFunction
 with
     member this.Type() =
         match this with
@@ -48,12 +48,10 @@ with
         | BooleanType _ -> "BOOLEAN"
         | NullType -> "NULL"
         | StringType _ -> "STRING"
-        | FunctionType _ -> "FUNCTION" 
+        | FunctionType funcType -> funcType.Type() 
         | ErrorType _ -> "ERROR" 
         | ArrayType _ -> "ARRAY" 
         | HashType _ -> "HASH"
-        
-        | CompiledFunctionType _ -> "COMPILED_FUNCTION" 
         
     member this.Inspect() = this.ToString()
         
@@ -69,19 +67,32 @@ with
             let elementsString = String.concat ", " (arr |> Array.map (_.ToString()))
             $"[{elementsString}]"
         | HashType _ -> failwith "todo"
-        
-        | CompiledFunctionType _ -> failwith "todo" 
 
+
+
+///
 and CompiledFunction =
     { InstructionBytes: byte array
       NumLocals: int
       NumParameters: int }
 
+
+
+///
 and Function =
     | UserFunction of UserFunction
+    | CompiledFunction of CompiledFunction
     | BuiltinFunction of BuiltinFunction
+with
+    member this.Type() =
+        match this with
+        | UserFunction _ -> "USER_FUNCTION" 
+        | CompiledFunction _ -> "COMPILED_FUNCTION"
+        | BuiltinFunction _ -> "BUILTIN_FUNCTION"
     
     
+    
+///
 and UserFunction =
     { Parameters: Identifier list
       Body: BlockStatement
@@ -94,6 +105,9 @@ with
         let commaSeparatedParameters = String.concat ", " (this.Parameters |> List.map (_.Value)) 
         $"fn ({commaSeparatedParameters}) {{ {this.Body.ToString()} }}" 
 
+
+
+///
 and BuiltinFunction =
     { Fn: Object list -> Result<Object option, string>
       NumParameters: int }
@@ -106,7 +120,8 @@ with
         e
         
         
-
+        
+///
 and HashableObject =
     | IntegerType of Int64
     | BooleanType of bool

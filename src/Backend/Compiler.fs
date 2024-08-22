@@ -166,7 +166,7 @@ module Compiler =
                     let compiledFunction = { InstructionBytes = scoped_bytes
                                              NumLocals = numLocals
                                              NumParameters = functionLiteral.Parameters.Length }
-                                           |> Object.CompiledFunctionType
+                                           |> CompiledFunction |> FunctionType
                     let newCompiler, constIndex = addConstant compiler_unscoped compiledFunction
                     
                     return (newCompiler, make Opcode.OpConstant [| constIndex |])

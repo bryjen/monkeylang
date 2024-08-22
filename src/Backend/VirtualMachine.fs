@@ -46,35 +46,16 @@ module VM =
         let inline fromOptionToResult opt = if Option.isSome opt then Ok opt.Value else Error failedPopMsg
         
         let inline toTuple2 a b = (b, a)
-        
-        [<Obsolete>]
-        let getCompiledFunctionFromOption objectOption =
-            match objectOption with
-            | Some object ->
-                match object with
-                | Object.CompiledFunctionType compiledFunction -> Ok compiledFunction
-                | _ -> Error $"Expected type of object to be \"CompiledFunctionType\", got \"{object.Type()}\"."
-            | None -> Error "Stack is empty."
-            
-        [<Obsolete>]
-        let tryGetCompiledFunction (objectWrapper: ObjectWrapper) =
+                
+        let getFunctionType (objectWrapper: ObjectWrapper) = 
             if not (isNull objectWrapper) then
                 match objectWrapper.Value with
-                | Object.CompiledFunctionType compiledFunction -> Ok compiledFunction
-                | object -> Error $"Expected type of object to be \"CompiledFunctionType\", got \"{object.Type()}\"."
-            else
-                Error "Stack is empty."
-                
-        let tryGetObject (objectWrapper: ObjectWrapper) =
-            if not (isNull objectWrapper) then
-                Ok objectWrapper.Value
+                | FunctionType func -> Ok func 
+                | obj -> Error $"Expected type of object to either be \"CompiledFunctionType\" or \"BuiltinFunction\", got \"{obj.Type()}\"."
             else
                 Error "Stack is empty."
             
                 
-            
-        
-    
     module internal Stack =
         let push vm object =
             if vm.StackPointer >= stackSize then
@@ -288,16 +269,13 @@ module VM =
         let rec handleOpCall vm i (byteArr: byte array) = 
             result {
                 let noArgs = readUInt8 byteArr[i + 1]
-                let! object = vm.Stack[vm.StackPointer - 1 - noArgs] |> tryGetObject
-               
-                return!
-                    match object with
-                    | FunctionType f ->
-                        match f with
-                        | UserFunction _ -> failwith "FATAL"
-                        | BuiltinFunction builtinFunction -> handleBuiltinFunctionCall vm i noArgs builtinFunction 
-                    | CompiledFunctionType compiledFunction -> handleCompiledFunctionCall vm noArgs compiledFunction 
-                    | _ -> Error $"Expected type of object to either be \"CompiledFunctionType\" or \"BuiltinFunction\", got \"{object.Type()}\"."
+                let! funcType = vm.Stack[vm.StackPointer - 1 - noArgs] |> getFunctionType
+                
+                return! 
+                    match funcType with
+                    | CompiledFunction compiledFunction -> handleCompiledFunctionCall vm noArgs compiledFunction 
+                    | BuiltinFunction builtinFunction -> handleBuiltinFunctionCall vm i noArgs builtinFunction 
+                    | _ -> Error "Expected type of object to either be \"CompiledFunctionType\" or \"BuiltinFunction\"."
             }
 
         and handleCompiledFunctionCall vm noArgs compiledFunction =
