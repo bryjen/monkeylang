@@ -169,7 +169,8 @@ module Compiler =
                                            |> CompiledFunction |> FunctionType
                     let newCompiler, constIndex = addConstant compiler_unscoped compiledFunction
                     
-                    return (newCompiler, make Opcode.OpConstant [| constIndex |])
+                    // TODO: Modify the second operand when handling of free variables is implemented
+                    return (newCompiler, make Opcode.OpClosure [| constIndex; 0 |])
                 }
                 
             and defineFunctionParams currentSymbolTable paramsList =

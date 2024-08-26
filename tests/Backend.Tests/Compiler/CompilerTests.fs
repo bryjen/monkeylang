@@ -356,7 +356,7 @@ type CompilerTests() =
               |]
           |]
           ExpectedInstructions = [|
-              make Opcode.OpConstant [| 2 |]
+              make Opcode.OpClosure [| 2; 0 |]
               make Opcode.OpPop [| |]
           |] |> Array.map Instructions }
         
@@ -372,7 +372,7 @@ type CompilerTests() =
               |]
           |]
           ExpectedInstructions = [|
-              make Opcode.OpConstant [| 2 |]
+              make Opcode.OpClosure [| 2; 0 |]
               make Opcode.OpPop [| |]
           |] |> Array.map Instructions }
         
@@ -388,7 +388,7 @@ type CompilerTests() =
               |]
           |]
           ExpectedInstructions = [|
-              make Opcode.OpConstant [| 2 |]
+              make Opcode.OpClosure [| 2; 0 |]
               make Opcode.OpPop [| |]
           |] |> Array.map Instructions }
         
@@ -406,7 +406,7 @@ type CompilerTests() =
               |]
           |]
           ExpectedInstructions = [|
-              make Opcode.OpConstant [| 2 |]
+              make Opcode.OpClosure [| 2; 0 |]
               make Opcode.OpPop [| |]
           |] |> Array.map Instructions }
     |]
@@ -421,7 +421,7 @@ type CompilerTests() =
               |]
           |]
           ExpectedInstructions = [|
-              make Opcode.OpConstant [| 1 |]
+              make Opcode.OpClosure [| 1; 0 |]
               make Opcode.OpCall [| 0 |]
               make Opcode.OpPop [| |]
           |] |> Array.map Instructions }
@@ -437,7 +437,7 @@ type CompilerTests() =
               |]
           |]
           ExpectedInstructions = [|
-              make Opcode.OpConstant [| 1 |]
+              make Opcode.OpClosure [| 1; 0 |]
               make Opcode.OpSetGlobal [| 0 |]
               make Opcode.OpGetGlobal [| 0 |]
               make Opcode.OpCall [| 0 |]
@@ -460,7 +460,7 @@ type CompilerTests() =
           ExpectedInstructions = [|
               make Opcode.OpConstant [| 0 |]
               make Opcode.OpSetGlobal [| 0 |]
-              make Opcode.OpConstant [| 1 |]
+              make Opcode.OpClosure [| 1; 0 |]
               make Opcode.OpPop [| |]
           |] |> Array.map Instructions }
         
@@ -480,7 +480,7 @@ type CompilerTests() =
               |]
           |]
           ExpectedInstructions = [|
-              make Opcode.OpConstant [| 1 |]
+              make Opcode.OpClosure [| 1; 0 |]
               make Opcode.OpPop [| |]
           |] |> Array.map Instructions }
         
@@ -506,7 +506,7 @@ type CompilerTests() =
               |]
           |]
           ExpectedInstructions = [|
-              make Opcode.OpConstant [| 2 |]
+              make Opcode.OpClosure [| 2; 0 |]
               make Opcode.OpPop [| |]
           |] |> Array.map Instructions }
     |]
@@ -522,7 +522,7 @@ type CompilerTests() =
               24
           |]
           ExpectedInstructions = [|
-              make Opcode.OpConstant [| 0 |]
+              make Opcode.OpClosure [| 0; 0 |]
               make Opcode.OpSetGlobal [| 0 |]
               make Opcode.OpGetGlobal [| 0 |]
               make Opcode.OpConstant [| 1 |]
@@ -542,7 +542,7 @@ type CompilerTests() =
               26
           |]
           ExpectedInstructions = [|
-              make Opcode.OpConstant [| 0 |]
+              make Opcode.OpClosure [| 0; 0 |]
               make Opcode.OpSetGlobal [| 0 |]
               make Opcode.OpGetGlobal [| 0 |]
               make Opcode.OpConstant [| 1 |]
@@ -563,7 +563,7 @@ type CompilerTests() =
               24
           |]
           ExpectedInstructions = [|
-              make Opcode.OpConstant [| 0 |]
+              make Opcode.OpClosure [| 0; 0 |]
               make Opcode.OpSetGlobal [| 0 |]
               make Opcode.OpGetGlobal [| 0 |]
               make Opcode.OpConstant [| 1 |]
@@ -588,7 +588,7 @@ type CompilerTests() =
               26
           |]
           ExpectedInstructions = [|
-              make Opcode.OpConstant [| 0 |]
+              make Opcode.OpClosure [| 0; 0 |]
               make Opcode.OpSetGlobal [| 0 |]
               make Opcode.OpGetGlobal [| 0 |]
               make Opcode.OpConstant [| 1 |]
@@ -629,7 +629,7 @@ type CompilerTests() =
               |]
           |]
           ExpectedInstructions = [|
-              make Opcode.OpConstant [| 0 |]
+              make Opcode.OpClosure [| 0; 0 |]
               make Opcode.OpPop [| |]
           |] |> Array.map Instructions }
         
@@ -651,7 +651,7 @@ type CompilerTests() =
               |]
           |]
           ExpectedInstructions = [|
-              make Opcode.OpConstant [| 1 |]
+              make Opcode.OpClosure [| 1; 0 |]
               make Opcode.OpSetGlobal [| 0 |]
               make Opcode.OpGetGlobal [| 0 |]
               make Opcode.OpCall [| 0 |]

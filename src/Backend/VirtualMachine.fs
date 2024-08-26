@@ -54,7 +54,14 @@ module VM =
                 | obj -> Error $"Expected type of object to either be \"CompiledFunctionType\" or \"BuiltinFunction\", got \"{obj.Type()}\"."
             else
                 Error "Stack is empty."
-            
+                
+        let getCompiledFunction object =
+            match object with
+            | FunctionType functionType ->
+                match functionType with
+                | CompiledFunction compiledFunction -> Ok compiledFunction
+                | _ -> Error $"Expected 'CompiledFunction' object, got '{functionType.Type()}'."
+            | _ -> Error $"Expected 'CompiledFunction' object, got '{object.Type()}'."
                 
     module internal Stack =
         let push vm object =
@@ -273,22 +280,28 @@ module VM =
                 
                 return! 
                     match funcType with
-                    | CompiledFunction compiledFunction -> handleCompiledFunctionCall vm noArgs compiledFunction 
-                    | BuiltinFunction builtinFunction -> handleBuiltinFunctionCall vm i noArgs builtinFunction 
-                    | _ -> Error "Expected type of object to either be \"CompiledFunctionType\" or \"BuiltinFunction\"."
+                    | CompiledFunction compiledFunction -> 
+                        failwith "Fatal Error: Type 'CompiledFunction' is 'discontinued'."
+                        // handleCompiledFunctionCall vm noArgs compiledFunction 
+                    | BuiltinFunction builtinFunction -> 
+                        handleBuiltinFunctionCall vm i noArgs builtinFunction 
+                    | ClosureFunction closureFunction -> 
+                        handleClosureFunctionCall vm noArgs closureFunction 
+                    | _ -> 
+                        Error "Expected type of object to either be \"CompiledFunctionType\" or \"BuiltinFunction\"."
             }
 
-        and handleCompiledFunctionCall vm noArgs compiledFunction =
+        and handleClosureFunctionCall vm noArgs closureFunction =
             result {
-                do! assertCorrectNumberOfArguments compiledFunction.NumParameters noArgs
+                do! assertCorrectNumberOfArguments closureFunction.Fn.NumParameters noArgs
                 
                 // Creating new frame
                 let basePtr = vm.StackPointer - noArgs
-                let newFrame = Frame.createNewFrame compiledFunction basePtr
+                let newFrame = Frame.createNewFrame closureFunction basePtr
                 let newVm = FrameControl.pushFrame vm newFrame
                 
                 // Allocating space on stack for arguments and locals
-                let newVm = { newVm with StackPointer = newVm.StackPointer + compiledFunction.NumLocals }
+                let newVm = { newVm with StackPointer = newVm.StackPointer + closureFunction.Fn.NumLocals }
                 
                 return (newVm, -1)  // -1 to step back from ins pointer increment
             }
@@ -349,7 +362,8 @@ module VM =
         let mainFn: CompiledFunction = { InstructionBytes = byteCode.Instructions.GetBytes()
                                          NumLocals = 0
                                          NumParameters = 0 }
-        let mainFrame = Frame.createNewFrame mainFn 0
+        let mainClosureFn = { Fn = mainFn; FreeVariables = [| |] }
+        let mainFrame = Frame.createNewFrame mainClosureFn 0
         
         let frames = Array.zeroCreate<Frame> maxFrames
         frames[0] <- mainFrame
@@ -373,12 +387,11 @@ module VM =
         | _ -> None 
             
     let rec run (vm: VM) =
-        let bytes = vm |> FrameControl.currentFrame |> (_.Function) |> (_.InstructionBytes)
         runLoop vm
         
     and private runLoop vm : Result<VM, string> =
         let currentFrame = FrameControl.currentFrame vm
-        let bytes = currentFrame.Function.InstructionBytes
+        let bytes = Frame.getInstructions currentFrame
         let insPointer = currentFrame.InsPointer 
         
         if insPointer < bytes.Length then
@@ -416,6 +429,19 @@ module VM =
                 handleOpJumpWhenFalse vm insPointer bytes
                 
             // opcodes for functions
+            | Opcode.OpClosure ->
+                result {
+                    let i = insPointer
+                    let constIndex = bytes[i+1 .. i+2] |> readUInt16 |> int
+                    let _ = bytes[i+3] |> readUInt8
+                    
+                    let object = vm.Constants[constIndex]
+                    let! compiledFn = getCompiledFunction object
+                    let asClosureFn = { Fn = compiledFn; FreeVariables = [| |] }
+                    let asObject = asClosureFn |> Function.ClosureFunction |> FunctionType
+                    let! newVm = Stack.push vm asObject
+                    return (newVm, i + 3)
+                }
             | Opcode.OpCall ->
                 handleOpCall vm insPointer bytes
             | Opcode.OpReturnValue ->

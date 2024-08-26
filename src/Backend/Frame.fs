@@ -4,15 +4,15 @@ open Monkey.Frontend.Eval.Object
 
 
 type Frame =
-    { Function: CompiledFunction
+    { ClosureFn: ClosureFunction
       mutable InsPointer: int  // pointer for executing byte instructions 
       BasePointer: int  // pointer for temporarily storing a stack pointer value
       }
     
 module Frame =
-    let inline createNewFrame compiledFunction basePointerVal =
-        { Function = compiledFunction
+    let inline createNewFrame closureFunction basePointerVal =
+        { ClosureFn = closureFunction
           InsPointer = 0
           BasePointer = basePointerVal }
         
-    let inline getInstructions frame = frame.Function.InstructionBytes
+    let inline getInstructions frame = frame.ClosureFn.Fn.InstructionBytes

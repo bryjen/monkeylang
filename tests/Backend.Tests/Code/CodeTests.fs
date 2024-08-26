@@ -26,11 +26,14 @@ type OpcodeTests() =
     member private this.``B: Test cases`` = [
         (Opcode.OpConstant, [| 65534 |], [| byte Opcode.OpConstant; 255uy; 254uy |])
         (Opcode.OpAdd, [| |], [| byte Opcode.OpAdd |])
-        (Opcode.OpGetLocal, [| 255 |], [| byte Opcode.OpAdd; 255uy |])
+        (Opcode.OpGetLocal, [| 255 |], [| byte Opcode.OpGetLocal; 255uy |])
+        (Opcode.OpClosure, [| 65534; 255 |], [| byte Opcode.OpClosure; 255uy; 254uy; 255uy |])
     ]
             
     [<TestCase(0)>]
     [<TestCase(1)>]
+    [<TestCase(2)>]
+    [<TestCase(3)>]
     member this.``B: Test 'make'``(testCaseIndex: int) =
         let opcode, operands, expectedBytes = List.item testCaseIndex this.``B: Test cases``
         let expectedItemsStr = expectedBytes |> Array.map formatByteWithInt |> String.concat ", "
@@ -104,6 +107,19 @@ type OpcodeTests() =
 0001 OpGetLocal 1
 0003 OpConstant 2
 0006 OpConstant 65535""")
+        
+        ([|
+            make Opcode.OpAdd [| |]
+            make Opcode.OpGetLocal [| 1 |]
+            make Opcode.OpConstant [| 2 |]
+            make Opcode.OpConstant [| 65535 |]
+            make Opcode.OpClosure [| 65535; 255 |]
+        |],
+         """0000 OpAdd 
+0001 OpGetLocal 1
+0003 OpConstant 2
+0006 OpConstant 65535
+0009 OpClosure 65535 255""")
     |]
         
            

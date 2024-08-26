@@ -70,11 +70,6 @@ with
 
 
 
-///
-and CompiledFunction =
-    { InstructionBytes: byte array
-      NumLocals: int
-      NumParameters: int }
 
 
 
@@ -83,12 +78,14 @@ and Function =
     | UserFunction of UserFunction
     | CompiledFunction of CompiledFunction
     | BuiltinFunction of BuiltinFunction
+    | ClosureFunction of ClosureFunction
 with
     member this.Type() =
         match this with
         | UserFunction _ -> "USER_FUNCTION" 
         | CompiledFunction _ -> "COMPILED_FUNCTION"
         | BuiltinFunction _ -> "BUILTIN_FUNCTION"
+        | ClosureFunction _ -> "CLOSURE_FUNCTION"
     
     
     
@@ -106,12 +103,22 @@ with
         $"fn ({commaSeparatedParameters}) {{ {this.Body.ToString()} }}" 
 
 
+///
+and CompiledFunction =
+    { InstructionBytes: byte array
+      NumLocals: int
+      NumParameters: int }
+
+
+and ClosureFunction = 
+    { Fn: CompiledFunction
+      FreeVariables: Object array }
+
 
 ///
 and BuiltinFunction =
     { Fn: Object list -> Result<Object option, string>
-      NumParameters: int }
-
+      NumParameters: int } 
 
 and ErrorType = ErrorType of string
 with
