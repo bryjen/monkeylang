@@ -117,26 +117,15 @@ module Compiler =
                 
             let rec compileIdentifier (identifier: Identifier) =
                 match SymbolTable.resolve compiler.SymbolTable identifier.Value with
-                | Some symbol ->
+                | Some (_, symbol) ->
                     let varGetOpcode = match symbol.Scope with
                                        | LocalScope -> Opcode.OpGetLocal
                                        | GlobalScope -> Opcode.OpGetGlobal 
                                        | BuiltinScope -> Opcode.OpGetBuiltin 
+                                       | FreeScope -> failwith "todo" 
                     Ok (compiler, make varGetOpcode [| symbol.Index |])
                 | None ->
                     Error $"Undefined variable \"{identifier.Value}\""
-                    
-(*
-                    tryResolveAsBuiltin identifier
-                    
-            and tryResolveAsBuiltin identifier =
-                try
-                    let builtinIndex = getBuiltinIndexByName identifier.Value
-                    Ok (compiler, make Opcode.OpGetBuiltin [| builtinIndex |])
-                with
-                | :? KeyNotFoundException as _ ->
-                    Error $"Undefined variable \"{identifier.Value}\""  // identifier is not a defined variable or a builtin
-*)
                 
                 
             let rec compileFunctionLiteral (functionLiteral: FunctionLiteral) =

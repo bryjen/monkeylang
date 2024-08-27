@@ -106,7 +106,7 @@ type SymbolTableTests() =
         
         for KeyValue(name, expectedSymbol) in expected do
             match SymbolTable.resolve newGlobalST name with
-            | Some actualSymbol ->
+            | Some (_, actualSymbol) ->
                 let msg = $"\nExpected:\n{expectedSymbol}\nGot:\n{actualSymbol}"
                 TestContext.WriteLine(msg)
                 if actualSymbol = expectedSymbol
@@ -136,7 +136,7 @@ type SymbolTableTests() =
         
         for expectedSymbol in expected do
             match SymbolTable.resolve newLocalST expectedSymbol.Name with
-            | Some actualSymbol ->
+            | Some (_, actualSymbol) ->
                 let msg = $"\nExpected:\n{expectedSymbol}\nGot:\n{actualSymbol}"
                 TestContext.WriteLine(msg)
                 if actualSymbol = expectedSymbol
@@ -181,8 +181,10 @@ type SymbolTableTests() =
             [|
                 { Name = "a"; Scope = GlobalScope; Index = 0 }
                 { Name = "b"; Scope = GlobalScope; Index = 1 }
+                (*  // Are 'free' variables, check the tests below
                 { Name = "c"; Scope = LocalScope; Index = 0 }
                 { Name = "d"; Scope = LocalScope; Index = 1 }
+                *)
                 { Name = "e"; Scope = LocalScope; Index = 0 }
                 { Name = "f"; Scope = LocalScope; Index = 1 }
             |])
@@ -193,13 +195,87 @@ type SymbolTableTests() =
             currentTestCase <- currentTestCase + 1
             for expectedSymbol in expectedSymbols do
                 match SymbolTable.resolve symbolTable expectedSymbol.Name with
-                | Some actualSymbol ->
+                | Some (_, actualSymbol) ->
                     let msg = $"\n[Test Case #{currentTestCase}] Expected:\n{expectedSymbol}\nGot:\n{actualSymbol}"
                     TestContext.WriteLine(msg)
                     if actualSymbol = expectedSymbol
                     then ()
-                    else Assert.Fail("[Test Case #{currentTestCase}] Failed - Wrong symbols\n")
+                    else Assert.Fail($"[Test Case #{currentTestCase}] Failed - Wrong symbols, got {actualSymbol}\nexpected {expectedSymbol}\n")
                 | None ->
                     Assert.Fail($"[Test Case #{currentTestCase}] Failed\nExpected the symbol \"{expectedSymbol.Name}\", was not present.") 
        
         Assert.Pass("Passed\n")
+        
+        
+    [<Test>]
+    member this.``Test Resolve Free``() =
+        let globalST = SymbolTable.createNew ()
+        let globalST, _ = SymbolTable.define globalST "a"
+        let globalST, _ = SymbolTable.define globalST "b"
+        
+        let firstLocalST = SymbolTable.createNewEnclosed globalST 
+        let firstLocalST, _ = SymbolTable.define firstLocalST "c"
+        let firstLocalST, _ = SymbolTable.define firstLocalST "d"
+        
+        let secondLocalST = SymbolTable.createNewEnclosed firstLocalST 
+        let secondLocalST, _ = SymbolTable.define secondLocalST "e"
+        let secondLocalST, _ = SymbolTable.define secondLocalST "f"
+        
+        // Symbol table * expected symbols * expected free symbols
+        let expected = [|
+            (firstLocalST,    
+            [|
+                { Name = "a"; Scope = GlobalScope; Index = 0 }
+                { Name = "b"; Scope = GlobalScope; Index = 1 }
+                { Name = "c"; Scope = LocalScope; Index = 0 }
+                { Name = "d"; Scope = LocalScope; Index = 1 }
+            |],
+            [| |]
+            )
+            
+            (secondLocalST,    
+            [|
+                { Name = "a"; Scope = GlobalScope; Index = 0 }
+                { Name = "b"; Scope = GlobalScope; Index = 1 }
+                { Name = "c"; Scope = FreeScope; Index = 0 }
+                { Name = "d"; Scope = FreeScope; Index = 1 }
+                { Name = "e"; Scope = LocalScope; Index = 0 }
+                { Name = "f"; Scope = LocalScope; Index = 1 }
+            |],
+            [|
+                { Name = "c"; Scope = LocalScope; Index = 0 }
+                { Name = "d"; Scope = LocalScope; Index = 1 }
+            |]
+            )
+        |]
+        
+        let mutable currentTestCase = 0
+        for symbolTable, expectedSymbols, expectedFreeSymbols in expected do
+            currentTestCase <- currentTestCase + 1
+            
+            let mutable updatedSymbolTable = symbolTable
+            for expectedSymbol in expectedSymbols do
+                match SymbolTable.resolve updatedSymbolTable expectedSymbol.Name with
+                | Some (updatedST, actualSymbol) ->
+                    updatedSymbolTable <- updatedST
+                    
+                    let msg = $"\n[Test Case #{currentTestCase}] Expected:\n{expectedSymbol}\nGot:\n{actualSymbol}"
+                    TestContext.WriteLine(msg)
+                    if actualSymbol = expectedSymbol
+                    then ()
+                    else Assert.Fail($"[Test Case #{currentTestCase}] Failed - Wrong symbols, got {actualSymbol}\nexpected {expectedSymbol}\n")
+                | None ->
+                    Assert.Fail($"[Test Case #{currentTestCase}] Failed\nExpected the symbol \"{expectedSymbol.Name}\", was not present.")
+                    
+            for expectedFreeSymbol in expectedFreeSymbols do
+                match List.tryFind (fun symbol -> symbol.Name = expectedFreeSymbol.Name) updatedSymbolTable.FreeSymbols with
+                | None -> Assert.Fail($"Could not find the free symbol for '{expectedFreeSymbol.Name}'")
+                | Some actualFreeSymbol ->
+                    if actualFreeSymbol = expectedFreeSymbol
+                    then ()
+                    else Assert.Fail($"[Test Case #{currentTestCase}] Failed\nExpected:\n\"{expectedFreeSymbol}\"\nGot:\n{actualFreeSymbol}")
+                
+            ()
+       
+        Assert.Pass("Passed\n")
+        
