@@ -1,16 +1,16 @@
-module Monkey.Backend.VirtualMachine
+module Monkey.Backend.VM
 
 
 open System
 open FsToolkit.ErrorHandling
 
 open Microsoft.FSharp.Core
-open Monkey.Backend.Frame
 open Monkey.Frontend.Eval
 open Monkey.Frontend.Eval.Object
 
+open Monkey.Backend
 open Monkey.Backend.Code
-open Monkey.Backend.Helpers
+open Monkey.Backend.Frame
 open Monkey.Backend.Compiler
 open Monkey.Backend.Operators
 
@@ -25,6 +25,11 @@ let private nullObj = Object.NullType
 let private getBoolObj boolValue = match boolValue with | true -> trueObj | false -> falseObj
 
 
+/// Wrapper type for 'Object' that allows for null values. Null values for performance considerations.
+[<AllowNullLiteral>]
+type ObjectWrapper(object: Object) =
+    member val Value = object with get, set
+    
 
 type VM =
     { Constants: Object array

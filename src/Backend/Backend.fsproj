@@ -8,12 +8,12 @@
     <ItemGroup>
         <Compile Include="AssemblyInfo.fs" />
         <Compile Include="Operators.fs" />
-        <Compile Include="Helpers.fs" />
         <Compile Include="Code.fs" />
         <Compile Include="SymbolTable.fs" />
         <Compile Include="Compiler.fs" />
         <Compile Include="Frame.fs" />
-        <Compile Include="VirtualMachine.fs" />
+        <Compile Include="VM.fs" />
+        <Compile Include="Helpers.fs" />
     </ItemGroup>
 
     <ItemGroup>

@@ -26,7 +26,7 @@
       <Compile Include="Compiler\Helpers.fs" />
       <Compile Include="Compiler\CompilerTests.fs" />
       <Compile Include="VirtualMachine\Helpers.fs" />
-      <Compile Include="VirtualMachine\VirtualMachineTests.fs" />
+      <Compile Include="VirtualMachine\VmTests.fs" />
     </ItemGroup>
 
     <ItemGroup>

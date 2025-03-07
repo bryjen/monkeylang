@@ -10,15 +10,6 @@ open Monkey.Frontend.Eval.Object
 [<RequireQualifiedAccess>]
 module VMHelpers =
     
-    [<AutoOpen>]
-    module Helpers =
-        let hashObjectCast (cast: Object -> Result<'a, string>) (hashableObject: HashableObject) =
-            match hashableObject with
-            | HashableObject.IntegerType integerType -> Object.IntegerType integerType 
-            | HashableObject.BooleanType booleanType -> Object.BooleanType booleanType
-            | HashableObject.StringType stringType -> Object.StringType stringType
-            |> cast
-        
     let assertProgramHasNoErrors (program: Program) =
         if program.Errors.Length = 0 then
             Ok ()
@@ -48,7 +39,7 @@ module VMHelpers =
                 
         helper 0
         
-    let private castMapKeys (cast: Object -> Result<'a, string>) (map: Map<HashableObject, 'b>) =
+    let rec private castMapKeys (cast: Object -> Result<'a, string>) (map: Map<HashableObject, 'b>) =
         let updatedMap = map
                          |> Map.toSeq
                          |> Seq.map (fun (key, value) -> (hashObjectCast cast key, value))
@@ -64,6 +55,13 @@ module VMHelpers =
             |> Ok
         | Some error ->
             error |> Result.map (fun _ -> Map.empty)
+            
+    and private hashObjectCast (cast: Object -> Result<'a, string>) (hashableObject: HashableObject) =
+        match hashableObject with
+        | HashableObject.IntegerType integerType -> Object.IntegerType integerType 
+        | HashableObject.BooleanType booleanType -> Object.BooleanType booleanType
+        | HashableObject.StringType stringType -> Object.StringType stringType
+        |> cast
         
     let private castMapValues (cast: Object -> Result<'a, string>) (map: Map<'b, Object>) =
         let updatedMap = map |> Map.map (fun _ -> cast)
@@ -84,9 +82,6 @@ module VMHelpers =
         if Array.length expectedArray = Array.length actualArray && Array.forall2 (=) expectedArray actualArray
         then Ok ()
         else Error $"'actualArray' has a wrong value, expected \"{expectedArray}\", got \"{actualArray}\""
-        
-        
-        
         
     let rec testExpectedObject (expected: obj) (actual: Object) =
         match expected with

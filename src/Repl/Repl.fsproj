@@ -10,6 +10,7 @@
     </ItemGroup>
 
     <ItemGroup>
+      <ProjectReference Include="..\Backend\Backend.fsproj" />
       <ProjectReference Include="..\Frontend\Frontend.fsproj" />
     </ItemGroup>
 
