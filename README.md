@@ -1,13 +1,12 @@
 <div align="center">
     <p align="center">
-        <h1 align="center">MonkeyInterpreter</h1>
-        <img src="https://cloud.githubusercontent.com/assets/1013641/22617482/9c60c27c-eb09-11e6-9dfa-b04c7fe498ea.png" alt="">
-		<br>
-		<br>
-        An interpreter for the Monkey programming language made in F#
-        <br>
-        <b>WIP</b>
-        <br>
+        <h1 align="center"><b>MonkeyLang</b></h1>
+        <br/>
+	<img src="https://github.com/user-attachments/assets/c3c25f7d-e5d4-4f26-b939-0b980157e352"/>
+        <br/>
+	An interpreter for the Monkey programming language made in F#.
+	<br/>
+	<b>Note that this project is still under active developement.</b>
     </p>
 </div>
 
