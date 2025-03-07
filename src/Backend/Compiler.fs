@@ -1,5 +1,6 @@
 module Monkey.Backend.Compiler
 
+open System
 open System.Collections.Generic
 open FsToolkit.ErrorHandling
 
@@ -22,6 +23,7 @@ type Compiler =
       
       Scopes: CompilationScope list }
     
+[<CLIMutable>]
 type Bytecode =
     { Instructions: Instructions
       Constants: Object array }

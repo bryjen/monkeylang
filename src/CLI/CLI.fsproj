@@ -1,0 +1,30 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net8.0</TargetFramework>
+        <AssemblyName>monkey</AssemblyName>  <!-- changes the name of the projects executable -->
+    </PropertyGroup>
+
+    <ItemGroup>
+        <Content Include="README.md" />
+        <Compile Include="Helpers.fs" />
+        <Compile Include="Arguments.fs" />
+        <Compile Include="Build.fs" />
+        <Compile Include="Run.fs" />
+        <Compile Include="Program.fs"/>
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Argu" Version="6.2.5" />
+      <PackageReference Include="CommandLineParser" Version="2.9.1" />
+      <PackageReference Include="FSharp.SystemTextJson" Version="1.3.13" />
+      <PackageReference Include="FsToolkit.ErrorHandling" Version="4.15.2" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\Backend\Backend.fsproj" />
+      <ProjectReference Include="..\Frontend\Frontend.fsproj" />
+    </ItemGroup>
+
+</Project>
