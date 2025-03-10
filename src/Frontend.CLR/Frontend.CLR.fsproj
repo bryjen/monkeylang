@@ -11,12 +11,14 @@
         <Compile Include="Helpers\Numbers.fs" />
         <Compile Include="Token.fs" />
         <Compile Include="Lexer.fs" />
+        <Compile Include="Parsers\ParseErrors.fs" />
         <Compile Include="Parsers\ModifiedRecursiveDescent.fs" />
         <Compile Include="Ast.fs" />
         <Compile Include="AssemblyInfo.fs" />
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.13.0" />
+        <PackageReference Include="FsToolkit.ErrorHandling" Version="4.15.2" />
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.13.0" />
     </ItemGroup>
 </Project>

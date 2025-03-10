@@ -3,6 +3,8 @@
 open Microsoft.CodeAnalysis
 open Microsoft.CodeAnalysis.CSharp
 open Microsoft.CodeAnalysis.CSharp.Syntax
+open Monkey.Frontend.CLR.Lexer
+open Monkey.Frontend.CLR.Parsers
 open Monkey.Frontend.CLR.Tests.Parser.Helpers
 open NUnit.Framework
 
@@ -80,17 +82,23 @@ type ExpressionParsingTests() =
 [<ParserComponent(ParserComponentType.Expressions)>]
 type NumericExpressionParsingTests() =
     // TODO: See if the declarations of the token are required (ex. the parentheses token in expression)
-    let testCases: (string * SyntaxNode) list = [
-        ("5", SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralToken, SyntaxFactory.Literal(5)))
+    member this.TestCases : (string * SyntaxNode) list = [
+        (
+            "5;",
+            SyntaxFactory.ExpressionStatement(
+                SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(5))
+            )
+        )
         
+        (*
         ("-5", SyntaxFactory.PrefixUnaryExpression(
                    SyntaxKind.UnaryMinusExpression,
                    SyntaxFactory.Token(SyntaxKind.MinusToken),
-                   SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralToken, SyntaxFactory.Literal(5))))
+                   SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(5))))
         
         ("(5)", SyntaxFactory.ParenthesizedExpression(
                    SyntaxFactory.Token(SyntaxKind.OpenParenToken),
-                   SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralToken, SyntaxFactory.Literal(5)),
+                   SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(5)),
                    SyntaxFactory.Token(SyntaxKind.OpenParenToken)))
         
         ("(-5)", SyntaxFactory.ParenthesizedExpression(
@@ -98,13 +106,30 @@ type NumericExpressionParsingTests() =
                    SyntaxFactory.PrefixUnaryExpression(
                        SyntaxKind.UnaryMinusExpression,
                        SyntaxFactory.Token(SyntaxKind.MinusToken),
-                       SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralToken, SyntaxFactory.Literal(5))),
+                       SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(5))),
                    SyntaxFactory.Token(SyntaxKind.OpenParenToken)))
+        *)
     ]
     
     [<Test>]
     member this.``something``() =
-        Assert.Pass()
+        let input, expectedSyntaxTree = List.item 0 this.TestCases
+        // let input = "5;"
+        let tokens = Lexer.parseIntoTokens input |> List.toArray
+        
+        match ModifiedRecursiveDescent.parseTokens tokens with
+        | Ok actualSyntaxTree ->
+            let asSyntaxNode = actualSyntaxTree[0] :> SyntaxNode
+            let isEquivalent = asSyntaxNode.IsEquivalentTo(expectedSyntaxTree)
+            if isEquivalent then
+                Assert.Pass()
+            else 
+                Assert.Fail()
+        | Error parseErrors ->
+            for parseError in parseErrors do
+                printfn $"{parseError}"
+            Assert.Fail()
+        
         
         
         
