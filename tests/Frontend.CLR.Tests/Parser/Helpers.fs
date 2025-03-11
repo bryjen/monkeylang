@@ -1,7 +1,10 @@
 ﻿module Monkey.Frontend.CLR.Tests.Parser.Helpers
 
 open System
+open System.ComponentModel
+open Microsoft.CodeAnalysis
 open Microsoft.CodeAnalysis.CSharp
+open Microsoft.CodeAnalysis.CSharp.Syntax
 
 type ParserComponentType =
     | Expressions = 1
@@ -25,3 +28,57 @@ type ParserComponentAttribute(parserComponent: ParserComponentType) =
 type ParserComponentDependsOnAttribute(dependsOn: ParserComponentType) =
     inherit Attribute()
     member _.DependsOn = dependsOn
+    
+
+type SyntaxNode with
+    member this.Print(?indent: int) =
+        let indent = defaultArg indent 0
+        printfn "%s%s : %s" (String.replicate indent " ") (this.Kind().ToString()) (this.ToString().Trim())
+        for child in this.ChildNodesAndTokens() do
+            if child.IsNode then
+                child.AsNode().Print(indent = indent + 2)
+            else
+                printfn "%sToken: %s - %s" (String.replicate (indent + 2) " ") (child.Kind().ToString()) (child.ToString())
+
+
+let compareSyntaxNodes (monkeyInput: string) (expectedSyntaxNodes: SyntaxNode array) (actualSyntaxNodes: SyntaxNode array) : bool =
+    let mutable pass = true
+    for expected, actual in Array.zip expectedSyntaxNodes actualSyntaxNodes do
+        if (not (expected.IsEquivalentTo(actual)) || not (actual.IsEquivalentTo(expected))) then
+            pass <- false
+        
+    printfn "Input/Output"
+    printfn "---------------------------------------------------------"
+    
+    printfn "```monkey"
+    printfn $"{monkeyInput}"
+    printfn "```"
+    printfn ""
+    
+    printfn "```csharp (expected)"
+    for expected in expectedSyntaxNodes do
+        printfn $"{expected}"
+    printfn "```"
+    printfn ""
+    
+    printfn "```csharp (actual)"
+    for actual in actualSyntaxNodes do
+        printfn $"{actual}"
+    printfn "```"
+    printfn "---------------------------------------------------------"
+    
+    printfn "\n\nSyntax Tree Visualization"
+    printfn "---------------------------------------------------------"
+    printfn "```csharp (expected)"
+    for expected in expectedSyntaxNodes do
+        printfn $"{expected.Print()}"
+    printfn "```"
+    printfn ""
+    
+    printfn "```csharp (actual)"
+    for actual in actualSyntaxNodes do
+        printfn $"{actual.Print()}"
+    printfn "```"
+    printfn ""
+    
+    pass 

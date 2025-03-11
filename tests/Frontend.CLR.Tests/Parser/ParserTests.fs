@@ -3,6 +3,7 @@
 open Microsoft.CodeAnalysis
 open Microsoft.CodeAnalysis.CSharp
 open Microsoft.CodeAnalysis.CSharp.Syntax
+open type Microsoft.CodeAnalysis.CSharp.SyntaxFactory
 open Monkey.Frontend.CLR.Lexer
 open Monkey.Frontend.CLR.Parsers
 open Monkey.Frontend.CLR.Tests.Parser.Helpers
@@ -63,25 +64,8 @@ map(numbers, fibonacci);
 
 
 [<TestFixture>]
-type Runner() =
-    [<Test>]
-    member this.Runner() =
-        Assert.Pass()
-        
-        
-        
-        
-[<TestFixture>]
-type ExpressionParsingTests() =
-    [<Test>]
-    member this.Runner() =
-        Assert.Pass()
-        
-        
-[<TestFixture>]
 [<ParserComponent(ParserComponentType.Expressions)>]
 type NumericExpressionParsingTests() =
-    // TODO: See if the declarations of the token are required (ex. the parentheses token in expression)
     member this.TestCases : (string * SyntaxNode) list = [
         (
             "5;",
@@ -90,129 +74,404 @@ type NumericExpressionParsingTests() =
             )
         )
         
-        (*
-        ("-5", SyntaxFactory.PrefixUnaryExpression(
-                   SyntaxKind.UnaryMinusExpression,
-                   SyntaxFactory.Token(SyntaxKind.MinusToken),
-                   SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(5))))
+        (
+            "-5;",
+            SyntaxFactory.ExpressionStatement(
+                SyntaxFactory.PrefixUnaryExpression(
+                    SyntaxKind.UnaryMinusExpression,
+                    SyntaxFactory.Token(SyntaxKind.MinusToken),
+                    SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(5))))
+        )
         
-        ("(5)", SyntaxFactory.ParenthesizedExpression(
-                   SyntaxFactory.Token(SyntaxKind.OpenParenToken),
-                   SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(5)),
-                   SyntaxFactory.Token(SyntaxKind.OpenParenToken)))
+        (
+            "(5);",
+            SyntaxFactory.ExpressionStatement(
+                SyntaxFactory.ParenthesizedExpression(
+                    SyntaxFactory.Token(SyntaxKind.OpenParenToken),
+                    SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression,  SyntaxFactory.Literal(5)),
+                    SyntaxFactory.Token(SyntaxKind.CloseParenToken)))
+        )
         
-        ("(-5)", SyntaxFactory.ParenthesizedExpression(
-                   SyntaxFactory.Token(SyntaxKind.OpenParenToken),
-                   SyntaxFactory.PrefixUnaryExpression(
-                       SyntaxKind.UnaryMinusExpression,
-                       SyntaxFactory.Token(SyntaxKind.MinusToken),
-                       SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(5))),
-                   SyntaxFactory.Token(SyntaxKind.OpenParenToken)))
-        *)
+        (
+            "(-5);",
+            SyntaxFactory.ExpressionStatement(
+                SyntaxFactory.ParenthesizedExpression(
+                    SyntaxFactory.Token(SyntaxKind.OpenParenToken),
+                    SyntaxFactory.PrefixUnaryExpression(
+                        SyntaxKind.UnaryMinusExpression,
+                        SyntaxFactory.Token(SyntaxKind.MinusToken),
+                        SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(5))),
+                    SyntaxFactory.Token(SyntaxKind.CloseParenToken))))
+            
     ]
     
-    [<Test>]
-    member this.``something``() =
-        let input, expectedSyntaxTree = List.item 0 this.TestCases
-        // let input = "5;"
+    [<TestCase(0)>]
+    [<TestCase(1)>]
+    [<TestCase(2)>]
+    [<TestCase(3)>]
+    member this.``A: Test Basic Numeric Expression Parsing``(testCaseIndex: int) =
+        let input, expectedSyntaxTree = List.item testCaseIndex this.TestCases
         let tokens = Lexer.parseIntoTokens input |> List.toArray
         
-        match ModifiedRecursiveDescent.parseTokens tokens with
-        | Ok actualSyntaxTree ->
-            let asSyntaxNode = actualSyntaxTree[0] :> SyntaxNode
-            let isEquivalent = asSyntaxNode.IsEquivalentTo(expectedSyntaxTree)
-            if isEquivalent then
-                Assert.Pass()
-            else 
-                Assert.Fail()
-        | Error parseErrors ->
+        let syntaxNodes, parseErrors = ModifiedRecursiveDescent.parseTokens tokens
+        match List.length parseErrors with
+        | 0 ->
+            let actualSyntaxNodes = List.toArray syntaxNodes |> Array.map (fun x -> x :> SyntaxNode)
+            let expectedSyntaxNodes = [| expectedSyntaxTree |]
+            match compareSyntaxNodes input expectedSyntaxNodes actualSyntaxNodes with
+            | true -> Assert.Pass()
+            | false -> Assert.Fail()
+        | _ ->
+            let mutable count = 1
             for parseError in parseErrors do
-                printfn $"{parseError}"
+                printfn $"{count}. {parseError}"
+                count <- count + 1
             Assert.Fail()
-        
-        
         
         
 [<TestFixture>]
 [<ParserComponent(ParserComponentType.Expressions)>]
 type BooleanExpressionParsingTests() =
-    // TODO: See if the declarations of the token are required (ex. the parentheses token in expression)
-    let testCases: (string * SyntaxNode) list = [
-        ("true", SyntaxFactory.LiteralExpression(SyntaxKind.TrueKeyword))
-        ("false", SyntaxFactory.LiteralExpression(SyntaxKind.FalseKeyword))
-        ("!true", SyntaxFactory.PrefixUnaryExpression(
-                   SyntaxKind.LogicalNotExpression,
-                   SyntaxFactory.Token(SyntaxKind.ExclamationToken),
-                   SyntaxFactory.LiteralExpression(SyntaxKind.TrueKeyword)))
-        ("!false", SyntaxFactory.PrefixUnaryExpression(
-                   SyntaxKind.LogicalNotExpression,
-                   SyntaxFactory.Token(SyntaxKind.ExclamationToken),
-                   SyntaxFactory.LiteralExpression(SyntaxKind.FalseKeyword)))
+    member this.TestCases : (string * SyntaxNode) list = [
+        (
+            "true;",
+            SyntaxFactory.ExpressionStatement(SyntaxFactory.LiteralExpression(SyntaxKind.TrueLiteralExpression))
+        )
+        (
+            "false;",
+            SyntaxFactory.ExpressionStatement(SyntaxFactory.LiteralExpression(SyntaxKind.FalseLiteralExpression))
+        )
+        (
+            "!true;",
+            SyntaxFactory.ExpressionStatement(
+                SyntaxFactory.PrefixUnaryExpression(
+                    SyntaxKind.LogicalNotExpression,
+                    SyntaxFactory.Token(SyntaxKind.ExclamationToken),
+                    SyntaxFactory.LiteralExpression(SyntaxKind.TrueLiteralExpression)))
+        )
+        (
+            "!false;",
+            SyntaxFactory.ExpressionStatement(
+                SyntaxFactory.PrefixUnaryExpression(
+                    SyntaxKind.LogicalNotExpression,
+                    SyntaxFactory.Token(SyntaxKind.ExclamationToken),
+                    SyntaxFactory.LiteralExpression(SyntaxKind.FalseLiteralExpression)))
+        )
     ]
     
-    [<Test>]
-    member this.``something``() =
-        Assert.Pass()
+    [<TestCase(0)>]
+    [<TestCase(1)>]
+    [<TestCase(2)>]
+    [<TestCase(3)>]
+    member this.``B. Test Basic Boolean Expression Parsing``(testCaseIndex: int) =
+        let input, expectedSyntaxTree = List.item testCaseIndex this.TestCases
+        let tokens = Lexer.parseIntoTokens input |> List.toArray
         
+        let syntaxNodes, parseErrors = ModifiedRecursiveDescent.parseTokens tokens
+        match List.length parseErrors with
+        | 0 ->
+            let actualSyntaxNodes = List.toArray syntaxNodes |> Array.map (fun x -> x :> SyntaxNode)
+            let expectedSyntaxNodes = [| expectedSyntaxTree |]
+            match compareSyntaxNodes input expectedSyntaxNodes actualSyntaxNodes with
+            | true -> Assert.Pass()
+            | false -> Assert.Fail()
+        | _ ->
+            let mutable count = 1
+            for parseError in parseErrors do
+                printfn $"{count}. {parseError}"
+                count <- count + 1
+            Assert.Fail()
         
         
 [<TestFixture>]
 [<ParserComponent(ParserComponentType.Expressions)>]
-type BasicNumericExpressionParsingTests() =
-    // TODO: See if the declarations of the token are required (ex. the parentheses token in expression)
-    let testCases: (string * SyntaxNode) list = [
-        ("5 + 5", SyntaxFactory.BinaryExpression(
-                       SyntaxKind.AddExpression,
-                       SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralToken, SyntaxFactory.Literal(5)),
-                       SyntaxFactory.Token(SyntaxKind.PlusToken),
-                       SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralToken, SyntaxFactory.Literal(5))))
-        ("5 - 5", SyntaxFactory.BinaryExpression(
-                       SyntaxKind.SubtractExpression,
-                       SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralToken, SyntaxFactory.Literal(5)),
-                       SyntaxFactory.Token(SyntaxKind.PlusToken),
-                       SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralToken, SyntaxFactory.Literal(5))))
-        ("5 * 5", SyntaxFactory.BinaryExpression(
-                       SyntaxKind.MultiplyExpression,
-                       SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralToken, SyntaxFactory.Literal(5)),
-                       SyntaxFactory.Token(SyntaxKind.AsteriskToken),
-                       SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralToken, SyntaxFactory.Literal(5))))
-        ("5 / 5", SyntaxFactory.BinaryExpression(
-                       SyntaxKind.DivideExpression,
-                       SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralToken, SyntaxFactory.Literal(5)),
-                       SyntaxFactory.Token(SyntaxKind.SlashToken),
-                       SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralToken, SyntaxFactory.Literal(5))))
-        ("5 > 5", SyntaxFactory.BinaryExpression(
-                       SyntaxKind.GreaterThanExpression,
-                       SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralToken, SyntaxFactory.Literal(5)),
-                       SyntaxFactory.Token(SyntaxKind.GreaterThanToken),
-                       SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralToken, SyntaxFactory.Literal(5))))
-        ("5 < 5", SyntaxFactory.BinaryExpression(
-                       SyntaxKind.LessThanExpression,
-                       SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralToken, SyntaxFactory.Literal(5)),
-                       SyntaxFactory.Token(SyntaxKind.LessThanToken),
-                       SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralToken, SyntaxFactory.Literal(5))))
-        ("5 == 5", SyntaxFactory.BinaryExpression(
-                       SyntaxKind.EqualsExpression,
-                       SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralToken, SyntaxFactory.Literal(5)),
-                       SyntaxFactory.Token(SyntaxKind.EqualsEqualsToken),
-                       SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralToken, SyntaxFactory.Literal(5))))
-        ("5 != 5", SyntaxFactory.BinaryExpression(
-                       SyntaxKind.EqualsExpression,
-                       SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralToken, SyntaxFactory.Literal(5)),
-                       SyntaxFactory.Token(SyntaxKind.NotEqualsExpression),
-                       SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralToken, SyntaxFactory.Literal(5))))
+type BasicInfixExpressionParsingTests() =
+    member this.TestCases : (string * SyntaxNode) list = [
+        (
+            "5 + 5;",
+            SyntaxFactory.ExpressionStatement(
+                SyntaxFactory.BinaryExpression(
+                    SyntaxKind.AddExpression,
+                    SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(5)),
+                    SyntaxFactory.Token(SyntaxKind.PlusToken),
+                    SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(5))))
+        )
+        (
+            "5 - 5;",
+            SyntaxFactory.ExpressionStatement(
+                SyntaxFactory.BinaryExpression(
+                    SyntaxKind.SubtractExpression,
+                    SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(5)),
+                    SyntaxFactory.Token(SyntaxKind.MinusToken),
+                    SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(5))))
+        )
+        (
+            "5 * 5;",
+            SyntaxFactory.ExpressionStatement(
+                SyntaxFactory.BinaryExpression(
+                    SyntaxKind.MultiplyExpression,
+                    SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(5)),
+                    SyntaxFactory.Token(SyntaxKind.AsteriskToken),
+                    SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(5))))
+        )
+        (
+            "5 / 5;",
+            SyntaxFactory.ExpressionStatement(
+                SyntaxFactory.BinaryExpression(
+                    SyntaxKind.DivideExpression,
+                    SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(5)),
+                    SyntaxFactory.Token(SyntaxKind.SlashToken),
+                    SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(5))))
+        )
+        (
+            "5 > 5;",
+            SyntaxFactory.ExpressionStatement(
+                SyntaxFactory.BinaryExpression(
+                    SyntaxKind.GreaterThanExpression,
+                    SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(5)),
+                    SyntaxFactory.Token(SyntaxKind.GreaterThanToken),
+                    SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(5))))
+        )
+        (
+            "5 < 5;",
+            SyntaxFactory.ExpressionStatement(
+                SyntaxFactory.BinaryExpression(
+                    SyntaxKind.LessThanExpression,
+                    SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(5)),
+                    SyntaxFactory.Token(SyntaxKind.LessThanToken),
+                    SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(5))))
+        )
+        (
+            "5 == 5;",
+            SyntaxFactory.ExpressionStatement(
+                SyntaxFactory.BinaryExpression(
+                    SyntaxKind.EqualsExpression,
+                    SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(5)),
+                    SyntaxFactory.Token(SyntaxKind.EqualsEqualsToken),
+                    SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(5))))
+        )
+        (
+            "5 != 5;",
+            SyntaxFactory.ExpressionStatement(
+                SyntaxFactory.BinaryExpression(
+                    SyntaxKind.NotEqualsExpression,
+                    SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(5)),
+                    SyntaxFactory.Token(SyntaxKind.ExclamationEqualsToken),
+                    SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(5))))
+        )
+        (
+            "3 + 4 * 5 == 3 * 1 + 4 * 5;",
+            SyntaxFactory.ExpressionStatement(
+                SyntaxFactory.BinaryExpression(
+                    SyntaxKind.EqualsExpression,
+                    SyntaxFactory.BinaryExpression(
+                        SyntaxKind.AddExpression,
+                        SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(3)),
+                        SyntaxFactory.Token(SyntaxKind.PlusToken),
+                        SyntaxFactory.BinaryExpression(
+                            SyntaxKind.MultiplyExpression,
+                            SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(4)),
+                            SyntaxFactory.Token(SyntaxKind.AsteriskToken),
+                            SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(5)))),
+                    SyntaxFactory.Token(SyntaxKind.EqualsEqualsToken),
+                    SyntaxFactory.BinaryExpression(
+                        SyntaxKind.AddExpression,
+                        SyntaxFactory.BinaryExpression(
+                            SyntaxKind.MultiplyExpression,
+                            SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(3)),
+                            SyntaxFactory.Token(SyntaxKind.AsteriskToken),
+                            SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(1))),
+                        SyntaxFactory.Token(SyntaxKind.PlusToken),
+                        SyntaxFactory.BinaryExpression(
+                            SyntaxKind.MultiplyExpression,
+                            SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(4)),
+                            SyntaxFactory.Token(SyntaxKind.AsteriskToken),
+                            SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(5)))))
+                )
+        )
     ]
     
-    [<Test>]
-    member this.``something``() =
-        Assert.Pass()
+    
+    [<TestCase(0)>]
+    [<TestCase(1)>]
+    [<TestCase(2)>]
+    [<TestCase(3)>]
+    [<TestCase(4)>]
+    [<TestCase(5)>]
+    [<TestCase(6)>]
+    [<TestCase(7)>]
+    [<TestCase(8)>]  // more complicated starts from here
+    member this.``C: Test Basic Infix Expression Parsing``(testCaseIndex: int) =
+        let input, expectedSyntaxTree = List.item testCaseIndex this.TestCases
+        let tokens = Lexer.parseIntoTokens input |> List.toArray
         
+        let syntaxNodes, parseErrors = ModifiedRecursiveDescent.parseTokens tokens
+        match List.length parseErrors with
+        | 0 ->
+            let actualSyntaxNodes = List.toArray syntaxNodes |> Array.map (fun x -> x :> SyntaxNode)
+            let expectedSyntaxNodes = [| expectedSyntaxTree |]
+            match compareSyntaxNodes input expectedSyntaxNodes actualSyntaxNodes with
+            | true -> Assert.Pass()
+            | false -> Assert.Fail()
+        | _ ->
+            let mutable count = 1
+            for parseError in parseErrors do
+                printfn $"{count}. {parseError}"
+                count <- count + 1
+            Assert.Fail()
         
         
 [<TestFixture>]
 [<ParserComponent(ParserComponentType.Statements)>]
 [<ParserComponentDependsOn(ParserComponentType.Expressions)>]
 type BasicVariableAssignmentParsingTests() =
-    [<Test>]
-    member this.``something``() =
-        Assert.Pass()
+    // TODO: assumes proper identifier expression parsing, which isn't tested for - as of right now.
+    member this.TestCases : (string * SyntaxNode) list = [
+        (
+            "let a = 5;",
+            SyntaxFactory.LocalDeclarationStatement(
+                SyntaxFactory.VariableDeclaration(
+                    SyntaxFactory.IdentifierName("var"),
+                    SyntaxFactory.SeparatedList(
+                        [|
+                        SyntaxFactory.VariableDeclarator(SyntaxFactory.Identifier("a"))
+                            .WithInitializer(
+                                SyntaxFactory.EqualsValueClause(
+                                    SyntaxFactory.LiteralExpression(
+                                        SyntaxKind.NumericLiteralExpression,
+                                        SyntaxFactory.Literal(5))
+                                    ))
+                        |]))
+                )
+        )
+        (
+            "let foobar = 3 + 4 * 5 == 3 * 1 + 4 * 5;",
+            SyntaxFactory.LocalDeclarationStatement(
+                SyntaxFactory.VariableDeclaration(
+                    SyntaxFactory.IdentifierName("var"),
+                    SyntaxFactory.SeparatedList(
+                        [|
+                        SyntaxFactory.VariableDeclarator(SyntaxFactory.Identifier("foobar"))
+                            .WithInitializer(
+                                SyntaxFactory.EqualsValueClause(
+                                    SyntaxFactory.BinaryExpression(
+                                        SyntaxKind.EqualsExpression,
+                                        SyntaxFactory.BinaryExpression(
+                                            SyntaxKind.AddExpression,
+                                            SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(3)),
+                                            SyntaxFactory.Token(SyntaxKind.PlusToken),
+                                            SyntaxFactory.BinaryExpression(
+                                                SyntaxKind.MultiplyExpression,
+                                                SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(4)),
+                                                SyntaxFactory.Token(SyntaxKind.AsteriskToken),
+                                                SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(5)))),
+                                        SyntaxFactory.Token(SyntaxKind.EqualsEqualsToken),
+                                        SyntaxFactory.BinaryExpression(
+                                            SyntaxKind.AddExpression,
+                                            SyntaxFactory.BinaryExpression(
+                                                SyntaxKind.MultiplyExpression,
+                                                SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(3)),
+                                                SyntaxFactory.Token(SyntaxKind.AsteriskToken),
+                                                SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(1))),
+                                            SyntaxFactory.Token(SyntaxKind.PlusToken),
+                                            SyntaxFactory.BinaryExpression(
+                                                SyntaxKind.MultiplyExpression,
+                                                SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(4)),
+                                                SyntaxFactory.Token(SyntaxKind.AsteriskToken),
+                                                SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(5)))))
+                                    ))
+                        |]
+                        )))
+        )
+        (
+            "let a = foobar;",
+            SyntaxFactory.LocalDeclarationStatement(
+                SyntaxFactory.VariableDeclaration(
+                    SyntaxFactory.IdentifierName("var"),
+                    SyntaxFactory.SeparatedList(
+                        [|
+                        SyntaxFactory.VariableDeclarator(SyntaxFactory.Identifier("a"))
+                            .WithInitializer(
+                                SyntaxFactory.EqualsValueClause(
+                                    SyntaxFactory.IdentifierName("foobar")
+                                    ))
+                        |]
+                        )))
+        )
+    ]
+    
+    [<TestCase(0)>]
+    [<TestCase(1)>]
+    [<TestCase(2)>]
+    member this.``D: Test Basic Let Statement Parsing``(testCaseIndex: int) =
+        let input, expectedSyntaxTree = List.item testCaseIndex this.TestCases
+        let tokens = Lexer.parseIntoTokens input |> List.toArray
+        
+        let syntaxNodes, parseErrors = ModifiedRecursiveDescent.parseTokens tokens
+        match List.length parseErrors with
+        | 0 ->
+            let actualSyntaxNodes = List.toArray syntaxNodes |> Array.map (fun x -> x :> SyntaxNode)
+            let expectedSyntaxNodes = [| expectedSyntaxTree |]
+            match compareSyntaxNodes input expectedSyntaxNodes actualSyntaxNodes with
+            | true -> Assert.Pass()
+            | false -> Assert.Fail()
+        | _ ->
+            let mutable count = 1
+            for parseError in parseErrors do
+                printfn $"{count}. {parseError}"
+                count <- count + 1
+            Assert.Fail()
+
+
+[<TestFixture>]
+[<ParserComponent(ParserComponentType.Expressions)>]
+type IfStatementParsingTests() =
+    member this.TestCases : (string * SyntaxNode) list = [
+        (
+            "if (5 > 2) { let foobar = 5; };",
+            IfStatement(
+                Token(SyntaxKind.IfKeyword),
+                Token(SyntaxKind.OpenParenToken),
+                BinaryExpression(
+                    SyntaxKind.GreaterThanExpression,
+                    LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(5)),
+                    LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(2))),
+                Token(SyntaxKind.CloseParenToken),
+                Block(
+                    [|
+                        LocalDeclarationStatement(
+                            VariableDeclaration(
+                                IdentifierName("var"),
+                                SeparatedList(
+                                    [|
+                                    VariableDeclarator(Identifier("foobar"))
+                                        .WithInitializer(
+                                            EqualsValueClause(
+                                                LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(5))
+                                                ))
+                                    |]
+                                    ))) :> StatementSyntax
+                    |]),
+                null)
+        )
+    ]
+    
+    [<TestCase(0)>]
+    member this.``E: Test If Statement Parsing``(testCaseIndex: int) =
+        let input, expectedSyntaxTree = List.item testCaseIndex this.TestCases
+        let tokens = Lexer.parseIntoTokens input |> List.toArray
+        
+        let syntaxNodes, parseErrors = ModifiedRecursiveDescent.parseTokens tokens
+        match List.length parseErrors with
+        | 0 ->
+            let actualSyntaxNodes = List.toArray syntaxNodes |> Array.map (fun x -> x :> SyntaxNode)
+            let expectedSyntaxNodes = [| expectedSyntaxTree |]
+            match compareSyntaxNodes input expectedSyntaxNodes actualSyntaxNodes with
+            | true -> Assert.Pass()
+            | false -> Assert.Fail()
+        | _ ->
+            let mutable count = 1
+            for parseError in parseErrors do
+                printfn $"{count}. {parseError}"
+                count <- count + 1
+            Assert.Fail()

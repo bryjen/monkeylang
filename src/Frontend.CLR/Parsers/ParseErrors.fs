@@ -29,6 +29,12 @@ type InvalidPrefixOperatorError(token: Token) =
 with
     static member private FormatMessage(token) =
         $"Unrecognized prefix operator \"{token.Literal}\" of type \"{token.Type}\""
+        
+type InvalidInfixOperatorError(token: Token) =
+    inherit Exception(InvalidInfixOperatorError.FormatMessage(token), null)
+with
+    static member private FormatMessage(token) =
+        $"Unrecognized infix operator \"{token.Literal}\" of type \"{token.Type}\""
     
     
     
@@ -46,5 +52,11 @@ type LiteralExpressionParseError(
         ?syntaxKind: SyntaxKind,
         ?message: string,
         ?token: Token option,
+        ?innerException: Exception) =
+    inherit ParseError(nullIfNone message, None, nullIfNone innerException)
+    
+///
+type LetStatementParseError(
+        ?message: string,
         ?innerException: Exception) =
     inherit ParseError(nullIfNone message, None, nullIfNone innerException)

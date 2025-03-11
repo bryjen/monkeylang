@@ -1,5 +1,6 @@
 ﻿module rec Monkey.Frontend.CLR.Parsers.ModifiedRecursiveDescent
 
+open Frontend.CLR.Parsers
 open Frontend.CLR.Parsers.ParseErrors
 open Microsoft.CodeAnalysis
 open Microsoft.CodeAnalysis.CSharp
@@ -10,113 +11,28 @@ open Monkey.Frontend.CLR.Token
 open FsToolkit.ErrorHandling
 
 
-// TODO: DEQUEUE MEANT POP, REPLACE ALL OCCURRENCES
-    
-        
-type internal ParserState(tokens: Token array) =
-    let mutable currentIdx: int = 0
-    let mutable parseErrors: ParseError list = []
-    let mutable statements: StatementSyntax list = []
-    
-    member this.Tokens = tokens
-    
-    member this.CurrentIdx
-        with get() = currentIdx
-        and set(value) = currentIdx <- value
-
-    member this.ParseErrors
-        with get() = parseErrors
-        and set(value) = parseErrors <- value
-        
-    member this.Statements
-        with get() = statements
-        and set(value) = statements <- value
-    
+type ParseOptions =
+    { OutputFormat: OutputFormat
+      UseGlobalStatements: bool }
 with
-    member this.TokensLength() =
-        Array.length this.Tokens
+    static member Default =
+        { OutputFormat = AsFullSyntaxTree
+          UseGlobalStatements = true }
         
-    member this.IsEof() =
-        let isEof =
-            match this.Tokens[this.CurrentIdx].Type with
-            | EOF -> true
-            | _ -> false
-        
-        (this.CurrentIdx >= Array.length this.Tokens) || isEof
-        
-    member this.PeekToken() =
-        this.Tokens[this.CurrentIdx]
-        
-    member this.PopToken() =
-        let token = this.Tokens[this.CurrentIdx]
-        this.CurrentIdx <- this.CurrentIdx + 1
-        token
-        
-    member this.GetTokenAt(index: int) =
-        this.Tokens[index]
-        
-        
-type internal Precedence =
-    | LOWEST = 1
-    | EQUALS = 2
-    | LESSGREATER = 3
-    | SUM = 4
-    | PRODUCT = 5
-    | PREFIX = 6
-    | CALL = 7
-    | INDEX = 8
+    static member DevelopmentOptions =
+        { OutputFormat = JustStatements 
+          UseGlobalStatements = false }
     
-module private Precedence =     
-    let tokenTypeToPrecedenceMap = Map.ofList [
-        (EQ, Precedence.EQUALS)
-        (NOT_EQ, Precedence.EQUALS)
-        (LT, Precedence.LESSGREATER)
-        (GT, Precedence.LESSGREATER)
-        (PLUS, Precedence.SUM)
-        (MINUS, Precedence.SUM)
-        (SLASH, Precedence.PRODUCT)
-        (ASTERISK, Precedence.PRODUCT)
-        (LPAREN, Precedence.CALL)
-        (LBRACKET, Precedence.INDEX)
-    ]
+and OutputFormat =
+    | JustStatements
+    | AsFullSyntaxTree
     
-    let getPrecedence (token: Token) : Precedence =
-        match Map.tryFind token.Type tokenTypeToPrecedenceMap with
-        | Some precedence -> precedence
-        | None -> Precedence.LOWEST
-            
-    
-    let peekPrecedence (tokensQueue: Token Queue) : Precedence =
-        option {
-            let! peekToken = Queue.peek tokensQueue
-            return! Map.tryFind peekToken.Type tokenTypeToPrecedenceMap
-        }
-        |> function
-           | Some precedence -> precedence
-           | None -> Precedence.LOWEST
-           
 
-// TODO: Re-write to use iteration once we know stuff works
-let rec internal consumeUntilSemicolon (parserState: ParserState) =
-    match parserState.IsEof() with
-    | true ->
-        parserState
-    | false ->
-        let token = parserState.PeekToken()
-        match token.Type with
-        | tokenType when tokenType = SEMICOLON || tokenType = EOF ->
-            parserState
-        | _ ->
-            parserState.CurrentIdx <- parserState.CurrentIdx + 1
-            consumeUntilSemicolon parserState
-        
-
-
-// TODO: Make 'SyntaxTree' out of 'StatementSyntax' list
-let rec parseTokens (tokens: Token array) : Result<StatementSyntax list, ParseError list> =
+let rec parseTokens (tokens: Token array) : StatementSyntax list * ParseError list =
     let parserState = ParserState(tokens)
     let newParserState: ParserState = parseTokensHelper parserState
-    Ok newParserState.Statements
+    newParserState.Statements, newParserState.ParseErrors
+    
     
 and internal parseTokensHelper (parserState: ParserState) =
     match parserState.IsEof() with
@@ -141,8 +57,7 @@ and internal tryParseStatement (parserState: ParserState) : Result<StatementSynt
     let token = parserState.PeekToken()
     match token.Type with
     | LET ->
-        failwith "todo"
-        // tokensQueue |> tryParseLetStatement |> encapsulateIntoCase Statement.LetStatement
+        parserState |> tryParseLetStatement |> (Result.map Some)
     | RETURN ->
         failwith "todo"
         // tokensQueue |> tryParseReturnStatement |> encapsulateIntoCase Statement.ReturnStatement 
@@ -150,172 +65,312 @@ and internal tryParseStatement (parserState: ParserState) : Result<StatementSynt
         parserState.PopToken() |> ignore  // we know that there is at least one element
         Ok None  // no parsing happens, jus continue type shi
     | _ ->
-        let mapOkType (exprStatementSyntax: ExpressionStatementSyntax) =
-            let asSyntaxNode = exprStatementSyntax :> StatementSyntax
-            Some asSyntaxNode
-            
-        parserState |> tryParseExpressionStatement |> (Result.map mapOkType)
-        
-
-(* Statement parsing *)
-
-let internal tryParseExpressionStatement (parserState: ParserState) : Result<ExpressionStatementSyntax, ParseError> =
-    result {
-        // let peekToken = parserState.PeekToken()
-        let! expr = tryParseExpression parserState Precedence.LOWEST
-        // TODO: roslyn global statment here?
-        return SyntaxFactory.ExpressionStatement(expr)
-    }
+        parserState |> tryParseExpressionStatement |> (Result.map Some)
     
+[<AutoOpen>]    
+module private Statements =
+    let internal tryParseExpressionStatement (parserState: ParserState) : Result<StatementSyntax, ParseError> =
+        result {
+            let! expr = tryParseExpression parserState Precedence.LOWEST
+            return SyntaxFactory.ExpressionStatement(expr)
+        }
         
-(* Simple expression parsing *)     
-        
-/// 
-let internal tryParseIdentifier (parserState: ParserState) : ExpressionSyntax =
-    let currentToken = parserState.PopToken()
-    SyntaxFactory.IdentifierName(currentToken.Literal)
-
-///    
-let internal tryParseIntegerLiteral (parserState: ParserState) : Result<ExpressionSyntax, ParseError> =
-    result {
-        let currentToken = parserState.PopToken()
-        let intValueOption = tryParseInt currentToken.Literal
-        let! intValue =
-            match intValueOption with
-            | Some value ->
-                Ok value
-            | None ->
-                let literalParseError = LiteralExpressionParseError(SyntaxKind.NumericLiteralExpression, token=Some currentToken, innerException=IntParseError(currentToken.Literal))
-                Error (ParseError(innerException=literalParseError))
-                
-        return SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(intValue))
-    }
-
-///    
-let internal tryParseBooleanLiteral (parserState: ParserState) : Result<ExpressionSyntax, ParseError> =
-    result {
-        let currentToken = parserState.PopToken()
-        let! syntaxKind =
-            match currentToken.Type with
-            | TRUE ->
-                Ok SyntaxKind.TrueKeyword
-            | FALSE ->
-                Ok SyntaxKind.FalseKeyword
-            | _ ->
-                let literalParseError = LiteralExpressionParseError(message=($"Failed to parse boolean literal, expected a \"bool\" type, got \"{currentToken.Type}\""), token=Some currentToken)
-                Error (ParseError(innerException=literalParseError))
-                
-        return SyntaxFactory.LiteralExpression(syntaxKind)
-    }
-
-///    
-let internal tryParseStringLiteral (parserState: ParserState) : ExpressionSyntax =
-    let currentToken = parserState.PopToken()
-    SyntaxFactory.LiteralExpression(SyntaxKind.StringLiteralExpression, SyntaxFactory.Literal(currentToken.Literal))
+    let internal tryParseLetStatement (parserState: ParserState) : Result<StatementSyntax, ParseError> =
+        result {
+            // is the 'let' keyword
+            // if ever we have more modifiers (ex. types and 'const' keyword for example), this needs to be modified
+            let _ = parserState.PopToken()
+            
+            let peekToken = parserState.PeekToken()
+            let! variableName = 
+                match peekToken.Type with
+                | IDENT ->
+                    let identToken = parserState.PopToken()
+                    Ok identToken.Literal
+                | _ ->
+                    consumeUntilTokenType isSemicolon parserState |> ignore
+                    let errorMsg = $"Expected an identifier after 'let' keyword, but received \"{peekToken.Literal}\" of type \"{peekToken.Type}\""
+                    Error (ParseError(innerException=LetStatementParseError(message=errorMsg)))
+                    
+            do! match parserState.PeekToken().Type with
+                | ASSIGN ->
+                    parserState.PopToken() |> ignore  // consume the 'equals' token
+                    Ok ()
+                | _ ->
+                    consumeUntilTokenType isSemicolon parserState |> ignore
+                    let errorMsg = $"Expected an assignment operator ('='), but received \"{peekToken.Literal}\" of type \"{peekToken.Type}\""
+                    Error (ParseError(innerException=LetStatementParseError(message=errorMsg)))
+                    
+            let! expr = tryParseExpression parserState Precedence.LOWEST
+            consumeUntilTokenType isSemicolon parserState |> ignore
+            
+            let variableDeclarator =
+                SyntaxFactory
+                    .VariableDeclarator(SyntaxFactory.Identifier(variableName))
+                    .WithInitializer(SyntaxFactory.EqualsValueClause(expr))
+            let variableDeclaration =
+                SyntaxFactory.VariableDeclaration(
+                    SyntaxFactory.IdentifierName("var"),
+                    SyntaxFactory.SeparatedList([| variableDeclarator |]))
+            return SyntaxFactory.LocalDeclarationStatement(variableDeclaration)
+        }
+    
    
-///  
-let rec internal tryParseExpression (parserState: ParserState) (precedence: Precedence) : Result<ExpressionSyntax, ParseError> =
+let rec internal tryParseExpression (parserState: ParserState) (precedence: Precedence) : Result<CSharpSyntaxNode, ParseError> =
     result {
         let! prefixParseFunc = tryGetPrefixParseFunc prefixParseFunctionsMap parserState 
         let! leftExpression = prefixParseFunc parserState
-        return leftExpression
-        
-        // TODO: you need to uncomment this to continue
-        // return! tryParseExpressionHelper parserState precedence leftExpression
+        return! tryParseExpressionHelper parserState precedence leftExpression
     }
     
-/// Attempts to get the PREFIX parse function based on the next token's type
-and internal tryGetPrefixParseFunc prefixParseFuncMap parserState : Result<ParserState -> Result<ExpressionSyntax, ParseError>, ParseError> =
-    match parserState.IsEof() with
-    | true ->
-        let message = "Tokens queue empty. This indicates a logical error in the parsing process."
-        failwith message
-        // Error (ParseError(message))
-    | false ->
-        let onMissingValue parserState =  // i.e. basically go to the next statement
-            consumeUntilSemicolon parserState |> ignore  // pass by reference, properties change 'in-place'
-            ParseError()
-            
-        let token = parserState.PeekToken()
-        match Map.tryFind token.Type prefixParseFuncMap with
-        | Some value -> Ok value
-        | None -> Error (onMissingValue parserState)
-        
-        
-    
-and internal tryParseExpressionHelper parserState precedence leftExpr =
-    failwith "todo"
-    
-    (*
+and internal tryParseExpressionHelper (parserState: ParserState) (precedence: Precedence) (leftExpr: CSharpSyntaxNode) : Result<CSharpSyntaxNode, ParseError> =
     result {
         let peekToken = parserState.PeekToken()
         let peekPrecedence =
-            match Map.tryFind peekToken.Type Precedence.tokenTypeToPrecedenceMap with
+            match Map.tryFind peekToken.Type tokenTypeToPrecedenceMap with
             | Some precedence -> precedence
             | None -> Precedence.LOWEST
             
         if peekToken.Type <> TokenType.SEMICOLON && precedence < peekPrecedence then
-            let! infixParseFunc = tryGetInfixParseFunc infixParseFunctionsMap tokensQueue
-            let! newTokensQueue, infixExpr = infixParseFunc tokensQueue leftExpr
-            return! tryParseExpressionHelper newTokensQueue precedence infixExpr
+            let! infixParseFunc = tryGetInfixParseFunc infixParseFunctionsMap parserState
+            let! infixExpr = infixParseFunc parserState leftExpr
+            return! tryParseExpressionHelper parserState precedence infixExpr
         else
-            return tokensQueue, leftExpr
+            return leftExpr
     }
-    *)
     
-///  
-let internal tryParsePrefixExpression (parserState: ParserState) =
-    result {
-        let currentToken = parserState.PopToken()
-        let! rightExpr = tryParseExpression parserState Precedence.PREFIX
-       
-        let! syntaxKind = 
-            match currentToken.Type with
-            | BANG ->
-                Ok SyntaxKind.UnaryMinusExpression
-            | MINUS ->
-                Ok SyntaxKind.LogicalNotExpression
-            | _ ->
-                let invalidPrefixOperatorError = InvalidPrefixOperatorError(token=currentToken)
-                let literalParseError = LiteralExpressionParseError(message="Failed to parse prefix expression", token=Some currentToken, innerException=invalidPrefixOperatorError)
-                Error (ParseError(innerException=literalParseError))
-                
-        return SyntaxFactory.PrefixUnaryExpression(syntaxKind, rightExpr)
-    }
+    
+    
+    
 
-let internal prefixParseFunctionsMap
-    : Map<TokenType, ParserState -> Result<ExpressionSyntax, ParseError>> =
-    Map.ofList [
-        (TokenType.IDENT, tryParseIdentifier >> Ok)
-        (TokenType.STRING, tryParseStringLiteral >> Ok)
-        (TokenType.INT, tryParseIntegerLiteral)
-        (TokenType.TRUE, tryParseBooleanLiteral)
-        (TokenType.FALSE, tryParseBooleanLiteral)
-        
-        (*
-        (TokenType.BANG, tryParsePrefixExpression)
-        (TokenType.MINUS, tryParsePrefixExpression)
-        (TokenType.LPAREN, tryParseGroupedExpression)
-        (TokenType.IF, tryParseIfExpression)
-        (TokenType.FUNCTION, tryParseFunctionLiteral)
-        (TokenType.LBRACKET, tryParseArrayLiteral)
-        (TokenType.LBRACE, tryParseHashLiteral)
-        *)
-    ]
     
-let internal infixParseFunctionsMap
-    : Map<TokenType, Token Queue -> ExpressionSyntax -> Result<ExpressionSyntax, ParseError>> =
-    Map.ofList [
-        (*
-        (TokenType.LPAREN, tryParseCallExpression) // parse call expr
-        (TokenType.LBRACKET, tryParseIndexExpression) // parse index expr 
-        (TokenType.PLUS, tryParseInfixExpression)
-        (TokenType.MINUS, tryParseInfixExpression)
-        (TokenType.SLASH, tryParseInfixExpression)
-        (TokenType.ASTERISK, tryParseInfixExpression)
-        (TokenType.EQ, tryParseInfixExpression)
-        (TokenType.NOT_EQ, tryParseInfixExpression)
-        (TokenType.LT, tryParseInfixExpression)
-        (TokenType.GT, tryParseInfixExpression)
-        *)
-    ]
+[<AutoOpen>]
+module internal PrefixExpressions =
+    /// <summary>
+    /// Consumes the current token and parses it as a string literal.
+    /// </summary>
+    let tryParseStringLiteral
+            (parserState: ParserState)
+            : ExpressionSyntax =
+        let currentToken = parserState.PopToken()
+        SyntaxFactory.LiteralExpression(SyntaxKind.StringLiteralExpression, SyntaxFactory.Literal(currentToken.Literal))
+        
+        
+    /// <summary>
+    /// Consumes the current token and parses it as an identifier.
+    /// </summary>
+    let tryParseIdentifier
+            (parserState: ParserState)
+            : ExpressionSyntax =
+        let currentToken = parserState.PopToken()
+        SyntaxFactory.IdentifierName(currentToken.Literal)
+
+    
+    /// <summary>
+    /// Consumes the current token and attempts to parse it as an integer number.
+    /// </summary>
+    let tryParseIntegerLiteral
+            (parserState: ParserState)
+            : Result<ExpressionSyntax, ParseError> =
+                
+        let getError (token: Token) =
+            let literalParseError = LiteralExpressionParseError(SyntaxKind.NumericLiteralExpression, token=Some token, innerException=IntParseError(token.Literal))
+            Error (ParseError(innerException=literalParseError))
+            
+        result {
+            let currentToken = parserState.PopToken()
+            let intValueOption = tryParseInt currentToken.Literal
+            let! intValue =
+                match intValueOption with
+                | Some value -> Ok value
+                | None -> getError currentToken
+            return SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(intValue))
+        }
+
+    
+    /// <summary>
+    /// Consumes the current token and attempts to parse it as a boolean type.
+    /// </summary>
+    let tryParseBooleanLiteral
+            (parserState: ParserState)
+            : Result<ExpressionSyntax, ParseError> =
+                
+        let getError (token: Token) =
+            let literalParseError = LiteralExpressionParseError(message=($"Failed to parse boolean literal, expected a \"bool\" type, got \"{token.Type}\""), token=Some token)
+            Error (ParseError(innerException=literalParseError))
+                
+        result {
+            let currentToken = parserState.PopToken()
+            let! syntaxKind =
+                match currentToken.Type with
+                | TRUE ->  Ok SyntaxKind.TrueLiteralExpression
+                | FALSE -> Ok SyntaxKind.FalseLiteralExpression
+                | _ ->     getError currentToken
+            return SyntaxFactory.LiteralExpression(syntaxKind)
+        }
+    
+    
+    /// <summary>
+    /// Consumes the current token and attempts to parse it as an expression surrounded by parentheses.
+    /// </summary>
+    let tryParseParenthesisExpression
+            (parserState: ParserState)
+            : Result<ExpressionSyntax, ParseError> =
+        result {
+            parserState.PopToken() |> ignore  // consume the left paren
+            
+            let! expr = tryParseExpression parserState Precedence.LOWEST
+            let wrappedExpr = SyntaxFactory.ParenthesizedExpression(SyntaxFactory.Token(SyntaxKind.OpenParenToken), expr, SyntaxFactory.Token(SyntaxKind.CloseParenToken))
+            consumeUntilTokenType (fun tt -> isSemicolon tt || isRParen tt) parserState |> ignore
+            
+            parserState.PopToken() |> ignore  // consume the right paren
+            return wrappedExpr
+        }
+        
+        
+    /// <summary>
+    /// Consumes the current token and attempts to parse it as a prefix expression.
+    /// </summary>
+    /// <remarks>
+    /// <ul>
+    /// <li>Note that the expression is not tied to a specific type, and can handle multiple expression types.</li>
+    /// </ul>
+    /// </remarks>
+    let tryParsePrefixExpression
+            (parserState: ParserState)
+            : Result<ExpressionSyntax, ParseError> =
+                
+        let getError (token: Token) =
+            let invalidPrefixOperatorError = InvalidPrefixOperatorError(token=token)
+            let literalParseError = LiteralExpressionParseError(message=($"Failed to parse prefix expression with type \"{token.Type}\""), token=Some token, innerException=invalidPrefixOperatorError)
+            Error (ParseError(innerException=literalParseError))
+            
+        result {
+            let currentToken = parserState.PopToken()
+            let! rightExpr = tryParseExpression parserState Precedence.PREFIX
+            let! syntaxKind = 
+                match currentToken.Type with
+                | BANG -> Ok SyntaxKind.LogicalNotExpression
+                | MINUS -> Ok SyntaxKind.UnaryMinusExpression
+                | _ -> getError currentToken
+            return SyntaxFactory.PrefixUnaryExpression(syntaxKind, rightExpr) :> ExpressionSyntax
+        }
+        
+    let tryParseIfExpression
+        (parserState: ParserState)
+        : Result<ExpressionSyntax, ParseError> =
+        failwith "todo"
+        
+    let private castToCSharpSyntaxNode (result: Result<'T, 'E>) : Result<CSharpSyntaxNode, 'E> =
+        Result.map (fun t -> t :> CSharpSyntaxNode) result
+        
+    /// <summary>
+    /// Map containing token types and the corresponding function required to parse them.
+    /// </summary>
+    let prefixParseFunctionsMap
+        : Map<TokenType, ParserState -> Result<CSharpSyntaxNode, ParseError>> =
+        Map.ofList [
+            (TokenType.IDENT,   tryParseIdentifier              >> Ok >> castToCSharpSyntaxNode)
+            (TokenType.STRING,  tryParseStringLiteral           >> Ok >> castToCSharpSyntaxNode)
+            (TokenType.INT,     tryParseIntegerLiteral          >> castToCSharpSyntaxNode)
+            (TokenType.TRUE,    tryParseBooleanLiteral          >> castToCSharpSyntaxNode)
+            (TokenType.FALSE,   tryParseBooleanLiteral          >> castToCSharpSyntaxNode)
+            (TokenType.BANG,    tryParsePrefixExpression        >> castToCSharpSyntaxNode)
+            (TokenType.MINUS,   tryParsePrefixExpression        >> castToCSharpSyntaxNode)
+            (TokenType.LPAREN,  tryParseParenthesisExpression   >> castToCSharpSyntaxNode)
+            (TokenType.IF,      tryParseIfExpression            >> castToCSharpSyntaxNode)
+            
+            (*
+            (TokenType.FUNCTION, tryParseFunctionLiteral)
+            (TokenType.LBRACKET, tryParseArrayLiteral)
+            (TokenType.LBRACE, tryParseHashLiteral)
+            *)
+        ]
+        
+    /// Attempts to get the INFIX parse function based on the next token's type
+    let tryGetInfixParseFunc (infixParseFuncMap: Map<TokenType, ParserState -> ExpressionSyntax -> Result<ExpressionSyntax, ParseError>>) (parserState: ParserState) : Result<ParserState -> ExpressionSyntax -> Result<ExpressionSyntax, ParseError>, ParseError> =
+        match parserState.IsEof() with
+        | true ->
+            let message = "FATAL. Tokens queue empty. This indicates a logical error in the parsing process."
+            failwith message
+            // TODO HERE MAYBE
+        | false ->
+            let onMissingValue parserState =  // i.e. basically go to the next statement
+                consumeUntilTokenType isSemicolon parserState |> ignore  // pass by reference, properties change 'in-place'
+                ParseError()
+                
+            let token = parserState.PeekToken()
+            match Map.tryFind token.Type infixParseFuncMap with
+            | Some value -> Ok value
+            | None -> Error (onMissingValue parserState)
+        
+        
+        
+[<AutoOpen>]
+module internal InfixExpressions =
+    
+    let tryParseInfixExpression (parserState: ParserState) (leftExpr: ExpressionSyntax) : Result<ExpressionSyntax, ParseError> =
+        let getError (token: Token) =
+            let invalidInfixOperatorError = InvalidInfixOperatorError(token=token)
+            let literalParseError = LiteralExpressionParseError(message="Failed to parse infix expression", token=Some token, innerException=invalidInfixOperatorError)
+            Error (ParseError(innerException=literalParseError))
+        
+        result {
+            let token = parserState.PopToken()
+            let precedence = 
+                match Map.tryFind token.Type tokenTypeToPrecedenceMap with
+                | Some precedence -> precedence
+                | None -> Precedence.LOWEST
+                
+            let! syntaxKindAndOperatorToken =
+                match token.Type with
+                | PLUS ->       Ok (SyntaxKind.AddExpression,           SyntaxFactory.Token(SyntaxKind.PlusToken))
+                | MINUS ->      Ok (SyntaxKind.SubtractExpression,      SyntaxFactory.Token(SyntaxKind.MinusToken))
+                | ASTERISK ->   Ok (SyntaxKind.MultiplyExpression,      SyntaxFactory.Token(SyntaxKind.AsteriskToken))
+                | SLASH ->      Ok (SyntaxKind.DivideExpression,        SyntaxFactory.Token(SyntaxKind.SlashToken))
+                | GT ->         Ok (SyntaxKind.GreaterThanExpression,   SyntaxFactory.Token(SyntaxKind.GreaterThanToken))
+                | LT ->         Ok (SyntaxKind.LessThanExpression,      SyntaxFactory.Token(SyntaxKind.LessThanToken))
+                | EQ ->         Ok (SyntaxKind.EqualsExpression,        SyntaxFactory.Token(SyntaxKind.EqualsEqualsToken))
+                | NOT_EQ ->     Ok (SyntaxKind.NotEqualsExpression,     SyntaxFactory.Token(SyntaxKind.ExclamationEqualsToken))
+                | _ -> getError token
+                    
+            let syntaxKind, operatorToken = syntaxKindAndOperatorToken
+            let! rightExpr = tryParseExpression parserState precedence
+            return SyntaxFactory.BinaryExpression(syntaxKind, leftExpr, operatorToken, rightExpr)
+        }
+    
+    let infixParseFunctionsMap
+        : Map<TokenType, ParserState -> ExpressionSyntax -> Result<ExpressionSyntax, ParseError>> =
+        Map.ofList [
+            (*
+            (TokenType.LPAREN, tryParseCallExpression) // parse call expr
+            (TokenType.LBRACKET, tryParseIndexExpression) // parse index expr 
+            *)
+            (TokenType.PLUS, tryParseInfixExpression)
+            (TokenType.MINUS, tryParseInfixExpression)
+            (TokenType.SLASH, tryParseInfixExpression)
+            (TokenType.ASTERISK, tryParseInfixExpression)
+            (TokenType.EQ, tryParseInfixExpression)
+            (TokenType.NOT_EQ, tryParseInfixExpression)
+            (TokenType.LT, tryParseInfixExpression)
+            (TokenType.GT, tryParseInfixExpression)
+        ]
+        
+        
+    /// Attempts to get the PREFIX parse function based on the next token's type
+    let tryGetPrefixParseFunc prefixParseFuncMap parserState : Result<ParserState -> Result<CSharpSyntaxNode, ParseError>, ParseError> =
+        match parserState.IsEof() with
+        | true ->
+            let message = "FATAL. Tokens queue empty. This indicates a logical error in the parsing process."
+            failwith message
+            // TODO HERE MAYBE
+        | false ->
+            let token = parserState.PeekToken()
+            
+            let onMissingValue parserState =  // i.e. basically go to the next statement
+                consumeUntilTokenType isSemicolon parserState |> ignore  // pass by reference, properties change 'in-place'
+                ParseError($"Could not find a prefix parse function for the token type \"{token.Type}\"")
+                
+            match Map.tryFind token.Type prefixParseFuncMap with
+            | Some value -> Ok value
+            | None -> Error (onMissingValue parserState)
