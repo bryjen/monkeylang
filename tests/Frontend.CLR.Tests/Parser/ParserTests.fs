@@ -1,5 +1,6 @@
 ﻿module Monkey.Frontend.CLR.Tests.Parser.ParserTests
 
+open System
 open Microsoft.CodeAnalysis
 open Microsoft.CodeAnalysis.CSharp
 open Microsoft.CodeAnalysis.CSharp.Syntax
@@ -61,6 +62,14 @@ map(numbers, fibonacci);
 // => returns: [1, 1, 2, 3, 5, 8]
 ```
 *)
+
+[<TestFixture>]
+[<ParserComponent(ParserComponentType.Expressions)>]
+type Runner() =
+    
+    member this.TestRunner() =
+        failwith "todo"
+    
 
 
 [<TestFixture>]
@@ -426,47 +435,357 @@ type BasicVariableAssignmentParsingTests() =
 [<TestFixture>]
 [<ParserComponent(ParserComponentType.Expressions)>]
 type IfStatementParsingTests() =
-    member this.TestCases : (string * SyntaxNode) list = [
+    member this.TestCases : (string * SyntaxNode list) list = [
         (
             "if (5 > 2) { let foobar = 5; };",
-            IfStatement(
-                Token(SyntaxKind.IfKeyword),
-                Token(SyntaxKind.OpenParenToken),
-                BinaryExpression(
-                    SyntaxKind.GreaterThanExpression,
-                    LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(5)),
-                    LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(2))),
-                Token(SyntaxKind.CloseParenToken),
-                Block(
-                    [|
-                        LocalDeclarationStatement(
-                            VariableDeclaration(
-                                IdentifierName("var"),
-                                SeparatedList(
-                                    [|
-                                    VariableDeclarator(Identifier("foobar"))
-                                        .WithInitializer(
-                                            EqualsValueClause(
-                                                LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(5))
-                                                ))
-                                    |]
-                                    ))) :> StatementSyntax
-                    |]),
-                null)
+            [
+                IfStatement(
+                    Token(SyntaxKind.IfKeyword),
+                    Token(SyntaxKind.OpenParenToken),
+                    BinaryExpression(
+                        SyntaxKind.GreaterThanExpression,
+                        LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(5)),
+                        LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(2))),
+                    Token(SyntaxKind.CloseParenToken),
+                    Block(
+                        [|
+                            LocalDeclarationStatement(
+                                VariableDeclaration(
+                                    IdentifierName("var"),
+                                    SeparatedList(
+                                        [|
+                                        VariableDeclarator(Identifier("foobar"))
+                                            .WithInitializer(
+                                                EqualsValueClause(
+                                                    LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(5))
+                                                    ))
+                                        |]
+                                        ))) :> StatementSyntax
+                        |]),
+                    null)
+            ]
+        )
+        (
+            "if (5 > 2) { let foo = 5; } else { let bar = 2; };",
+            [
+                IfStatement(
+                    Token(SyntaxKind.IfKeyword),
+                    Token(SyntaxKind.OpenParenToken),
+                    BinaryExpression(
+                        SyntaxKind.GreaterThanExpression,
+                        LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(5)),
+                        LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(2))),
+                    Token(SyntaxKind.CloseParenToken),
+                    Block(
+                        [|
+                            LocalDeclarationStatement(
+                                VariableDeclaration(
+                                    IdentifierName("var"),
+                                    SeparatedList(
+                                        [|
+                                        VariableDeclarator(Identifier("foo"))
+                                            .WithInitializer(
+                                                EqualsValueClause(
+                                                    LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(5))
+                                                    ))
+                                        |]
+                                        ))) :> StatementSyntax
+                        |]),
+                    ElseClause(Block(
+                        [|
+                            LocalDeclarationStatement(
+                                VariableDeclaration(
+                                    IdentifierName("var"),
+                                    SeparatedList(
+                                        [|
+                                        VariableDeclarator(Identifier("bar"))
+                                            .WithInitializer(
+                                                EqualsValueClause(
+                                                    LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(2))
+                                                    ))
+                                        |]
+                                        ))) :> StatementSyntax
+                        |]))
+                    )
+            ]
+        )
+        (
+            "let foobar = if (5 > 2) { 5; } else { 2; };",
+            [
+                LocalDeclarationStatement(
+                    VariableDeclaration(
+                        PredefinedType(Token(SyntaxKind.ObjectKeyword)),
+                        SeparatedList(
+                            [|
+                            VariableDeclarator(Identifier("foobar"))
+                            |]
+                            )
+                        )
+                    )
+                
+                IfStatement(
+                    Token(SyntaxKind.IfKeyword),
+                    Token(SyntaxKind.OpenParenToken),
+                    BinaryExpression(
+                        SyntaxKind.GreaterThanExpression,
+                        LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(5)),
+                        LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(2))),
+                    Token(SyntaxKind.CloseParenToken),
+                    Block(
+                        [|
+                            ExpressionStatement(
+                                AssignmentExpression(
+                                    SyntaxKind.SimpleAssignmentExpression,
+                                    IdentifierName("foobar"),
+                                    LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(5))
+                                    )
+                                )
+                            :> StatementSyntax
+                        |]),
+                    ElseClause(Block(
+                        [|
+                            ExpressionStatement(
+                                AssignmentExpression(
+                                    SyntaxKind.SimpleAssignmentExpression,
+                                    IdentifierName("foobar"),
+                                    LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(2))
+                                    )
+                                )
+                            :> StatementSyntax
+                        |]
+                        )
+                    ))
+            ]
         )
     ]
     
     [<TestCase(0)>]
+    [<TestCase(1)>]
+    [<TestCase(2)>]  // inline if statement assignment
     member this.``E: Test If Statement Parsing``(testCaseIndex: int) =
-        let input, expectedSyntaxTree = List.item testCaseIndex this.TestCases
+        let input, expectedSyntaxNodes = List.item testCaseIndex this.TestCases
         let tokens = Lexer.parseIntoTokens input |> List.toArray
         
         let syntaxNodes, parseErrors = ModifiedRecursiveDescent.parseTokens tokens
         match List.length parseErrors with
         | 0 ->
             let actualSyntaxNodes = List.toArray syntaxNodes |> Array.map (fun x -> x :> SyntaxNode)
-            let expectedSyntaxNodes = [| expectedSyntaxTree |]
-            match compareSyntaxNodes input expectedSyntaxNodes actualSyntaxNodes with
+            match compareSyntaxNodes input (List.toArray expectedSyntaxNodes) actualSyntaxNodes with
+            | true -> Assert.Pass()
+            | false -> Assert.Fail()
+        | _ ->
+            let mutable count = 1
+            for parseError in parseErrors do
+                printfn $"{count}. {parseError}"
+                count <- count + 1
+            Assert.Fail()
+            
+            
+[<TestFixture>]
+[<ParserComponent(ParserComponentType.Expressions)>]
+type FunctionParsingTests() =
+    let castTypeSyntaxArr (arr: 'R array) =
+        Array.map (fun o -> o :> TypeSyntax) arr
+    
+    member this.TestCases : (string * SyntaxNode) list = [
+        (
+            """fn(int x, int y) : int {
+    let z = 10;
+    x + y + z;
+}
+""",
+            ExpressionStatement(
+                CastExpression(
+                    Token(SyntaxKind.OpenParenToken),
+                    PredefinedType(Token(SyntaxKind.IntKeyword)),
+                    Token(SyntaxKind.CloseParenToken),
+                    ParenthesizedExpression(
+                        Token(SyntaxKind.OpenParenToken),
+                        ParenthesizedLambdaExpression(
+                            ParameterList(
+                                SeparatedList<ParameterSyntax>(
+                                    [|
+                                        Parameter(Identifier("x")).WithType(PredefinedType(Token(SyntaxKind.IntKeyword)))
+                                        Parameter(Identifier("y")).WithType(PredefinedType(Token(SyntaxKind.IntKeyword)))
+                                    |])
+                                ),
+                            
+                            Block(
+                                [|
+                                    LocalDeclarationStatement(
+                                        VariableDeclaration(IdentifierName("var"))
+                                            .WithVariables(
+                                                SingletonSeparatedList(
+                                                    VariableDeclarator(Identifier("z"))
+                                                        .WithInitializer(
+                                                            EqualsValueClause(
+                                                                LiteralExpression(
+                                                                    SyntaxKind.NumericLiteralExpression,
+                                                                    Literal(10)
+                                                                )
+                                                            )
+                                                    )
+                                                )
+                                            )
+                                        ) :> StatementSyntax
+                                    
+                                    ReturnStatement(
+                                        BinaryExpression(
+                                            SyntaxKind.AddExpression,
+                                            BinaryExpression(
+                                                SyntaxKind.AddExpression,
+                                                IdentifierName("x"),
+                                                IdentifierName("y")
+                                                ),
+                                            IdentifierName("z")
+                                            )
+                                        ) :> StatementSyntax
+                                |]
+                                )
+                            ),
+                        Token(SyntaxKind.CloseParenToken)
+                        )
+                    )
+                )
+        )
+        (
+            """fn() : int {
+    let x = 10;
+    x + 12;
+}
+""",
+            ExpressionStatement(
+                CastExpression(
+                    Token(SyntaxKind.OpenParenToken),
+                    PredefinedType(Token(SyntaxKind.IntKeyword)),
+                    Token(SyntaxKind.CloseParenToken),
+                    ParenthesizedExpression(
+                        Token(SyntaxKind.OpenParenToken),
+                        ParenthesizedLambdaExpression(
+                            ParameterList(SeparatedList<ParameterSyntax>()),
+                            Block(
+                                [|
+                                    LocalDeclarationStatement(
+                                        VariableDeclaration(IdentifierName("var"))
+                                            .WithVariables(
+                                                SingletonSeparatedList(
+                                                    VariableDeclarator(Identifier("x"))
+                                                        .WithInitializer(
+                                                            EqualsValueClause(
+                                                                LiteralExpression(
+                                                                    SyntaxKind.NumericLiteralExpression,
+                                                                    Literal(10)
+                                                                )
+                                                            )
+                                                    )
+                                                )
+                                            )
+                                        ) :> StatementSyntax
+                                    
+                                    ReturnStatement(
+                                        BinaryExpression(
+                                            SyntaxKind.AddExpression,
+                                            IdentifierName("x"),
+                                            LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(12))
+                                            )
+                                        ) :> StatementSyntax
+                                |]
+                                )
+                            ),
+                        Token(SyntaxKind.CloseParenToken)
+                        )
+                    )
+                )
+        )
+        
+        (  // TODO: update this test case
+            """let add = fn(int x, int y) : int {
+    let z = 10;
+    x + y + z;
+}
+""",
+            VariableDeclaration(
+                GenericName(Identifier("Func"))
+                    .WithTypeArgumentList(
+                        TypeArgumentList(
+                            SeparatedList<TypeSyntax>(
+                            [|
+                                PredefinedType(Token(SyntaxKind.IntKeyword))
+                                PredefinedType(Token(SyntaxKind.IntKeyword))
+                                PredefinedType(Token(SyntaxKind.IntKeyword))
+                            |] |> castTypeSyntaxArr,
+                            [|
+                                Token(SyntaxKind.CommaToken)
+                                Token(SyntaxKind.CommaToken)
+                                Token(SyntaxKind.CommaToken)
+                            |]
+                            ))
+                        ),
+                SeparatedList(
+                    [|
+                        SyntaxFactory.VariableDeclarator(SyntaxFactory.Identifier("add"))
+                            .WithInitializer(
+                                SyntaxFactory.EqualsValueClause(
+                                    ParenthesizedLambdaExpression(
+                                        ParameterList(
+                                            SeparatedList<ParameterSyntax>(
+                                                [|
+                                                    Parameter(Identifier("x")).WithType(PredefinedType(Token(SyntaxKind.IntKeyword)))
+                                                    Parameter(Identifier("y")).WithType(PredefinedType(Token(SyntaxKind.IntKeyword)))
+                                                |])
+                                            ),
+                                        
+                                        Block(
+                                            [|
+                                                LocalDeclarationStatement(
+                                                    VariableDeclaration(PredefinedType(Token(SyntaxKind.IntKeyword)))
+                                                        .WithVariables(
+                                                            SingletonSeparatedList(
+                                                                VariableDeclarator(Identifier("z"))
+                                                                    .WithInitializer(
+                                                                        EqualsValueClause(
+                                                                            LiteralExpression(
+                                                                                SyntaxKind.NumericLiteralExpression,
+                                                                                Literal(10)
+                                                                            )
+                                                                        )
+                                                                )
+                                                            )
+                                                        )
+                                                    ) :> StatementSyntax
+                                                
+                                                ReturnStatement(
+                                                    BinaryExpression(
+                                                        SyntaxKind.AddExpression,
+                                                        BinaryExpression(
+                                                            SyntaxKind.AddExpression,
+                                                            IdentifierName("x"),
+                                                            IdentifierName("y")
+                                                            ),
+                                                        IdentifierName("z")
+                                                        )
+                                                    ) :> StatementSyntax
+                                            |]
+                                            )
+                                        )
+                                    ))
+                    |]
+                    )
+                )
+        )
+    ]
+    
+    [<TestCase(0)>]
+    [<TestCase(1)>]
+    member this.``F: Test Function Expression Parsing``(testCaseIndex: int) =
+        let input, expectedSyntaxNodes = List.item testCaseIndex this.TestCases
+        let tokens = Lexer.parseIntoTokens input |> List.toArray
+        
+        let syntaxNodes, parseErrors = ModifiedRecursiveDescent.parseTokens tokens
+        match List.length parseErrors with
+        | 0 ->
+            let actualSyntaxNodes = List.toArray syntaxNodes |> Array.map (fun x -> x :> SyntaxNode)
+            match compareSyntaxNodes input [| expectedSyntaxNodes |] actualSyntaxNodes with
             | true -> Assert.Pass()
             | false -> Assert.Fail()
         | _ ->

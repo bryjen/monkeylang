@@ -1,7 +1,7 @@
 ﻿[<AutoOpen>]
-module Frontend.CLR.Parsers.ModifiedRecursiveDescentHelpers
+module Monkey.Frontend.CLR.Parsers.ModifiedRecursiveDescentHelpers
 
-open Frontend.CLR.Parsers.ParseErrors
+open Monkey.Frontend.CLR.Parsers.ParseErrors
 open Microsoft.CodeAnalysis.CSharp.Syntax
 open Monkey.Frontend.CLR.Token
 
@@ -97,3 +97,11 @@ let internal tokenTypeToPrecedenceMap = Map.ofList [
     (LPAREN, Precedence.CALL)
     (LBRACKET, Precedence.INDEX)
 ]
+
+
+let assertNoParseErrors (parseErrors: ParseError list) =
+    match parseErrors with
+    | [ ] ->
+        Ok ()
+    | head :: _ ->
+        Error head

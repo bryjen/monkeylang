@@ -1,14 +1,19 @@
-﻿module rec Monkey.Frontend.CLR.Parsers.ModifiedRecursiveDescent
+﻿// ReSharper disable FSharpRedundantParens
 
-open Frontend.CLR.Parsers
-open Frontend.CLR.Parsers.ParseErrors
+module rec Monkey.Frontend.CLR.Parsers.ModifiedRecursiveDescent
+
+open System.Xml
 open Microsoft.CodeAnalysis
 open Microsoft.CodeAnalysis.CSharp
 open Microsoft.CodeAnalysis.CSharp.Syntax
-open Monkey.Frontend.CLR.Helpers
-open Monkey.Frontend.CLR.Helpers.Queue
-open Monkey.Frontend.CLR.Token
+open type Microsoft.CodeAnalysis.CSharp.SyntaxFactory
+
 open FsToolkit.ErrorHandling
+
+open Monkey.Frontend.CLR.Token
+open Monkey.Frontend.CLR.Helpers
+open Monkey.Frontend.CLR.Parsers
+open Monkey.Frontend.CLR.Parsers.ParseErrors
 
 
 type ParseOptions =
@@ -30,30 +35,34 @@ and OutputFormat =
 
 let rec parseTokens (tokens: Token array) : StatementSyntax list * ParseError list =
     let parserState = ParserState(tokens)
-    let newParserState: ParserState = parseTokensHelper parserState
-    newParserState.Statements, newParserState.ParseErrors
+    
+    let parseStopCondition (parserState: ParserState) = parserState.IsEof()
+    let statements, parseErrors = parseTokensHelper parseStopCondition parserState [] []
+    statements, parseErrors
     
     
-and internal parseTokensHelper (parserState: ParserState) =
-    match parserState.IsEof() with
-    | true ->
-        parserState
+let rec internal parseTokensHelper
+        (stopCondition: ParserState -> bool)
+        (parserState: ParserState)
+        (statements: StatementSyntax list)
+        (parseErrors: ParseError list)
+        : StatementSyntax list * ParseError list =
+    match stopCondition parserState with
+    | true -> statements, parseErrors
     | false ->
         match tryParseStatement parserState with
         | Ok statementSyntaxOption ->
             match statementSyntaxOption with
-            | Some statementSyntax ->
-                let newStatements = statementSyntax :: parserState.Statements
-                parserState.Statements <- newStatements
-                parserState
+            | Some newStatements ->
+                let newStatements = List.append statements (Array.toList newStatements)
+                parseTokensHelper stopCondition parserState newStatements parseErrors
             | None ->
-                parserState
+                parseTokensHelper stopCondition parserState statements parseErrors
         | Error errorValue ->
-            let newErrors = errorValue :: parserState.ParseErrors
-            parserState.ParseErrors <- newErrors
-            parserState
+            parseTokensHelper stopCondition parserState statements (errorValue :: parseErrors)
+            
         
-and internal tryParseStatement (parserState: ParserState) : Result<StatementSyntax option, ParseError> =
+and internal tryParseStatement (parserState: ParserState) : Result<StatementSyntax[] option, ParseError> =
     let token = parserState.PeekToken()
     match token.Type with
     | LET ->
@@ -65,17 +74,69 @@ and internal tryParseStatement (parserState: ParserState) : Result<StatementSynt
         parserState.PopToken() |> ignore  // we know that there is at least one element
         Ok None  // no parsing happens, jus continue type shi
     | _ ->
-        parserState |> tryParseExpressionStatement |> (Result.map Some)
+        parserState |> tryParseExpressionStatement |> (Result.map (fun stat -> Some [| stat |]))
+        
+
+
+/// <remarks>
+/// Mainly parses expressions. However, since we treat 'if' clauses as expressions and C# treats them as statements, we
+/// need to work around this by being able to take both expressions and statements.
+/// <br/>
+/// <br/>
+/// Since we cannot inherit 'ExpressionSyntax' to represent these cases as an expression (due to ROSLYN's design), this
+/// seems like one of the few solutions without re-writing the api (2025-03-11).
+/// </remarks>
+let rec internal tryParseExpressionOrStatement (parserState: ParserState) (precedence: Precedence) : Result<CSharpSyntaxNode, ParseError> =
+    result {
+        let! prefixParseFunc = tryGetPrefixParseFunc prefixParseFunctionsMap parserState 
+        let! csSyntaxNode = prefixParseFunc parserState
+        
+        return!
+            match csSyntaxNode with
+            | :? ExpressionSyntax as leftExpression ->
+                tryParseExpressionOrStatementHelper parserState precedence leftExpression
+            | :? StatementSyntax as stat ->
+                Ok stat
+            | _ ->
+                Error (ParseError())  // TODO
+    }
+    
+and internal tryParseExpressionOrStatementHelper (parserState: ParserState) (precedence: Precedence) (leftExpr: ExpressionSyntax) : Result<CSharpSyntaxNode, ParseError> =
+    result {
+        let peekToken = parserState.PeekToken()
+        let peekPrecedence =
+            match Map.tryFind peekToken.Type tokenTypeToPrecedenceMap with
+            | Some precedence -> precedence
+            | None -> Precedence.LOWEST
+            
+        if peekToken.Type <> TokenType.SEMICOLON && precedence < peekPrecedence then
+            let! infixParseFunc = tryGetInfixParseFunc infixParseFunctionsMap parserState
+            let! infixExpr = infixParseFunc parserState leftExpr
+            return! tryParseExpressionOrStatementHelper parserState precedence infixExpr
+        else
+            return leftExpr
+    }
+    
+    
     
 [<AutoOpen>]    
 module private Statements =
     let internal tryParseExpressionStatement (parserState: ParserState) : Result<StatementSyntax, ParseError> =
         result {
-            let! expr = tryParseExpression parserState Precedence.LOWEST
-            return SyntaxFactory.ExpressionStatement(expr)
+            let! csSyntaxNode = tryParseExpressionOrStatement parserState Precedence.LOWEST
+            let! statementSyntax =
+                match csSyntaxNode with
+                | :? ExpressionSyntax as expressionSyntax ->
+                    Ok (ExpressionStatement(expressionSyntax) :> StatementSyntax)
+                | :? IfStatementSyntax as ifStatementSyntax ->
+                    Ok ifStatementSyntax  // regular if statement parsing
+                | _ ->
+                    Error (ParseError())  // TODO
+                
+            return statementSyntax
         }
         
-    let internal tryParseLetStatement (parserState: ParserState) : Result<StatementSyntax, ParseError> =
+    let rec internal tryParseLetStatement (parserState: ParserState) : Result<StatementSyntax array, ParseError> =
         result {
             // is the 'let' keyword
             // if ever we have more modifiers (ex. types and 'const' keyword for example), this needs to be modified
@@ -101,43 +162,149 @@ module private Statements =
                     let errorMsg = $"Expected an assignment operator ('='), but received \"{peekToken.Literal}\" of type \"{peekToken.Type}\""
                     Error (ParseError(innerException=LetStatementParseError(message=errorMsg)))
                     
-            let! expr = tryParseExpression parserState Precedence.LOWEST
+            let! csSyntaxNode = tryParseExpressionOrStatement parserState Precedence.LOWEST
             consumeUntilTokenType isSemicolon parserState |> ignore
             
-            let variableDeclarator =
-                SyntaxFactory
-                    .VariableDeclarator(SyntaxFactory.Identifier(variableName))
-                    .WithInitializer(SyntaxFactory.EqualsValueClause(expr))
-            let variableDeclaration =
-                SyntaxFactory.VariableDeclaration(
-                    SyntaxFactory.IdentifierName("var"),
-                    SyntaxFactory.SeparatedList([| variableDeclarator |]))
-            return SyntaxFactory.LocalDeclarationStatement(variableDeclaration)
+            let! statementSyntax =
+                match csSyntaxNode with
+                | :? ExpressionSyntax as expressionSyntax ->
+                    let variableDeclarator =
+                        SyntaxFactory
+                            .VariableDeclarator(SyntaxFactory.Identifier(variableName))
+                            .WithInitializer(SyntaxFactory.EqualsValueClause(expressionSyntax))
+                    let variableDeclaration =
+                        SyntaxFactory.VariableDeclaration(
+                            SyntaxFactory.IdentifierName("var"),
+                            SyntaxFactory.SeparatedList([| variableDeclarator |]))
+                    let localDeclarationStatement = SyntaxFactory.LocalDeclarationStatement(variableDeclaration) :> StatementSyntax
+                    Ok [| localDeclarationStatement |]
+                    
+                | :? IfStatementSyntax as ifStatementSyntax ->
+                    // reformat if statement into separate blocks of code
+                    let varDeclarationStatement =
+                        LocalDeclarationStatement(
+                            VariableDeclaration(
+                                PredefinedType(Token(SyntaxKind.ObjectKeyword)),
+                                SeparatedList(
+                                [|
+                                    VariableDeclarator(Identifier(variableName))
+                                |])
+                                )
+                            ) :> StatementSyntax
+                        
+                    let transformedIfStatementResult = transformIfStatement variableName ifStatementSyntax
+                    
+                    transformedIfStatementResult
+                    |> Result.map (fun transformedIfStatement -> [| varDeclarationStatement; transformedIfStatement :> StatementSyntax |])
+                | _ ->
+                    Error (ParseError())  // TODO
+                    
+            return statementSyntax
         }
+        
+    /// <summary>
+    /// Transforms an inline if-assignment expression into a multi-line one.
+    /// <code>
+    /// var foobar = 5 > 2 ? 5 : 2;
+    /// </code>
+    /// Becomes
+    /// <code>
+    /// object foobar;
+    /// if (5 > 2)
+    /// {
+    ///     foobar = 5;
+    /// }
+    /// else
+    /// {
+    ///     foobar = 2;
+    /// }
+    /// </code>
+    /// </summary>
+    /// <remarks>
+    /// <ul>
+    /// <li>
+    /// As of right now (2025/03/11), the assigned type is <c>object</c>, but this could be changed later on to infer
+    /// the actual type of the returned if expression.
+    /// </li>
+    /// <li>
+    /// It needs to be done this way since we want to put multiple expressions and/or statements.
+    /// </li>
+    /// </ul>
+    /// </remarks>
+    and private transformIfStatement (variableName: string) (ifStatement: IfStatementSyntax) =
+        let tryCastToBlockStatement (statementSyntax: StatementSyntax) =
+            match statementSyntax with
+            | :? BlockSyntax as blockSyntax -> Ok blockSyntax
+            | _ -> 
+                let errMsg = $"Expected the clause of an inline 'if expression to be \"{nameof(BlockSyntax)}\", received \"{statementSyntax.GetType()}\" instead"
+                Error (InlineIfExpressionParseError(message=errMsg) :> ParseError)
+        
+        let tryGetExpression (syntaxNode: CSharpSyntaxNode) : Result<ExpressionSyntax, ParseError> =
+            match syntaxNode with
+            | :? ExpressionStatementSyntax as expressionStatement ->
+                Ok expressionStatement.Expression
+            | _ ->
+                let errMsg = $"Expected an expression statement as the last statement in an inline 'if expression', received \"{syntaxNode.GetType()}\" instead"
+                Error (InlineIfExpressionParseError(message=errMsg) :> ParseError)
+                
+        try
+            result {
+                // #1. Asserts on given if statement
+                do! match isNull ifStatement.Else with
+                    | true -> Error (InlineIfExpressionParseError(message="An inline 'if expression' requires at least both branches of an if statement") :> ParseError)
+                    | false -> Ok ()
+                
+                // #2. Attempting to convert the last expression of each clause to an assignment statement (to the variable)
+                let! primaryClause = tryCastToBlockStatement ifStatement.Statement
+                let lastStatement = primaryClause.Statements.Item(primaryClause.Statements.Count - 1)
+                let! primaryClauseLastExpr = tryGetExpression lastStatement
+                let primaryAssignmentStatement = 
+                    ExpressionStatement(
+                        AssignmentExpression(
+                            SyntaxKind.SimpleAssignmentExpression,
+                            IdentifierName(variableName),
+                            primaryClauseLastExpr
+                            )
+                        ) :> StatementSyntax
+                
+                let! elseClause = tryCastToBlockStatement ifStatement.Else.Statement
+                let lastStatement = elseClause.Statements.Item(elseClause.Statements.Count - 1)
+                let! elseClauseLastExpr = tryGetExpression lastStatement
+                let elseAssignmentStatement = 
+                    ExpressionStatement(
+                        AssignmentExpression(
+                            SyntaxKind.SimpleAssignmentExpression,
+                            IdentifierName(variableName),
+                            elseClauseLastExpr
+                            )
+                        ) :> StatementSyntax
+                    
+                // #3. Rebuilding the if statement
+                let newPrimaryClauseStatements =
+                    primaryClause.Statements
+                    |> Seq.pairwise |> Seq.map fst  // get every item but last
+                    |> (fun s -> Seq.append s (Seq.singleton primaryAssignmentStatement))   // append to end
+                let newPrimaryClauseStatement = Block(newPrimaryClauseStatements)
+                
+                let newElseClauseStatements =
+                    elseClause.Statements
+                    |> Seq.pairwise |> Seq.map fst  // get every item but last
+                    |> (fun s -> Seq.append s (Seq.singleton elseAssignmentStatement))   // append to end
+                let newElseClauseStatement = Block(newElseClauseStatements)
+                
+                return IfStatement(
+                    Token(SyntaxKind.IfKeyword),
+                    Token(SyntaxKind.OpenParenToken),
+                    ifStatement.Condition,
+                    Token(SyntaxKind.CloseParenToken),
+                    newPrimaryClauseStatement,
+                    ElseClause(newElseClauseStatement))
+            }
+        with
+        | ex ->
+            Error (InlineIfExpressionParseError(message="An unexpected error occurred.") :> ParseError)
     
-   
-let rec internal tryParseExpression (parserState: ParserState) (precedence: Precedence) : Result<CSharpSyntaxNode, ParseError> =
-    result {
-        let! prefixParseFunc = tryGetPrefixParseFunc prefixParseFunctionsMap parserState 
-        let! leftExpression = prefixParseFunc parserState
-        return! tryParseExpressionHelper parserState precedence leftExpression
-    }
-    
-and internal tryParseExpressionHelper (parserState: ParserState) (precedence: Precedence) (leftExpr: CSharpSyntaxNode) : Result<CSharpSyntaxNode, ParseError> =
-    result {
-        let peekToken = parserState.PeekToken()
-        let peekPrecedence =
-            match Map.tryFind peekToken.Type tokenTypeToPrecedenceMap with
-            | Some precedence -> precedence
-            | None -> Precedence.LOWEST
-            
-        if peekToken.Type <> TokenType.SEMICOLON && precedence < peekPrecedence then
-            let! infixParseFunc = tryGetInfixParseFunc infixParseFunctionsMap parserState
-            let! infixExpr = infixParseFunc parserState leftExpr
-            return! tryParseExpressionHelper parserState precedence infixExpr
-        else
-            return leftExpr
-    }
+
     
     
     
@@ -219,7 +386,12 @@ module internal PrefixExpressions =
         result {
             parserState.PopToken() |> ignore  // consume the left paren
             
-            let! expr = tryParseExpression parserState Precedence.LOWEST
+            let! csSyntaxNode = tryParseExpressionOrStatement parserState Precedence.LOWEST
+            let! expr =
+                match csSyntaxNode with
+                | :? ExpressionSyntax as expr -> Ok expr
+                | _ -> Error (ParseError())  // TODO
+                
             let wrappedExpr = SyntaxFactory.ParenthesizedExpression(SyntaxFactory.Token(SyntaxKind.OpenParenToken), expr, SyntaxFactory.Token(SyntaxKind.CloseParenToken))
             consumeUntilTokenType (fun tt -> isSemicolon tt || isRParen tt) parserState |> ignore
             
@@ -247,7 +419,12 @@ module internal PrefixExpressions =
             
         result {
             let currentToken = parserState.PopToken()
-            let! rightExpr = tryParseExpression parserState Precedence.PREFIX
+            let! csSyntaxNode = tryParseExpressionOrStatement parserState Precedence.PREFIX
+            let! rightExpr =
+                match csSyntaxNode with
+                | :? ExpressionSyntax as expr -> Ok expr
+                | _ -> Error (ParseError())  // TODO
+                
             let! syntaxKind = 
                 match currentToken.Type with
                 | BANG -> Ok SyntaxKind.LogicalNotExpression
@@ -256,10 +433,253 @@ module internal PrefixExpressions =
             return SyntaxFactory.PrefixUnaryExpression(syntaxKind, rightExpr) :> ExpressionSyntax
         }
         
-    let tryParseIfExpression
+        
+    /// <summary>
+    /// Parses an if expression (can be-inline).
+    /// </summary>
+    let rec tryParseIfExpression
         (parserState: ParserState)
-        : Result<ExpressionSyntax, ParseError> =
-        failwith "todo"
+        : Result<IfStatementSyntax, ParseError> =
+        result {
+            parserState.PopToken() |> ignore  // 'if' keyword
+            
+            // #1. Parsing the condition
+            let currentToken = parserState.PopToken()
+            do! match currentToken.Type with
+                | LPAREN -> Ok ()
+                | _ -> consumeUntilTokenType isSemicolon parserState |> ignore
+                       onUnexpectedToken LPAREN currentToken
+
+            let! csSyntaxNode = tryParseExpressionOrStatement parserState Precedence.LOWEST
+            let! condition =
+                match csSyntaxNode with
+                | :? ExpressionSyntax as expr -> Ok expr
+                | other -> Error (ParseError(message=($"Expected an expression for the condition, but received \"{other.GetType()}\"")))
+                
+            let currentToken = parserState.PopToken()
+            do! match currentToken.Type with
+                | RPAREN -> Ok ()
+                | _ -> consumeUntilTokenType isSemicolon parserState |> ignore
+                       onUnexpectedToken RPAREN currentToken
+                       
+                       
+            // #2. Parsing the main block
+            let currentToken = parserState.PopToken()
+            do! match currentToken.Type with
+                | LBRACE -> Ok ()
+                | _ -> consumeUntilTokenType isSemicolon parserState |> ignore
+                       onUnexpectedToken LBRACE currentToken
+                       
+            let stopCondition (parserState: ParserState) = parserState.PeekToken().Type = TokenType.RBRACE || parserState.IsEof()
+            let statements, parseErrors = parseTokensHelper stopCondition parserState [] []
+            do! assertNoParseErrors parseErrors
+            
+            let mainBlock = Block(List.toArray statements)
+            
+            let currentToken = parserState.PopToken()
+            do! match currentToken.Type with
+                | RBRACE -> Ok ()
+                | _ -> consumeUntilTokenType isSemicolon parserState |> ignore
+                       onUnexpectedToken RBRACE currentToken
+                       
+                       
+            // #3. Parsing the else statement, if any
+            let! elseClause =
+                match parserState.PeekToken().Type with
+                | ELSE ->
+                    parserState.PopToken() |> ignore
+                    Result.map Some (parseElseBlock parserState)
+                | _ ->
+                    Ok None
+                    
+            let elseClauseNullable : ElseClauseSyntax | null =
+                match elseClause with
+                | None -> null
+                | Some value -> value
+                    
+            // #4. Construct the thang
+            let ifStatement = 
+                IfStatement(
+                    Token(SyntaxKind.IfKeyword),
+                    Token(SyntaxKind.OpenParenToken),
+                    condition,
+                    Token(SyntaxKind.CloseParenToken),
+                    mainBlock,
+                    elseClauseNullable)
+            return ifStatement
+        }
+        
+        
+    // TODO:
+    // Right now, parsing a block can yield multiple parse errors, but we are only checking for one cause I don't
+    // want to change the API as of right now 2025/03/11, 5:31PM
+        
+    and private onUnexpectedToken (expectedTokenType: TokenType) (actualToken: Token) =
+        let errorMsg = $"Expected a/an \"{expectedTokenType}\", but received \"{actualToken.Literal}\" of type \"{actualToken.Type}\""
+        Error (ParseError(message=errorMsg))
+        
+        
+    and private parseElseBlock (parserState: ParserState) : Result<ElseClauseSyntax, ParseError> =
+        result {
+            let currentToken = parserState.PopToken()
+            do! match currentToken.Type with
+                | LBRACE -> Ok ()
+                | _ -> consumeUntilTokenType isSemicolon parserState |> ignore
+                       onUnexpectedToken LBRACE currentToken
+            
+            let stopCondition (parserState: ParserState) = parserState.PeekToken().Type = TokenType.RBRACE || parserState.IsEof()
+            let statements, parseErrors = parseTokensHelper stopCondition parserState [] []
+            do! assertNoParseErrors parseErrors
+            
+            let currentToken = parserState.PopToken()
+            do! match currentToken.Type with
+                | RBRACE -> Ok ()
+                | _ -> consumeUntilTokenType isSemicolon parserState |> ignore
+                       onUnexpectedToken RBRACE currentToken
+                       
+            let asBlock = Block(List.toArray statements)
+            let elseClause = ElseClause(Token(SyntaxKind.ElseKeyword), asBlock)
+            return elseClause
+        }
+        
+        
+    /// <summary>
+    /// Parses a function literal to its C# equivalent. Below are sample equivalent examples:
+    /// <br/>
+    /// Monkey:
+    /// <code>
+    /// fn(int x, int y) : int {
+    ///     let z = 10;
+    ///     x + y + z;
+    /// }
+    /// </code>
+    ///
+    /// C# equivalent:
+    /// <code>
+    /// (int)((int x, int y) =>
+    /// {
+    ///     int z = 10;
+    ///     return x + y + z;
+    /// });
+    /// </code>
+    /// </summary>
+    /// <remarks>
+    /// Note that the 'cast' in the C# equivalent code 'enforces' the return type of our declared function.
+    /// </remarks>
+    let rec tryParseFunctionExpression
+        (parserState: ParserState)
+        : Result<CastExpressionSyntax, ParseError> =
+            
+        let assertAndPop (expectedTokenType: TokenType) (parserState: ParserState) =
+            let currentToken = parserState.PopToken()
+            match currentToken.Type with
+            | tokenType when tokenType = expectedTokenType -> Ok ()
+            | _ -> consumeUntilTokenType isSemicolon parserState |> ignore
+                   onUnexpectedToken expectedTokenType currentToken
+            
+        result {
+            parserState.PopToken() |> ignore  // consume 'fn' keyword
+            
+            
+            // #1. parse parameters list
+            do! assertAndPop LPAREN parserState
+            
+            let! parametersList =
+                match parserState.PeekToken().Type with
+                | RPAREN -> Ok (SeparatedSyntaxList<ParameterSyntax>())  // no parameters
+                | _ -> parseArgumentsList [] parserState
+            do! assertAndPop RPAREN parserState
+            
+            
+            // #2. parse return type
+            do! assertAndPop COLON parserState
+            let currentToken = parserState.PopToken()
+            let! returnTypeSyntax =
+                match currentToken.Type, currentToken.Literal with
+                | IDENT, "int" ->  Token(SyntaxKind.IntKeyword)         |> PredefinedType |> (fun t -> t :> TypeSyntax) |> Ok
+                | IDENT, "string" ->  Token(SyntaxKind.StringKeyword)   |> PredefinedType |> (fun t -> t :> TypeSyntax) |> Ok
+                | IDENT, _ ->  IdentifierName(currentToken.Literal) :> TypeSyntax |> Ok
+                | _ ->      Error (ParseError(message=($"Expected a valid return type, but received \"{currentToken.Literal}\"")))
+                
+            // #3. parse function block
+            do! assertAndPop LBRACE parserState
+            
+            let stopCondition (parserState: ParserState) = parserState.PeekToken().Type = TokenType.RBRACE || parserState.IsEof()
+            let statements, parseErrors = parseTokensHelper stopCondition parserState [] []
+            do! assertNoParseErrors parseErrors
+            let! modifiedStatements = modifiedStatementsList statements
+            let asBlock = modifiedStatements |> Block
+            
+            do! assertAndPop RBRACE parserState
+            
+            
+            // #4. construct cast expression to statically enforce return type
+            let lambdaExpression = ParenthesizedLambdaExpression(ParameterList(parametersList), asBlock)
+            let castExpression =
+                CastExpression(
+                    Token(SyntaxKind.OpenParenToken),
+                    returnTypeSyntax,
+                    Token(SyntaxKind.CloseParenToken),
+                    ParenthesizedExpression(
+                        Token(SyntaxKind.OpenParenToken),
+                        lambdaExpression,
+                        Token(SyntaxKind.CloseParenToken)
+                        )
+                    )
+            
+            return castExpression
+        }
+        
+    /// Expected input "TYPEDEF_1 ARG_NAME_1, TYPEDEF_2 ARG_NAME_2, ..., TYPEDEF_N ARG_NAME_N) ... ~ REST OF THE TOKENS"
+    and private parseArgumentsList
+            (parameters: ParameterSyntax list)
+            (parserState: ParserState)
+            : Result<SeparatedSyntaxList<ParameterSyntax>, ParseError> =
+        result {
+            let currentToken = parserState.PopToken()
+            let! typeSyntax = 
+                match currentToken.Type, currentToken.Literal with
+                | IDENT, "int" ->  Token(SyntaxKind.IntKeyword)         |> PredefinedType |> (fun t -> t :> TypeSyntax) |> Ok
+                | IDENT, "string" ->  Token(SyntaxKind.StringKeyword)   |> PredefinedType |> (fun t -> t :> TypeSyntax) |> Ok
+                | IDENT, _ ->  IdentifierName(currentToken.Literal) :> TypeSyntax |> Ok
+                | _ ->      Error (ParseError(message=($"Expected a valid return type, but received \"{currentToken.Literal}\"")))
+            
+            let currentToken = parserState.PopToken()
+            let! argNameToken = 
+                match currentToken.Type with
+                | IDENT ->  Identifier(currentToken.Literal)    |> Ok
+                | _ ->      Error (ParseError(message=($"[arg #{List.length parameters}] Expected an identifier for the argument name, but received \"{currentToken.Literal}\"")))
+            
+            return Parameter(argNameToken).WithType(typeSyntax)
+        }
+        |> function
+           | Ok parameterSyntax ->
+               let newParameters = parameterSyntax :: parameters
+               match parserState.PeekToken().Type with
+               | COMMA ->
+                   parserState.PopToken() |> ignore  // consume the comma
+                   parseArgumentsList newParameters parserState
+               | RPAREN ->
+                   Ok (SeparatedList<ParameterSyntax>(List.rev newParameters))
+               | tokenType ->
+                   Error (ParseError(message=($"Invalid token type \"{tokenType}\" detected")))
+           | Error error ->
+               Error error
+
+    /// Transforms the last statement into a return statement if applicable, errors otherwise
+    and private modifiedStatementsList (statements: StatementSyntax seq) : Result<StatementSyntax seq, ParseError> =
+        let everythingButLastStatement = statements |> Seq.pairwise |> Seq.map fst
+        let lastStatement = Seq.last statements
+        
+        match lastStatement with
+        | :? ExpressionStatementSyntax as expressionStatementSyntax ->
+            let newLastStatement = expressionStatementSyntax.Expression |> ReturnStatement
+            let newStatements = Seq.append everythingButLastStatement (Seq.singleton newLastStatement)
+            newStatements |> Ok
+        | _ -> 
+            Error (ParseError(message=($"Expected the last statement of a function to be a return statement or an expression statement, but got \"{lastStatement.GetType()}\"")))
+        
+        
         
     let private castToCSharpSyntaxNode (result: Result<'T, 'E>) : Result<CSharpSyntaxNode, 'E> =
         Result.map (fun t -> t :> CSharpSyntaxNode) result
@@ -279,9 +699,9 @@ module internal PrefixExpressions =
             (TokenType.MINUS,   tryParsePrefixExpression        >> castToCSharpSyntaxNode)
             (TokenType.LPAREN,  tryParseParenthesisExpression   >> castToCSharpSyntaxNode)
             (TokenType.IF,      tryParseIfExpression            >> castToCSharpSyntaxNode)
+            (TokenType.FUNCTION, tryParseFunctionExpression     >> castToCSharpSyntaxNode)
             
             (*
-            (TokenType.FUNCTION, tryParseFunctionLiteral)
             (TokenType.LBRACKET, tryParseArrayLiteral)
             (TokenType.LBRACE, tryParseHashLiteral)
             *)
@@ -335,7 +755,12 @@ module internal InfixExpressions =
                 | _ -> getError token
                     
             let syntaxKind, operatorToken = syntaxKindAndOperatorToken
-            let! rightExpr = tryParseExpression parserState precedence
+            let! csSyntaxNode = tryParseExpressionOrStatement parserState precedence
+            let! rightExpr =
+                match csSyntaxNode with
+                | :? ExpressionSyntax as expr -> Ok expr
+                | _ -> Error (ParseError())  // TODO
+                
             return SyntaxFactory.BinaryExpression(syntaxKind, leftExpr, operatorToken, rightExpr)
         }
     

@@ -1,4 +1,4 @@
-﻿module Frontend.CLR.Parsers.ParseErrors
+﻿module Monkey.Frontend.CLR.Parsers.ParseErrors
 
 open System
 open Microsoft.CodeAnalysis.CSharp
@@ -57,6 +57,18 @@ type LiteralExpressionParseError(
     
 ///
 type LetStatementParseError(
+        ?message: string,
+        ?innerException: Exception) =
+    inherit ParseError(nullIfNone message, None, nullIfNone innerException)
+    
+///
+type InlineIfExpressionParseError(
+        ?message: string,
+        ?innerException: Exception) =
+    inherit ParseError(nullIfNone message, None, nullIfNone innerException)
+    
+///
+type FunctionExpressionParseError(
         ?message: string,
         ?innerException: Exception) =
     inherit ParseError(nullIfNone message, None, nullIfNone innerException)
