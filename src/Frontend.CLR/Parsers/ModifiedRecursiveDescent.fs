@@ -708,7 +708,11 @@ module internal PrefixExpressions =
         ]
         
     /// Attempts to get the INFIX parse function based on the next token's type
-    let tryGetInfixParseFunc (infixParseFuncMap: Map<TokenType, ParserState -> ExpressionSyntax -> Result<ExpressionSyntax, ParseError>>) (parserState: ParserState) : Result<ParserState -> ExpressionSyntax -> Result<ExpressionSyntax, ParseError>, ParseError> =
+    let tryGetInfixParseFunc
+            (infixParseFuncMap: Map<TokenType, ParserState -> ExpressionSyntax -> Result<ExpressionSyntax, ParseError>>)
+            (parserState: ParserState)
+            : Result<ParserState -> ExpressionSyntax -> Result<ExpressionSyntax, ParseError>, ParseError> =
+                
         match parserState.IsEof() with
         | true ->
             let message = "FATAL. Tokens queue empty. This indicates a logical error in the parsing process."

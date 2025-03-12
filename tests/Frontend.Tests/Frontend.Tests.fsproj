@@ -32,7 +32,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\src\Frontend\Frontend.fsproj" />
+      <ProjectReference Include="..\..\src\legacy\Frontend\Frontend.fsproj" />
     </ItemGroup>
 
 </Project>

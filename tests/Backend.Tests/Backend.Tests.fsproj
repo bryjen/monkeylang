@@ -30,7 +30,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\src\Backend\Backend.fsproj" />
+      <ProjectReference Include="..\..\src\legacy\Backend\Backend.fsproj" />
     </ItemGroup>
 
 </Project>

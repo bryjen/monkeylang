@@ -23,8 +23,8 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\Backend\Backend.fsproj" />
-      <ProjectReference Include="..\Frontend\Frontend.fsproj" />
+      <ProjectReference Include="..\legacy\Backend\Backend.fsproj" />
+      <ProjectReference Include="..\legacy\Frontend\Frontend.fsproj" />
     </ItemGroup>
 
 </Project>
