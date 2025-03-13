@@ -125,15 +125,26 @@ let internal tokenTypeToPrecedenceMap = Map.ofList [
 ]
 
 
-let defaultHashLen = 16
+let internal defaultHashLen = 16
 
-let generateRandomStringHash n =
+let internal generateRandomStringHash n =
     let chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
     let random = Random()
     Array.init n (fun _ -> chars.[random.Next(chars.Length)]) |> String
+    
+    
+let internal onUnexpectedToken (expectedTokenType: TokenType) (actualToken: Token) =
+    let errorMsg = $"Expected a/an \"{expectedTokenType}\", but received \"{actualToken.Literal}\" of type \"{actualToken.Type}\""
+    Error (ParseError(message=errorMsg))
 
+let internal assertAndPop (expectedTokenType: TokenType) (parserState: ParserState) =
+    let currentToken = parserState.PopToken()
+    match currentToken.Type with
+    | tokenType when tokenType = expectedTokenType -> Ok ()
+    | _ -> consumeUntilTokenType isSemicolon parserState |> ignore
+           onUnexpectedToken expectedTokenType currentToken
 
-let assertNoParseErrors (parseErrors: ParseError list) =
+let internal assertNoParseErrors (parseErrors: ParseError list) =
     match parseErrors with
     | [ ] ->
         Ok ()

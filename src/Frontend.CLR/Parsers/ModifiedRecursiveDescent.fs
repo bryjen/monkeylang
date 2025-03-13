@@ -142,6 +142,7 @@ module private Statements =
             // if ever we have more modifiers (ex. types and 'const' keyword for example), this needs to be modified
             let _ = parserState.PopToken()
             
+            // #1. parse variable name
             let peekToken = parserState.PeekToken()
             let! variableName = 
                 match peekToken.Type with
@@ -153,6 +154,23 @@ module private Statements =
                     let errorMsg = $"Expected an identifier after 'let' keyword, but received \"{peekToken.Literal}\" of type \"{peekToken.Type}\""
                     Error (ParseError(innerException=LetStatementParseError(message=errorMsg)))
                     
+                    
+            // #2. trying to parse explicit type annotation, if it exists
+            let! explicitTypeSyntaxOption =
+                match parserState.PeekToken().Type with
+                | COLON ->
+                    parserState.PopToken() |> ignore  // consume the ':' token
+                    let explicitTypeSyntaxResult = tryParseTypeSyntax (ParseError(innerException=LetStatementParseError(message="Failed to parse explicit variable type annotation."))) parserState
+                    Result.map Some explicitTypeSyntaxResult
+                | _ -> Ok None
+                
+            let varTypeSyntax =
+                match explicitTypeSyntaxOption with
+                | Some typeSyntax -> typeSyntax
+                | None -> SyntaxFactory.IdentifierName("var") :> TypeSyntax  // default to 'var'
+                    
+                    
+            // #3. asserting equals token
             do! match parserState.PeekToken().Type with
                 | ASSIGN ->
                     parserState.PopToken() |> ignore  // consume the 'equals' token
@@ -162,9 +180,13 @@ module private Statements =
                     let errorMsg = $"Expected an assignment operator ('='), but received \"{peekToken.Literal}\" of type \"{peekToken.Type}\""
                     Error (ParseError(innerException=LetStatementParseError(message=errorMsg)))
                     
+                    
+            // #4. parsing actual expression
             let! csSyntaxNode = tryParseExpressionOrStatement parserState Precedence.LOWEST
             consumeUntilTokenType isSemicolon parserState |> ignore
             
+            
+            // #5. forming the let statement, as well as performing any modifications as necessary
             let! statementSyntax =
                 match csSyntaxNode with
                 | :? ExpressionSyntax as expr ->
@@ -175,7 +197,7 @@ module private Statements =
                             let functionSignature = parserState.LambdaTypeMap[functionHash]
                             functionSignature.ToFuncTypeSyntax() :> TypeSyntax
                         | _ ->
-                            SyntaxFactory.IdentifierName("var") :> TypeSyntax
+                            varTypeSyntax
                             
                     let variableDeclarator =
                         SyntaxFactory
@@ -202,15 +224,14 @@ module private Statements =
                                 )
                             ) :> StatementSyntax
                         
-                    let transformedIfStatementResult = transformIfStatement variableName ifStatementSyntax
-                    
-                    transformedIfStatementResult
+                    transformIfStatement variableName ifStatementSyntax
                     |> Result.map (fun transformedIfStatement -> [| varDeclarationStatement; transformedIfStatement :> StatementSyntax |])
                 | _ ->
                     Error (ParseError())  // TODO
                     
             return statementSyntax
         }
+        
         
     /// <remarks>
     /// We need this to determine whether the expression we're assigning to the variable is a function.
@@ -328,6 +349,64 @@ module private Statements =
             Error (InlineIfExpressionParseError(message="An unexpected error occurred.") :> ParseError)
     
 
+    
+let rec internal tryParseTypeSyntax
+        (onInvalid: ParseError)
+        (parserState: ParserState)
+        : Result<TypeSyntax, ParseError> =
+            
+    let currentToken = parserState.PopToken()
+    match currentToken.Type, currentToken.Literal with
+    | LBRACKET, "[" ->
+        tryParseFunctionTypeSyntax [] onInvalid parserState
+    | IDENT, "int" ->
+        Token(SyntaxKind.IntKeyword)         |> PredefinedType |> (fun t -> t :> TypeSyntax) |> Ok
+    | IDENT, "string" ->
+        Token(SyntaxKind.StringKeyword)   |> PredefinedType |> (fun t -> t :> TypeSyntax) |> Ok
+    | IDENT, _ ->
+        IdentifierName(currentToken.Literal) :> TypeSyntax |> Ok
+    | _ ->
+        Error onInvalid
+        
+/// example input:  "int -> int -> int]"
+/// the 'lbracket' is assumed to be consumed by the caller function
+and private tryParseFunctionTypeSyntax 
+        (funcSigTypes: TypeSyntax list)
+        (onInvalid: ParseError)
+        (parserState: ParserState)
+        : Result<TypeSyntax, ParseError> =
+            
+    // modified to also stop at rbrackets
+    let assertAndPopAlt (expectedTokenType: TokenType) (parserState: ParserState) =
+        let isRBracket tokenType = tokenType = RBRACKET
+        let isRbBracketOrSemicolon tokenType = isSemicolon tokenType || isRBracket tokenType
+        
+        let currentToken = parserState.PopToken()
+        match currentToken.Type with
+        | tokenType when tokenType = expectedTokenType -> Ok ()
+        | _ -> consumeUntilTokenType isRbBracketOrSemicolon parserState |> ignore
+               onUnexpectedToken expectedTokenType currentToken
+            
+    tryParseTypeSyntax onInvalid parserState
+    |> function
+        | Ok typeSyntax ->
+            let newFuncSigTypes = typeSyntax :: funcSigTypes
+            let peekToken = parserState.PeekToken()
+            match peekToken.Type with
+            | RBRACKET ->
+                parserState.PopToken() |> ignore  // consume the ']'
+                let typeSyntaxArr = newFuncSigTypes |> List.toArray |> Array.rev
+                let commas = Array.create ((Array.length typeSyntaxArr) - 1) (Token(SyntaxKind.CommaToken))
+                let typeSyntax = GenericName(Identifier("Func")).WithTypeArgumentList(TypeArgumentList(SeparatedList<TypeSyntax>(typeSyntaxArr, commas)))
+                Ok typeSyntax
+            | RARROW ->
+                parserState.PopToken() |> ignore
+                tryParseFunctionTypeSyntax newFuncSigTypes onInvalid parserState
+            | tokenType ->
+               Error (ParseError(message=($"Invalid token type \"{tokenType}\" detected")))
+        | Error parseError ->
+            // TODO: see what you can do with composite errors
+            Error parseError
     
     
     
@@ -537,11 +616,6 @@ module internal PrefixExpressions =
     // Right now, parsing a block can yield multiple parse errors, but we are only checking for one cause I don't
     // want to change the API as of right now 2025/03/11, 5:31PM
         
-    and private onUnexpectedToken (expectedTokenType: TokenType) (actualToken: Token) =
-        let errorMsg = $"Expected a/an \"{expectedTokenType}\", but received \"{actualToken.Literal}\" of type \"{actualToken.Type}\""
-        Error (ParseError(message=errorMsg))
-        
-        
     and private parseElseBlock (parserState: ParserState) : Result<ElseClauseSyntax, ParseError> =
         result {
             let currentToken = parserState.PopToken()
@@ -593,12 +667,6 @@ module internal PrefixExpressions =
         (parserState: ParserState)
         : Result<ParenthesizedLambdaExpressionSyntax, ParseError> =
             
-        let assertAndPop (expectedTokenType: TokenType) (parserState: ParserState) =
-            let currentToken = parserState.PopToken()
-            match currentToken.Type with
-            | tokenType when tokenType = expectedTokenType -> Ok ()
-            | _ -> consumeUntilTokenType isSemicolon parserState |> ignore
-                   onUnexpectedToken expectedTokenType currentToken
             
         result {
             parserState.PopToken() |> ignore  // consume 'fn' keyword
@@ -617,15 +685,14 @@ module internal PrefixExpressions =
             
             // #2. parse return type
             do! assertAndPop COLON parserState
-            let currentToken = parserState.PopToken()
-            let onInvalidReturnTypeError = ParseError(message=($"Expected a valid return type, but received \"{currentToken.Literal}\""))
-            let! returnTypeSyntax = tryParseType onInvalidReturnTypeError currentToken
+            let retTypeToken = parserState.PeekToken()
+            let onInvalidReturnTypeError = ParseError(message=($"Expected a valid return type, but received \"{retTypeToken.Literal}\""))
+            let! returnTypeSyntax = tryParseTypeSyntax onInvalidReturnTypeError parserState
             
             let isUnitReturn =  // equivalent to 'void' method
-                match currentToken.Type, currentToken.Literal with
+                match retTypeToken.Type, retTypeToken.Literal with
                 | IDENT, "unit" -> true
                 | _ -> false
-                
                 
                 
             // #3. parse function block
@@ -666,23 +733,15 @@ module internal PrefixExpressions =
             return lambdaExpression
         }
         
-    and tryParseType (onInvalid: ParseError) (token: Token) =
-        match token.Type, token.Literal with
-        | IDENT, "int" ->     Token(SyntaxKind.IntKeyword)         |> PredefinedType |> (fun t -> t :> TypeSyntax) |> Ok
-        | IDENT, "string" ->  Token(SyntaxKind.StringKeyword)   |> PredefinedType |> (fun t -> t :> TypeSyntax) |> Ok
-        | IDENT, _ ->         IdentifierName(token.Literal) :> TypeSyntax |> Ok
-        | _ -> Error onInvalid
-        
     /// Expected input "TYPEDEF_1 ARG_NAME_1, TYPEDEF_2 ARG_NAME_2, ..., TYPEDEF_N ARG_NAME_N) ... ~ REST OF THE TOKENS"
     and private parseArgumentsList
             (parameters: ParameterSyntax list)
             (parserState: ParserState)
             : Result<SeparatedSyntaxList<ParameterSyntax>, ParseError> =
         result {
-            let currentToken = parserState.PopToken()
-            
+            let currentToken = parserState.PeekToken()
             let onInvalidTypeSyntaxError = ParseError(message=($"Expected a valid return type, but received \"{currentToken.Literal}\""))
-            let! typeSyntax = tryParseType onInvalidTypeSyntaxError currentToken
+            let! typeSyntax = tryParseTypeSyntax onInvalidTypeSyntaxError parserState
             
             let currentToken = parserState.PopToken()
             let! argNameToken = 

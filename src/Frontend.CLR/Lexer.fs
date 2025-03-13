@@ -54,6 +54,8 @@ module private LexerHelpers =
             currentIndex + 2, { Type = EQ; Literal = "==" }
         elif currentChar = '!' && nextChar = '=' then
             currentIndex + 2, { Type = NOT_EQ; Literal = "!=" }
+        elif currentChar = '-' && nextChar = '>' then
+            currentIndex + 2, { Type = RARROW; Literal = "->" }
         else
             let tokenType = 
                 match currentChar with

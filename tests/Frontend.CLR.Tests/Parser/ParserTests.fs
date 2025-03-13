@@ -68,11 +68,11 @@ map(numbers, fibonacci);
 
 ```Monkey
 let foobar: int = 5;  
-// TODO: optional type annotations
+// optional type annotations
 // "int foobar = 5;"
 
 let partial_app_demo = fn([int -> int -> int] multi_transform, int initialValue) { ... };
-// TODO: taking functions as parameters, as well as being able to typedef them as above
+// taking functions as parameters, as well as being able to typedef them as above
 // "Func<Func<int, int, int>, int, Func<int, int>> partial_app_demo = (Func<int, int, int> transform, int initialValue) => { ... }"
 
 let full_transform: [int -> int -> int] = fn(int x, int y) { ... };
@@ -426,11 +426,89 @@ type BasicVariableAssignmentParsingTests() =
                         |]
                         )))
         )
+        
+        
+        (
+            "let a: int = 5;",
+            SyntaxFactory.LocalDeclarationStatement(
+                SyntaxFactory.VariableDeclaration(
+                    PredefinedType(Token(SyntaxKind.IntKeyword)),
+                    SyntaxFactory.SeparatedList(
+                        [|
+                        SyntaxFactory.VariableDeclarator(SyntaxFactory.Identifier("a"))
+                            .WithInitializer(
+                                SyntaxFactory.EqualsValueClause(
+                                    SyntaxFactory.LiteralExpression(
+                                        SyntaxKind.NumericLiteralExpression,
+                                        SyntaxFactory.Literal(5))
+                                    ))
+                        |]))
+                )
+        )
+        (
+            "let foobar: int = 3 + 4 * 5 == 3 * 1 + 4 * 5;",
+            SyntaxFactory.LocalDeclarationStatement(
+                SyntaxFactory.VariableDeclaration(
+                    PredefinedType(Token(SyntaxKind.IntKeyword)),
+                    SyntaxFactory.SeparatedList(
+                        [|
+                        SyntaxFactory.VariableDeclarator(SyntaxFactory.Identifier("foobar"))
+                            .WithInitializer(
+                                SyntaxFactory.EqualsValueClause(
+                                    SyntaxFactory.BinaryExpression(
+                                        SyntaxKind.EqualsExpression,
+                                        SyntaxFactory.BinaryExpression(
+                                            SyntaxKind.AddExpression,
+                                            SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(3)),
+                                            SyntaxFactory.Token(SyntaxKind.PlusToken),
+                                            SyntaxFactory.BinaryExpression(
+                                                SyntaxKind.MultiplyExpression,
+                                                SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(4)),
+                                                SyntaxFactory.Token(SyntaxKind.AsteriskToken),
+                                                SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(5)))),
+                                        SyntaxFactory.Token(SyntaxKind.EqualsEqualsToken),
+                                        SyntaxFactory.BinaryExpression(
+                                            SyntaxKind.AddExpression,
+                                            SyntaxFactory.BinaryExpression(
+                                                SyntaxKind.MultiplyExpression,
+                                                SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(3)),
+                                                SyntaxFactory.Token(SyntaxKind.AsteriskToken),
+                                                SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(1))),
+                                            SyntaxFactory.Token(SyntaxKind.PlusToken),
+                                            SyntaxFactory.BinaryExpression(
+                                                SyntaxKind.MultiplyExpression,
+                                                SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(4)),
+                                                SyntaxFactory.Token(SyntaxKind.AsteriskToken),
+                                                SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(5)))))
+                                    ))
+                        |]
+                        )))
+        )
+        (
+            "let a: SomeClass = foobar;",
+            SyntaxFactory.LocalDeclarationStatement(
+                SyntaxFactory.VariableDeclaration(
+                    IdentifierName("SomeClass"),
+                    SyntaxFactory.SeparatedList(
+                        [|
+                        SyntaxFactory.VariableDeclarator(SyntaxFactory.Identifier("a"))
+                            .WithInitializer(
+                                SyntaxFactory.EqualsValueClause(
+                                    SyntaxFactory.IdentifierName("foobar")
+                                    ))
+                        |]
+                        )))
+        )
     ]
     
     [<TestCase(0)>]
     [<TestCase(1)>]
     [<TestCase(2)>]
+    
+    // testing explicit type annotations
+    [<TestCase(3)>]
+    [<TestCase(4)>]
+    [<TestCase(5)>]
     member this.``D: Test Basic Let Statement Parsing``(testCaseIndex: int) =
         let input, expectedSyntaxTree = List.item testCaseIndex this.TestCases
         let tokens = Lexer.parseIntoTokens input |> List.toArray
@@ -602,6 +680,7 @@ type IfStatementParsingTests() =
             
 [<TestFixture>]
 [<ParserComponent(ParserComponentType.Expressions)>]
+[<ParserComponent(ParserComponentType.Statements)>]
 type FunctionParsingTests() =
     let castTypeSyntaxArr (arr: 'R array) =
         Array.map (fun o -> o :> TypeSyntax) arr
@@ -614,6 +693,14 @@ type FunctionParsingTests() =
                 ArgumentList(),
                 null)
             )
+        
+    let createFuncSignatureType (types: TypeSyntax array) =
+        let commas = Array.create ((Array.length types) - 1) (Token(SyntaxKind.CommaToken))
+        GenericName(Identifier("Func"))
+            .WithTypeArgumentList(
+                TypeArgumentList(
+                    SeparatedList<TypeSyntax>(types, commas)))
+        
     
     member this.TestCases : (string * SyntaxNode) list = [
         (
@@ -799,14 +886,211 @@ type FunctionParsingTests() =
                     )
                 )
         )
+        (
+            """fn([int -> int] transform, int init_value) : int {
+    init_value;
+}
+""",
+            ExpressionStatement(
+                ParenthesizedLambdaExpression(
+                    ParameterList(
+                        SeparatedList<ParameterSyntax>(
+                            [|
+                                Parameter(Identifier("transform"))
+                                    .WithType(createFuncSignatureType [|
+                                        PredefinedType(Token(SyntaxKind.IntKeyword))
+                                        PredefinedType(Token(SyntaxKind.IntKeyword))
+                                    |])
+                                Parameter(Identifier("init_value"))
+                                    .WithType(PredefinedType(Token(SyntaxKind.IntKeyword)))
+                            |])
+                        ),
+                    
+                    Block(
+                        [|
+                            ReturnStatement(
+                                IdentifierName("init_value")
+                                ) :> StatementSyntax
+                        |]
+                        )
+                    )
+                )
+        )
+        (
+            """fn([int -> int -> int] full_transform, int init_value) : [int -> int] {
+    init_value;
+}
+""",
+            ExpressionStatement(
+                ParenthesizedLambdaExpression(
+                    ParameterList(
+                        SeparatedList<ParameterSyntax>(
+                            [|
+                                Parameter(Identifier("full_transform"))
+                                    .WithType(createFuncSignatureType [|
+                                        PredefinedType(Token(SyntaxKind.IntKeyword))
+                                        PredefinedType(Token(SyntaxKind.IntKeyword))
+                                        PredefinedType(Token(SyntaxKind.IntKeyword))
+                                    |])
+                                Parameter(Identifier("init_value"))
+                                    .WithType(PredefinedType(Token(SyntaxKind.IntKeyword)))
+                            |])
+                        ),
+                    
+                    Block(
+                        [|
+                            ReturnStatement(
+                                IdentifierName("init_value")
+                                ) :> StatementSyntax
+                        |]
+                        )
+                    )
+                )
+        )
+        (
+            """let partial_application_example = fn([int -> int -> int] full_transform, int init_value) : [int -> int] {
+    init_value;
+}
+""",
+            LocalDeclarationStatement(
+                VariableDeclaration(
+                    GenericName(Identifier("Func"))
+                        .WithTypeArgumentList(
+                            TypeArgumentList(
+                                SeparatedList<TypeSyntax>(
+                                [|
+                                    (createFuncSignatureType
+                                        [|
+                                            PredefinedType(Token(SyntaxKind.IntKeyword))
+                                            PredefinedType(Token(SyntaxKind.IntKeyword))
+                                            PredefinedType(Token(SyntaxKind.IntKeyword))
+                                        |]) :> TypeSyntax
+                                    
+                                    PredefinedType(Token(SyntaxKind.IntKeyword)) :> TypeSyntax
+                                    
+                                    (createFuncSignatureType
+                                        [|
+                                            PredefinedType(Token(SyntaxKind.IntKeyword))
+                                            PredefinedType(Token(SyntaxKind.IntKeyword))
+                                        |]) :> TypeSyntax
+                                |] |> castTypeSyntaxArr,
+                                [|
+                                    Token(SyntaxKind.CommaToken)
+                                    Token(SyntaxKind.CommaToken)
+                                |]
+                                ))
+                            ),
+                    SeparatedList(
+                        [|
+                            SyntaxFactory.VariableDeclarator(SyntaxFactory.Identifier("partial_application_example"))
+                                .WithInitializer(
+                                    SyntaxFactory.EqualsValueClause(
+                                        ParenthesizedLambdaExpression(
+                                            ParameterList(
+                                                SeparatedList<ParameterSyntax>(
+                                                    [|
+                                                        Parameter(Identifier("full_transform"))
+                                                            .WithType(createFuncSignatureType [|
+                                                                PredefinedType(Token(SyntaxKind.IntKeyword))
+                                                                PredefinedType(Token(SyntaxKind.IntKeyword))
+                                                                PredefinedType(Token(SyntaxKind.IntKeyword))
+                                                            |])
+                                                        Parameter(Identifier("init_value"))
+                                                            .WithType(PredefinedType(Token(SyntaxKind.IntKeyword)))
+                                                    |])
+                                                ),
+                                            
+                                            Block(
+                                                [|
+                                                    ReturnStatement(
+                                                        IdentifierName("init_value")
+                                                        ) :> StatementSyntax
+                                                |]
+                                                )
+                                            )
+                                        ))
+                        |]
+                        )
+                    )
+                )
+        )
     ]
     
     [<TestCase(0)>]
     [<TestCase(1)>]
     [<TestCase(2)>]
     [<TestCase(3)>]
+    [<TestCase(4)>]  // parsing function signature types as parameters
+    [<TestCase(5)>]
+    [<TestCase(6)>]  // asserting type in variable assignment
     // TODO: Find a way to implement unit typing when we implement 'class' implementations
+    // TODO: For non assignment statements, the expression does not keep track of function return type, so we need to add annotation tests
     member this.``F: Test Function Expression Parsing``(testCaseIndex: int) =
+        let input, expectedSyntaxNodes = List.item testCaseIndex this.TestCases
+        let tokens = Lexer.parseIntoTokens input |> List.toArray
+        
+        let syntaxNodes, parseErrors = ModifiedRecursiveDescent.parseTokens tokens
+        match List.length parseErrors with
+        | 0 ->
+            let actualSyntaxNodes = List.toArray syntaxNodes |> Array.map (fun x -> x :> SyntaxNode)
+            match compareSyntaxNodes input [| expectedSyntaxNodes |] actualSyntaxNodes with
+            | true -> Assert.Pass()
+            | false -> Assert.Fail()
+        | _ ->
+            let mutable count = 1
+            for parseError in parseErrors do
+                printfn $"{count}. {parseError}"
+                count <- count + 1
+            Assert.Fail()
+
+
+
+// Examples:
+
+// var array = new int[10];
+// let array: int[10];
+
+// var arrayInit = new int[] { 1, 2, 3, 4, 5 };
+// let array: int[] = [1, 2, 3, 4, 5];
+[<TestFixture>]
+[<ParserComponent(ParserComponentType.Expressions)>]
+[<ParserComponent(ParserComponentType.Statements)>]
+type ArrayParsingTests() =
+    
+    member this.TestCases : (string * SyntaxNode) list = [
+        (
+            """[1, 2, 3, 4, 5]""",
+            ExpressionStatement(
+                ArrayCreationExpression(
+                    Token(SyntaxKind.NewKeyword),
+                    ArrayType(
+                        PredefinedType(Token(SyntaxKind.IntKeyword)),
+                        SyntaxFactory.List<ArrayRankSpecifierSyntax>([|
+                            ArrayRankSpecifier(
+                                Token(SyntaxKind.OpenBraceToken),
+                                SeparatedList([|
+                                    LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(5)) :> ExpressionSyntax
+                                |]),
+                                Token(SyntaxKind.CloseBraceToken)
+                                )
+                            |])
+                        ),
+                    InitializerExpression(
+                        SyntaxKind.ArrayInitializerExpression,
+                        Token(SyntaxKind.OpenBraceToken),
+                        SeparatedList<ExpressionSyntax>([|
+                            LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(1)) :> ExpressionSyntax
+                            LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(2)) :> ExpressionSyntax
+                            LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(3)) :> ExpressionSyntax
+                            LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(4)) :> ExpressionSyntax
+                            LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(5)) :> ExpressionSyntax
+                        |]),
+                        Token(SyntaxKind.CloseBraceToken))
+                ))
+        ) 
+    ]
+    
+    member this.``G: Test Function Expression Parsing``(testCaseIndex: int) =
         let input, expectedSyntaxNodes = List.item testCaseIndex this.TestCases
         let tokens = Lexer.parseIntoTokens input |> List.toArray
         

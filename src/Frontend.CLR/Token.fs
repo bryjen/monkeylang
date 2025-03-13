@@ -25,6 +25,7 @@ type TokenType =
     | GT
     
     // Delimiters
+    | RARROW  // "->", which is used for function type definitions
     | COMMA
     | COLON
     | SEMICOLON

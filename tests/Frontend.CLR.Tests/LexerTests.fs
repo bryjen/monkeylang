@@ -312,3 +312,73 @@ if (5 < 10) {
         ]
         
         testLexer testInput testCases
+        
+    [<Test>]
+    member this.``Test function signature lexing``() =
+        let testInput = """let five = 5;
+let ten = 10;
+            
+let add: [int -> int] = fn(int x, int y) : int {
+    x + y;
+};
+            
+let result = add(five, ten);"""
+        
+        let testCases = [
+            (TokenType.LET, "let")
+            (TokenType.IDENT, "five")
+            (TokenType.ASSIGN, "=")
+            (TokenType.INT, "5")
+            (TokenType.SEMICOLON, ";")
+            (TokenType.LET, "let")
+            (TokenType.IDENT, "ten")
+            (TokenType.ASSIGN, "=")
+            (TokenType.INT, "10")
+            (TokenType.SEMICOLON, ";")
+            (TokenType.LET, "let")
+            (TokenType.IDENT, "add")
+            (TokenType.COLON, ":")
+            
+            (TokenType.LBRACKET, "[")
+            (TokenType.IDENT, "int")
+            (TokenType.RARROW, "->")
+            (TokenType.IDENT, "int")
+            (TokenType.RBRACKET, "]")
+            
+            (TokenType.ASSIGN, "=")
+            (TokenType.FUNCTION, "fn")
+            (TokenType.LPAREN, "(")
+            
+            (TokenType.IDENT, "int")
+            (TokenType.IDENT, "x")
+            (TokenType.COMMA, ",")
+            
+            (TokenType.IDENT, "int")
+            (TokenType.IDENT, "y")
+            
+            (TokenType.RPAREN, ")")
+            
+            (TokenType.COLON, ":")
+            (TokenType.IDENT, "int")
+            
+            (TokenType.LBRACE, "{")
+            (TokenType.IDENT, "x")
+            (TokenType.PLUS, "+")
+            (TokenType.IDENT, "y")
+            (TokenType.SEMICOLON, ";")
+            (TokenType.RBRACE, "}")
+            (TokenType.SEMICOLON, ";")
+            (TokenType.LET, "let")
+            (TokenType.IDENT, "result")
+            (TokenType.ASSIGN, "=")
+            (TokenType.IDENT, "add")
+            (TokenType.LPAREN, "(")
+            (TokenType.IDENT, "five")
+            (TokenType.COMMA, ",")
+            (TokenType.IDENT, "ten")
+            (TokenType.RPAREN, ")")
+            (TokenType.SEMICOLON, ";")
+            (TokenType.EOF, "")
+        ]
+        
+        testLexer testInput testCases
