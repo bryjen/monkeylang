@@ -1,9 +1,16 @@
 ﻿[<AutoOpen>]
 module Monkey.Frontend.CLR.Parsers.ModifiedRecursiveDescentHelpers
 
-open Monkey.Frontend.CLR.Parsers.ParseErrors
+open System
+
 open Microsoft.CodeAnalysis.CSharp.Syntax
+open Microsoft.CodeAnalysis.CSharp
+open type Microsoft.CodeAnalysis.CSharp.SyntaxFactory
+
+open FsToolkit.ErrorHandling
+
 open Monkey.Frontend.CLR.Token
+open Monkey.Frontend.CLR.Parsers.ParseErrors
 
 
 /// <summary>
@@ -13,6 +20,7 @@ type internal ParserState(tokens: Token array) =
     let mutable currentIdx: int = 0
     let mutable parseErrors: ParseError list = []
     let mutable statements: StatementSyntax list = []
+    let mutable lambdaTypeMap: Map<string, LambdaFunctionSignature> = Map.empty
     
     member this.Tokens = tokens
     
@@ -27,6 +35,12 @@ type internal ParserState(tokens: Token array) =
     member this.Statements
         with get() = statements
         and set(value) = statements <- value
+        
+    /// Map containing function signatures of lambda expressions (since their syntax does not contain any type info as
+    /// compared to normal member methods.
+    member this.LambdaTypeMap
+        with get() = lambdaTypeMap
+        and set(value) = lambdaTypeMap <- value
     
 with
     member this.TokensLength() =
@@ -50,6 +64,18 @@ with
         
     member this.GetTokenAt(index: int) =
         this.Tokens[index]
+        
+and LambdaFunctionSignature =
+    { ParameterTypes: TypeSyntax array
+      ReturnType: TypeSyntax }
+with
+    member this.ToFuncTypeSyntax() =
+        let types = Array.append this.ParameterTypes [| this.ReturnType |]
+        let commas = Array.create ((Array.length types) - 1) (Token(SyntaxKind.CommaToken))
+        GenericName(Identifier("Func"))
+            .WithTypeArgumentList(
+                TypeArgumentList(
+                    SeparatedList<TypeSyntax>(types, commas)))
 
 
 [<AutoOpen>]
@@ -97,6 +123,14 @@ let internal tokenTypeToPrecedenceMap = Map.ofList [
     (LPAREN, Precedence.CALL)
     (LBRACKET, Precedence.INDEX)
 ]
+
+
+let defaultHashLen = 16
+
+let generateRandomStringHash n =
+    let chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    let random = Random()
+    Array.init n (fun _ -> chars.[random.Next(chars.Length)]) |> String
 
 
 let assertNoParseErrors (parseErrors: ParseError list) =

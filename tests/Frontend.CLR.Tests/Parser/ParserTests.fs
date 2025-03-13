@@ -63,6 +63,25 @@ map(numbers, fibonacci);
 ```
 *)
 
+(*
+// Examples of updated statements that can be done with C#'s exposed functionality
+
+```Monkey
+let foobar: int = 5;  
+// TODO: optional type annotations
+// "int foobar = 5;"
+
+let partial_app_demo = fn([int -> int -> int] multi_transform, int initialValue) { ... };
+// TODO: taking functions as parameters, as well as being able to typedef them as above
+// "Func<Func<int, int, int>, int, Func<int, int>> partial_app_demo = (Func<int, int, int> transform, int initialValue) => { ... }"
+
+let full_transform: [int -> int -> int] = fn(int x, int y) { ... };
+partial_app_demo(full_transform, foobar)
+// TODO: passing functions as arguments
+// "Func<int, int, int> full_transform = (int x, int y) => { ... };"
+// "partial_app_demo(full_transform, foobar);"
+ *)
+
 [<TestFixture>]
 [<ParserComponent(ParserComponentType.Expressions)>]
 type Runner() =
@@ -586,6 +605,15 @@ type IfStatementParsingTests() =
 type FunctionParsingTests() =
     let castTypeSyntaxArr (arr: 'R array) =
         Array.map (fun o -> o :> TypeSyntax) arr
+        
+    let unitReturnStatement =
+        ReturnStatement(
+            ObjectCreationExpression(
+                Token(SyntaxKind.NewKeyword),
+                IdentifierName("unit"),
+                ArgumentList(),
+                null)
+            )
     
     member this.TestCases : (string * SyntaxNode) list = [
         (
@@ -595,55 +623,46 @@ type FunctionParsingTests() =
 }
 """,
             ExpressionStatement(
-                CastExpression(
-                    Token(SyntaxKind.OpenParenToken),
-                    PredefinedType(Token(SyntaxKind.IntKeyword)),
-                    Token(SyntaxKind.CloseParenToken),
-                    ParenthesizedExpression(
-                        Token(SyntaxKind.OpenParenToken),
-                        ParenthesizedLambdaExpression(
-                            ParameterList(
-                                SeparatedList<ParameterSyntax>(
-                                    [|
-                                        Parameter(Identifier("x")).WithType(PredefinedType(Token(SyntaxKind.IntKeyword)))
-                                        Parameter(Identifier("y")).WithType(PredefinedType(Token(SyntaxKind.IntKeyword)))
-                                    |])
-                                ),
-                            
-                            Block(
-                                [|
-                                    LocalDeclarationStatement(
-                                        VariableDeclaration(IdentifierName("var"))
-                                            .WithVariables(
-                                                SingletonSeparatedList(
-                                                    VariableDeclarator(Identifier("z"))
-                                                        .WithInitializer(
-                                                            EqualsValueClause(
-                                                                LiteralExpression(
-                                                                    SyntaxKind.NumericLiteralExpression,
-                                                                    Literal(10)
-                                                                )
-                                                            )
+                ParenthesizedLambdaExpression(
+                    ParameterList(
+                        SeparatedList<ParameterSyntax>(
+                            [|
+                                Parameter(Identifier("x")).WithType(PredefinedType(Token(SyntaxKind.IntKeyword)))
+                                Parameter(Identifier("y")).WithType(PredefinedType(Token(SyntaxKind.IntKeyword)))
+                            |])
+                        ),
+                    
+                    Block(
+                        [|
+                            LocalDeclarationStatement(
+                                VariableDeclaration(IdentifierName("var"))
+                                    .WithVariables(
+                                        SingletonSeparatedList(
+                                            VariableDeclarator(Identifier("z"))
+                                                .WithInitializer(
+                                                    EqualsValueClause(
+                                                        LiteralExpression(
+                                                            SyntaxKind.NumericLiteralExpression,
+                                                            Literal(10)
+                                                        )
                                                     )
-                                                )
                                             )
-                                        ) :> StatementSyntax
-                                    
-                                    ReturnStatement(
-                                        BinaryExpression(
-                                            SyntaxKind.AddExpression,
-                                            BinaryExpression(
-                                                SyntaxKind.AddExpression,
-                                                IdentifierName("x"),
-                                                IdentifierName("y")
-                                                ),
-                                            IdentifierName("z")
-                                            )
-                                        ) :> StatementSyntax
-                                |]
-                                )
-                            ),
-                        Token(SyntaxKind.CloseParenToken)
+                                        )
+                                    )
+                                ) :> StatementSyntax
+                            
+                            ReturnStatement(
+                                BinaryExpression(
+                                    SyntaxKind.AddExpression,
+                                    BinaryExpression(
+                                        SyntaxKind.AddExpression,
+                                        IdentifierName("x"),
+                                        IdentifierName("y")
+                                        ),
+                                    IdentifierName("z")
+                                    )
+                                ) :> StatementSyntax
+                        |]
                         )
                     )
                 )
@@ -655,121 +674,128 @@ type FunctionParsingTests() =
 }
 """,
             ExpressionStatement(
-                CastExpression(
-                    Token(SyntaxKind.OpenParenToken),
-                    PredefinedType(Token(SyntaxKind.IntKeyword)),
-                    Token(SyntaxKind.CloseParenToken),
-                    ParenthesizedExpression(
-                        Token(SyntaxKind.OpenParenToken),
-                        ParenthesizedLambdaExpression(
-                            ParameterList(SeparatedList<ParameterSyntax>()),
-                            Block(
-                                [|
-                                    LocalDeclarationStatement(
-                                        VariableDeclaration(IdentifierName("var"))
-                                            .WithVariables(
-                                                SingletonSeparatedList(
-                                                    VariableDeclarator(Identifier("x"))
-                                                        .WithInitializer(
-                                                            EqualsValueClause(
-                                                                LiteralExpression(
-                                                                    SyntaxKind.NumericLiteralExpression,
-                                                                    Literal(10)
-                                                                )
-                                                            )
+                ParenthesizedLambdaExpression(
+                    ParameterList(SeparatedList<ParameterSyntax>()),
+                    Block(
+                        [|
+                            LocalDeclarationStatement(
+                                VariableDeclaration(IdentifierName("var"))
+                                    .WithVariables(
+                                        SingletonSeparatedList(
+                                            VariableDeclarator(Identifier("x"))
+                                                .WithInitializer(
+                                                    EqualsValueClause(
+                                                        LiteralExpression(
+                                                            SyntaxKind.NumericLiteralExpression,
+                                                            Literal(10)
+                                                        )
                                                     )
-                                                )
                                             )
-                                        ) :> StatementSyntax
-                                    
-                                    ReturnStatement(
-                                        BinaryExpression(
-                                            SyntaxKind.AddExpression,
-                                            IdentifierName("x"),
-                                            LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(12))
-                                            )
-                                        ) :> StatementSyntax
-                                |]
-                                )
-                            ),
-                        Token(SyntaxKind.CloseParenToken)
+                                        )
+                                    )
+                                ) :> StatementSyntax
+                            
+                            ReturnStatement(
+                                BinaryExpression(
+                                    SyntaxKind.AddExpression,
+                                    IdentifierName("x"),
+                                    LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(12))
+                                    )
+                                ) :> StatementSyntax
+                        |]
+                        )
+                    )
+                )
+        )
+        (
+            """fn() : unit {
+}
+""",
+            ExpressionStatement(
+                ParenthesizedLambdaExpression(
+                    ParameterList(SeparatedList<ParameterSyntax>()),
+                    Block(
+                        [|
+                            unitReturnStatement :> StatementSyntax
+                        |]
                         )
                     )
                 )
         )
         
-        (  // TODO: update this test case
+        (
             """let add = fn(int x, int y) : int {
     let z = 10;
     x + y + z;
 }
 """,
-            VariableDeclaration(
-                GenericName(Identifier("Func"))
-                    .WithTypeArgumentList(
-                        TypeArgumentList(
-                            SeparatedList<TypeSyntax>(
-                            [|
-                                PredefinedType(Token(SyntaxKind.IntKeyword))
-                                PredefinedType(Token(SyntaxKind.IntKeyword))
-                                PredefinedType(Token(SyntaxKind.IntKeyword))
-                            |] |> castTypeSyntaxArr,
-                            [|
-                                Token(SyntaxKind.CommaToken)
-                                Token(SyntaxKind.CommaToken)
-                                Token(SyntaxKind.CommaToken)
-                            |]
-                            ))
-                        ),
-                SeparatedList(
-                    [|
-                        SyntaxFactory.VariableDeclarator(SyntaxFactory.Identifier("add"))
-                            .WithInitializer(
-                                SyntaxFactory.EqualsValueClause(
-                                    ParenthesizedLambdaExpression(
-                                        ParameterList(
-                                            SeparatedList<ParameterSyntax>(
+            LocalDeclarationStatement(
+                VariableDeclaration(
+                    GenericName(Identifier("Func"))
+                        .WithTypeArgumentList(
+                            TypeArgumentList(
+                                SeparatedList<TypeSyntax>(
+                                [|
+                                    PredefinedType(Token(SyntaxKind.IntKeyword))
+                                    PredefinedType(Token(SyntaxKind.IntKeyword))
+                                    PredefinedType(Token(SyntaxKind.IntKeyword))
+                                |] |> castTypeSyntaxArr,
+                                [|
+                                    Token(SyntaxKind.CommaToken)
+                                    Token(SyntaxKind.CommaToken)
+                                |]
+                                ))
+                            ),
+                    SeparatedList(
+                        [|
+                            SyntaxFactory.VariableDeclarator(SyntaxFactory.Identifier("add"))
+                                .WithInitializer(
+                                    SyntaxFactory.EqualsValueClause(
+                                        ParenthesizedLambdaExpression(
+                                            ParameterList(
+                                                SeparatedList<ParameterSyntax>(
+                                                    [|
+                                                        Parameter(Identifier("x")).WithType(PredefinedType(Token(SyntaxKind.IntKeyword)))
+                                                        Parameter(Identifier("y")).WithType(PredefinedType(Token(SyntaxKind.IntKeyword)))
+                                                    |])
+                                                ),
+                                            
+                                            Block(
                                                 [|
-                                                    Parameter(Identifier("x")).WithType(PredefinedType(Token(SyntaxKind.IntKeyword)))
-                                                    Parameter(Identifier("y")).WithType(PredefinedType(Token(SyntaxKind.IntKeyword)))
-                                                |])
-                                            ),
-                                        
-                                        Block(
-                                            [|
-                                                LocalDeclarationStatement(
-                                                    VariableDeclaration(PredefinedType(Token(SyntaxKind.IntKeyword)))
-                                                        .WithVariables(
-                                                            SingletonSeparatedList(
-                                                                VariableDeclarator(Identifier("z"))
-                                                                    .WithInitializer(
-                                                                        EqualsValueClause(
-                                                                            LiteralExpression(
-                                                                                SyntaxKind.NumericLiteralExpression,
-                                                                                Literal(10)
+                                                    LocalDeclarationStatement(
+                                                        VariableDeclaration(IdentifierName("var"))
+                                                            .WithVariables(
+                                                                SingletonSeparatedList(
+                                                                    VariableDeclarator(Identifier("z"))
+                                                                        .WithInitializer(
+                                                                            EqualsValueClause(
+                                                                                LiteralExpression(
+                                                                                    SyntaxKind.NumericLiteralExpression,
+                                                                                    Literal(10)
+                                                                                )
                                                                             )
-                                                                        )
+                                                                    )
                                                                 )
                                                             )
-                                                        )
-                                                    ) :> StatementSyntax
-                                                
-                                                ReturnStatement(
-                                                    BinaryExpression(
-                                                        SyntaxKind.AddExpression,
+                                                        ) :> StatementSyntax
+                                                    
+                                                    ReturnStatement(
                                                         BinaryExpression(
                                                             SyntaxKind.AddExpression,
-                                                            IdentifierName("x"),
-                                                            IdentifierName("y")
-                                                            ),
-                                                        IdentifierName("z")
-                                                        )
-                                                    ) :> StatementSyntax
-                                            |]
+                                                            BinaryExpression(
+                                                                SyntaxKind.AddExpression,
+                                                                IdentifierName("x"),
+                                                                IdentifierName("y")
+                                                                ),
+                                                            IdentifierName("z")
+                                                            )
+                                                        ) :> StatementSyntax
+                                                |]
+                                                )
                                             )
-                                        )
-                                    ))
-                    |]
+                                        ))
+                        |]
+                        )
                     )
                 )
         )
@@ -777,6 +803,9 @@ type FunctionParsingTests() =
     
     [<TestCase(0)>]
     [<TestCase(1)>]
+    [<TestCase(2)>]
+    [<TestCase(3)>]
+    // TODO: Find a way to implement unit typing when we implement 'class' implementations
     member this.``F: Test Function Expression Parsing``(testCaseIndex: int) =
         let input, expectedSyntaxNodes = List.item testCaseIndex this.TestCases
         let tokens = Lexer.parseIntoTokens input |> List.toArray

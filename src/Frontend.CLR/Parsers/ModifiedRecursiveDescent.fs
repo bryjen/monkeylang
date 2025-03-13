@@ -167,19 +167,29 @@ module private Statements =
             
             let! statementSyntax =
                 match csSyntaxNode with
-                | :? ExpressionSyntax as expressionSyntax ->
+                | :? ExpressionSyntax as expr ->
+                        
+                    let typeSyntax =
+                        match isFunction expr with
+                        | Some functionHash when parserState.LambdaTypeMap.ContainsKey functionHash ->
+                            let functionSignature = parserState.LambdaTypeMap[functionHash]
+                            functionSignature.ToFuncTypeSyntax() :> TypeSyntax
+                        | _ ->
+                            SyntaxFactory.IdentifierName("var") :> TypeSyntax
+                            
                     let variableDeclarator =
                         SyntaxFactory
                             .VariableDeclarator(SyntaxFactory.Identifier(variableName))
-                            .WithInitializer(SyntaxFactory.EqualsValueClause(expressionSyntax))
+                            .WithInitializer(SyntaxFactory.EqualsValueClause(expr))
                     let variableDeclaration =
                         SyntaxFactory.VariableDeclaration(
-                            SyntaxFactory.IdentifierName("var"),
+                            typeSyntax,
                             SyntaxFactory.SeparatedList([| variableDeclarator |]))
                     let localDeclarationStatement = SyntaxFactory.LocalDeclarationStatement(variableDeclaration) :> StatementSyntax
                     Ok [| localDeclarationStatement |]
                     
                 | :? IfStatementSyntax as ifStatementSyntax ->
+                    
                     // reformat if statement into separate blocks of code
                     let varDeclarationStatement =
                         LocalDeclarationStatement(
@@ -200,6 +210,19 @@ module private Statements =
                     Error (ParseError())  // TODO
                     
             return statementSyntax
+        }
+        
+    /// <remarks>
+    /// We need this to determine whether the expression we're assigning to the variable is a function.
+    /// </remarks>
+    and private isFunction (expression: ExpressionSyntax) : string option =
+        option {
+            let! parenLambdaExpr =
+                match expression with
+                | :? ParenthesizedLambdaExpressionSyntax as parenLambdaExpr -> Some parenLambdaExpr
+                | _ -> None
+            let! annotationOption = Seq.tryHead (parenLambdaExpr.GetAnnotations("FunctionSignature"))
+            return! annotationOption.Data
         }
         
     /// <summary>
@@ -568,7 +591,7 @@ module internal PrefixExpressions =
     /// </remarks>
     let rec tryParseFunctionExpression
         (parserState: ParserState)
-        : Result<CastExpressionSyntax, ParseError> =
+        : Result<ParenthesizedLambdaExpressionSyntax, ParseError> =
             
         let assertAndPop (expectedTokenType: TokenType) (parserState: ParserState) =
             let currentToken = parserState.PopToken()
@@ -584,22 +607,26 @@ module internal PrefixExpressions =
             // #1. parse parameters list
             do! assertAndPop LPAREN parserState
             
-            let! parametersList =
+            let! syntaxSeparatedList =
                 match parserState.PeekToken().Type with
                 | RPAREN -> Ok (SeparatedSyntaxList<ParameterSyntax>())  // no parameters
                 | _ -> parseArgumentsList [] parserState
+            let parameterList = ParameterList(syntaxSeparatedList)
             do! assertAndPop RPAREN parserState
             
             
             // #2. parse return type
             do! assertAndPop COLON parserState
             let currentToken = parserState.PopToken()
-            let! returnTypeSyntax =
+            let onInvalidReturnTypeError = ParseError(message=($"Expected a valid return type, but received \"{currentToken.Literal}\""))
+            let! returnTypeSyntax = tryParseType onInvalidReturnTypeError currentToken
+            
+            let isUnitReturn =  // equivalent to 'void' method
                 match currentToken.Type, currentToken.Literal with
-                | IDENT, "int" ->  Token(SyntaxKind.IntKeyword)         |> PredefinedType |> (fun t -> t :> TypeSyntax) |> Ok
-                | IDENT, "string" ->  Token(SyntaxKind.StringKeyword)   |> PredefinedType |> (fun t -> t :> TypeSyntax) |> Ok
-                | IDENT, _ ->  IdentifierName(currentToken.Literal) :> TypeSyntax |> Ok
-                | _ ->      Error (ParseError(message=($"Expected a valid return type, but received \"{currentToken.Literal}\"")))
+                | IDENT, "unit" -> true
+                | _ -> false
+                
+                
                 
             // #3. parse function block
             do! assertAndPop LBRACE parserState
@@ -607,28 +634,44 @@ module internal PrefixExpressions =
             let stopCondition (parserState: ParserState) = parserState.PeekToken().Type = TokenType.RBRACE || parserState.IsEof()
             let statements, parseErrors = parseTokensHelper stopCondition parserState [] []
             do! assertNoParseErrors parseErrors
-            let! modifiedStatements = modifiedStatementsList statements
+            
+            let! modifiedStatements =
+                match isUnitReturn with
+                | true -> statements |> appendUnitReturn |> Ok
+                | false -> tryTransformLastStatementToReturn statements
+                
+            
             let asBlock = modifiedStatements |> Block
             
             do! assertAndPop RBRACE parserState
             
             
-            // #4. construct cast expression to statically enforce return type
-            let lambdaExpression = ParenthesizedLambdaExpression(ParameterList(parametersList), asBlock)
-            let castExpression =
-                CastExpression(
-                    Token(SyntaxKind.OpenParenToken),
-                    returnTypeSyntax,
-                    Token(SyntaxKind.CloseParenToken),
-                    ParenthesizedExpression(
-                        Token(SyntaxKind.OpenParenToken),
-                        lambdaExpression,
-                        Token(SyntaxKind.CloseParenToken)
-                        )
-                    )
+            // #4. create a type signature for the function (since it's a lambda, there's no inherent property for typing)
+            let parameterTypes =
+                parameterList.Parameters
+                |> Seq.choose (fun p -> if isNull p.Type then None else Some p.Type)
+                |> Seq.toArray
             
-            return castExpression
+            let functionSignature =
+                { ParameterTypes = parameterTypes
+                  ReturnType = returnTypeSyntax }
+                
+            let functionHashId = generateRandomStringHash defaultHashLen
+            parserState.LambdaTypeMap <- parserState.LambdaTypeMap.Add(functionHashId, functionSignature)
+            
+            let lambdaExpression =
+                ParenthesizedLambdaExpression(parameterList, asBlock)
+                    .WithAdditionalAnnotations(SyntaxAnnotation("FunctionSignature", functionHashId))
+                    
+            return lambdaExpression
         }
+        
+    and tryParseType (onInvalid: ParseError) (token: Token) =
+        match token.Type, token.Literal with
+        | IDENT, "int" ->     Token(SyntaxKind.IntKeyword)         |> PredefinedType |> (fun t -> t :> TypeSyntax) |> Ok
+        | IDENT, "string" ->  Token(SyntaxKind.StringKeyword)   |> PredefinedType |> (fun t -> t :> TypeSyntax) |> Ok
+        | IDENT, _ ->         IdentifierName(token.Literal) :> TypeSyntax |> Ok
+        | _ -> Error onInvalid
         
     /// Expected input "TYPEDEF_1 ARG_NAME_1, TYPEDEF_2 ARG_NAME_2, ..., TYPEDEF_N ARG_NAME_N) ... ~ REST OF THE TOKENS"
     and private parseArgumentsList
@@ -637,12 +680,9 @@ module internal PrefixExpressions =
             : Result<SeparatedSyntaxList<ParameterSyntax>, ParseError> =
         result {
             let currentToken = parserState.PopToken()
-            let! typeSyntax = 
-                match currentToken.Type, currentToken.Literal with
-                | IDENT, "int" ->  Token(SyntaxKind.IntKeyword)         |> PredefinedType |> (fun t -> t :> TypeSyntax) |> Ok
-                | IDENT, "string" ->  Token(SyntaxKind.StringKeyword)   |> PredefinedType |> (fun t -> t :> TypeSyntax) |> Ok
-                | IDENT, _ ->  IdentifierName(currentToken.Literal) :> TypeSyntax |> Ok
-                | _ ->      Error (ParseError(message=($"Expected a valid return type, but received \"{currentToken.Literal}\"")))
+            
+            let onInvalidTypeSyntaxError = ParseError(message=($"Expected a valid return type, but received \"{currentToken.Literal}\""))
+            let! typeSyntax = tryParseType onInvalidTypeSyntaxError currentToken
             
             let currentToken = parserState.PopToken()
             let! argNameToken = 
@@ -667,7 +707,7 @@ module internal PrefixExpressions =
                Error error
 
     /// Transforms the last statement into a return statement if applicable, errors otherwise
-    and private modifiedStatementsList (statements: StatementSyntax seq) : Result<StatementSyntax seq, ParseError> =
+    and private tryTransformLastStatementToReturn (statements: StatementSyntax seq) : Result<StatementSyntax seq, ParseError> =
         let everythingButLastStatement = statements |> Seq.pairwise |> Seq.map fst
         let lastStatement = Seq.last statements
         
@@ -678,6 +718,18 @@ module internal PrefixExpressions =
             newStatements |> Ok
         | _ -> 
             Error (ParseError(message=($"Expected the last statement of a function to be a return statement or an expression statement, but got \"{lastStatement.GetType()}\"")))
+            
+    /// Adds a 'unit' return to the end of the statements
+    and private appendUnitReturn (statements: StatementSyntax seq) : StatementSyntax seq =
+        let unitReturnStatement =
+            ReturnStatement(
+                ObjectCreationExpression(
+                    Token(SyntaxKind.NewKeyword),
+                    IdentifierName("unit"),
+                    ArgumentList(),
+                    null)
+                )
+        Seq.append statements (Seq.singleton unitReturnStatement)
         
         
         
