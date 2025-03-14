@@ -6,9 +6,23 @@ module rec Monkey.Frontend.CLR.HostStubGenerator
 open System.Diagnostics
 open System.IO
 
+module Ps1Gen =
+    let generateHostStub (assemblyName: string) (outputAssemblyDir: string) =
+        let templatePs1Script: string = generateTemplatePs1Script assemblyName
+        let templatePs1ScriptFileInfo = FileInfo(Path.Join(outputAssemblyDir, $"{assemblyName}.ps1"))
+        File.WriteAllText(templatePs1ScriptFileInfo.FullName, templatePs1Script)
+        ()
+
+    let private generateTemplatePs1Script(assemblyName: string) =
+        $"""
+Invoke-Expression "dotnet {assemblyName}.dll"
+"""
+        
+        
+
 module DotnetProjectGen = 
     // TODO: Refine down the line
-    let rec generateHostSub (assemblyName: string) (outputAssemblyDir: string) =
+    let rec generateHostStub (assemblyName: string) (outputAssemblyDir: string) =
         let outputAssemblyDirInfo = Directory.CreateDirectory(Path.Join(outputAssemblyDir, "temp"))
         
         let templateProgram : string = generateTemplateProgram assemblyName (Path.Combine(outputAssemblyDir, $"{assemblyName}.dll"))

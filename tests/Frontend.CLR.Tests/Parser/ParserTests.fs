@@ -1052,7 +1052,7 @@ type FunctionParsingTests() =
 
 // var arrayInit = new int[] { 1, 2, 3, 4, 5 };
 // let array: int[] = [1, 2, 3, 4, 5];
-[<TestFixture>]
+// [<TestFixture>]
 [<ParserComponent(ParserComponentType.Expressions)>]
 [<ParserComponent(ParserComponentType.Statements)>]
 type ArrayParsingTests() =
@@ -1169,6 +1169,76 @@ type ArrayParsingTests() =
     ]
     
     member this.``G: Test Function Expression Parsing``(testCaseIndex: int) =
+        let input, expectedSyntaxNodes = List.item testCaseIndex this.TestCases
+        let tokens = Lexer.parseIntoTokens input |> List.toArray
+        
+        let syntaxNodes, parseErrors = ModifiedRecursiveDescent.parseTokens tokens
+        match List.length parseErrors with
+        | 0 ->
+            let actualSyntaxNodes = List.toArray syntaxNodes |> Array.map (fun x -> x :> SyntaxNode)
+            match compareSyntaxNodes input [| expectedSyntaxNodes |] actualSyntaxNodes with
+            | true -> Assert.Pass()
+            | false -> Assert.Fail()
+        | _ ->
+            let mutable count = 1
+            for parseError in parseErrors do
+                printfn $"{count}. {parseError}"
+                count <- count + 1
+            Assert.Fail()
+
+
+[<TestFixture>]
+[<ParserComponent(ParserComponentType.Expressions)>]
+[<ParserComponent(ParserComponentType.Statements)>]
+type FunctionCallParsingTests () =
+    
+    member this.TestCases : (string * SyntaxNode) list = [
+        (
+            """foobar(1, 2)""",
+            ExpressionStatement(
+                InvocationExpression(
+                        IdentifierName("foobar"),
+                        ArgumentList(
+                            Token(SyntaxKind.OpenParenToken),
+                            SeparatedList<ArgumentSyntax>(
+                                [|
+                                    Argument(LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(1)))
+                                    Argument(LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(2)))
+                                |]
+                                ),
+                            Token(SyntaxKind.CloseParenToken)
+                            )
+                    )
+                )
+        )
+        
+        (
+            """Console.WriteLine("Hello World")""",
+            ExpressionStatement(
+                InvocationExpression(
+                        MemberAccessExpression(
+                            SyntaxKind.SimpleMemberAccessExpression,
+                            IdentifierName("Console"),
+                            Token(SyntaxKind.DotToken),
+                            IdentifierName("WriteLine")
+                            ),
+                        ArgumentList(
+                            Token(SyntaxKind.OpenParenToken),
+                            SeparatedList<ArgumentSyntax>(
+                                [|
+                                    Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal("Hello World")))
+                                |]
+                                ),
+                            Token(SyntaxKind.CloseParenToken)
+                            )
+                    )
+                )
+        ) 
+    ]
+    
+    [<TestCase(0)>]
+    [<TestCase(1)>]
+    member this.``H: Test Function Call Parsing``(testCaseIndex: int) =
         let input, expectedSyntaxNodes = List.item testCaseIndex this.TestCases
         let tokens = Lexer.parseIntoTokens input |> List.toArray
         

@@ -39,6 +39,10 @@ type SyntaxNode with
                 child.AsNode().Print(indent = indent + 2)
             else
                 printfn "%sToken: %s - %s" (String.replicate (indent + 2) " ") (child.Kind().ToString()) (child.ToString())
+                
+                
+let csharpToSyntaxTree (rawCsharp: string) : SyntaxNode array =
+    failwith "todo"
 
 
 let compareSyntaxNodes (monkeyInput: string) (expectedSyntaxNodes: SyntaxNode array) (actualSyntaxNodes: SyntaxNode array) : bool =

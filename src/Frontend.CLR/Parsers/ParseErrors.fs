@@ -67,6 +67,13 @@ type InlineIfExpressionParseError(
         ?innerException: Exception) =
     inherit ParseError(nullIfNone message, None, nullIfNone innerException)
     
+
+///
+type FunctionCallExpressionParseError(
+        ?message: string,
+        ?innerException: Exception) =
+    inherit ParseError(nullIfNone message, None, nullIfNone innerException)
+    
 ///
 type FunctionExpressionParseError(
         ?message: string,

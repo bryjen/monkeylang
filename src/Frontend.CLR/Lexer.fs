@@ -70,6 +70,7 @@ module private LexerHelpers =
                 | '>' -> GT
                     
                 // Delimiters
+                | '.' -> DOT
                 | ',' -> COMMA
                 | ':' -> COLON 
                 | ';' -> SEMICOLON

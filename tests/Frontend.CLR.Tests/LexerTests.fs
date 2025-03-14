@@ -382,3 +382,23 @@ let result = add(five, ten);"""
         ]
         
         testLexer testInput testCases
+        
+        
+    [<Test>]
+    member this.``Test Dot token parsing``() =
+        let testInput = """System.Console.WriteLine("Hello World");"""
+        
+        let testCases = [
+            (TokenType.IDENT, "System")
+            (TokenType.DOT, ".")
+            (TokenType.IDENT, "Console")
+            (TokenType.DOT, ".")
+            (TokenType.IDENT, "WriteLine")
+            (TokenType.LPAREN, "(")
+            (TokenType.STRING, "Hello World")
+            (TokenType.RPAREN, ")")
+            (TokenType.SEMICOLON, ";")
+            (TokenType.EOF, "")
+        ]
+        
+        testLexer testInput testCases

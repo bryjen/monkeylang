@@ -2,6 +2,7 @@
 
 module rec Monkey.Frontend.CLR.Parsers.ModifiedRecursiveDescent
 
+open System.Linq.Expressions
 open System.Xml
 open Microsoft.CodeAnalysis
 open Microsoft.CodeAnalysis.CSharp
@@ -433,6 +434,86 @@ module internal PrefixExpressions =
             : ExpressionSyntax =
         let currentToken = parserState.PopToken()
         SyntaxFactory.IdentifierName(currentToken.Literal)
+        
+        
+    let rec tryParseIdentifierOrCallExpression
+            (parserState: ParserState)
+            : Result<ExpressionSyntax, ParseError> =
+                
+        tryParseIdentifierOrCallExpressionHelper [] parserState
+        
+    and private tryParseIdentifierOrCallExpressionHelper
+            (identifiers: IdentifierNameSyntax list)
+            (parserState: ParserState)
+            : Result<ExpressionSyntax, ParseError> =
+        
+        let currentToken = parserState.PopToken()
+        let identifier = SyntaxFactory.IdentifierName(currentToken.Literal)
+        
+        match parserState.PeekToken().Type with
+        | DOT ->
+            parserState.PopToken() |> ignore
+            tryParseIdentifierOrCallExpressionHelper (identifier :: identifiers) parserState
+        | LPAREN ->
+            tryParseFunctionCallExpression (identifier :: identifiers) parserState
+            |> Result.map (fun invocationExpression -> invocationExpression :> ExpressionSyntax)
+        | _ ->
+            identifier :> ExpressionSyntax |> Ok
+        
+    and private tryParseFunctionCallExpression
+            (identifiers: IdentifierNameSyntax list)
+            (parserState: ParserState)
+            : Result<InvocationExpressionSyntax, ParseError> =
+                
+        let rec buildMemberAccessExpressionTree (_identifiers: IdentifierNameSyntax list) : ExpressionSyntax =
+            match _identifiers with
+            | [] ->
+                failwith "this is really unexpected"
+            | [ last ] ->
+                last :> ExpressionSyntax
+            | head :: tail ->
+                MemberAccessExpression(
+                    SyntaxKind.SimpleMemberAccessExpression,
+                    buildMemberAccessExpressionTree tail,
+                    Token(SyntaxKind.DotToken),
+                    head) 
+                
+        result {
+            parserState.PopToken() |> ignore
+            let! argumentListSyntax = tryParseFunctionCallArgumentsList [] parserState
+            do! assertAndPop RPAREN parserState
+            let expression = buildMemberAccessExpressionTree identifiers
+            return InvocationExpression(expression, argumentListSyntax)
+        }
+        
+    and private tryParseFunctionCallArgumentsList
+            (arguments: ArgumentSyntax list)
+            (parserState: ParserState)
+            : Result<ArgumentListSyntax, ParseError> =
+                
+        let assertIsExpression (syntaxNode: CSharpSyntaxNode) : Result<ExpressionSyntax, ParseError> =
+            match syntaxNode with
+            | :? ExpressionSyntax as expressionSyntax -> Ok expressionSyntax
+            | _ -> FunctionCallExpressionParseError($"Expected an expression, but received \"{syntaxNode.GetType()}\"") :> ParseError |> Error
+                
+        tryParseExpressionOrStatement parserState Precedence.LOWEST
+        |> Result.bind assertIsExpression
+        |> Result.map Argument
+        |> function
+           | Ok argument ->
+               let newArguments = argument :: arguments
+               match parserState.PeekToken().Type with
+               | COMMA ->
+                   parserState.PopToken() |> ignore  // consume the comma
+                   tryParseFunctionCallArgumentsList newArguments parserState
+               | RPAREN ->
+                   let asArray = newArguments |> List.toArray |> Array.rev
+                   SeparatedList<ArgumentSyntax>(asArray) |> ArgumentList |> Ok
+               | tokenType ->
+                   FunctionCallExpressionParseError($"Invalid token type \"{tokenType}\" detected") :> ParseError |> Error
+           | Error parseError ->
+               Error parseError
+        
 
     
     /// <summary>
@@ -801,16 +882,18 @@ module internal PrefixExpressions =
     let prefixParseFunctionsMap
         : Map<TokenType, ParserState -> Result<CSharpSyntaxNode, ParseError>> =
         Map.ofList [
-            (TokenType.IDENT,   tryParseIdentifier              >> Ok >> castToCSharpSyntaxNode)
-            (TokenType.STRING,  tryParseStringLiteral           >> Ok >> castToCSharpSyntaxNode)
-            (TokenType.INT,     tryParseIntegerLiteral          >> castToCSharpSyntaxNode)
-            (TokenType.TRUE,    tryParseBooleanLiteral          >> castToCSharpSyntaxNode)
-            (TokenType.FALSE,   tryParseBooleanLiteral          >> castToCSharpSyntaxNode)
-            (TokenType.BANG,    tryParsePrefixExpression        >> castToCSharpSyntaxNode)
-            (TokenType.MINUS,   tryParsePrefixExpression        >> castToCSharpSyntaxNode)
-            (TokenType.LPAREN,  tryParseParenthesisExpression   >> castToCSharpSyntaxNode)
-            (TokenType.IF,      tryParseIfExpression            >> castToCSharpSyntaxNode)
-            (TokenType.FUNCTION, tryParseFunctionExpression     >> castToCSharpSyntaxNode)
+            // (TokenType.IDENT,   tryParseIdentifier              >> Ok >> castToCSharpSyntaxNode)
+            (TokenType.IDENT,   tryParseIdentifierOrCallExpression  >> castToCSharpSyntaxNode)
+            
+            (TokenType.STRING,  tryParseStringLiteral               >> Ok >> castToCSharpSyntaxNode)
+            (TokenType.INT,     tryParseIntegerLiteral              >> castToCSharpSyntaxNode)
+            (TokenType.TRUE,    tryParseBooleanLiteral              >> castToCSharpSyntaxNode)
+            (TokenType.FALSE,   tryParseBooleanLiteral              >> castToCSharpSyntaxNode)
+            (TokenType.BANG,    tryParsePrefixExpression            >> castToCSharpSyntaxNode)
+            (TokenType.MINUS,   tryParsePrefixExpression            >> castToCSharpSyntaxNode)
+            (TokenType.LPAREN,  tryParseParenthesisExpression       >> castToCSharpSyntaxNode)
+            (TokenType.IF,      tryParseIfExpression                >> castToCSharpSyntaxNode)
+            (TokenType.FUNCTION, tryParseFunctionExpression         >> castToCSharpSyntaxNode)
             
             (*
             (TokenType.LBRACKET, tryParseArrayLiteral)
@@ -878,7 +961,8 @@ module internal InfixExpressions =
                 
             return SyntaxFactory.BinaryExpression(syntaxKind, leftExpr, operatorToken, rightExpr)
         }
-    
+        
+        
     let infixParseFunctionsMap
         : Map<TokenType, ParserState -> ExpressionSyntax -> Result<ExpressionSyntax, ParseError>> =
         Map.ofList [
@@ -886,6 +970,7 @@ module internal InfixExpressions =
             (TokenType.LPAREN, tryParseCallExpression) // parse call expr
             (TokenType.LBRACKET, tryParseIndexExpression) // parse index expr 
             *)
+            
             (TokenType.PLUS, tryParseInfixExpression)
             (TokenType.MINUS, tryParseInfixExpression)
             (TokenType.SLASH, tryParseInfixExpression)

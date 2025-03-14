@@ -105,7 +105,8 @@ type FrontendApi() =
                     let runtimeConfigJsonPath = Path.Join(dirInfo.FullName, $"{compilation.AssemblyName}.runtimeconfig.json")
                     File.WriteAllText(runtimeConfigJsonPath, FrontendApi.generateRuntimeConfigJson())
                     
-                    DotnetProjectGen.generateHostSub compilation.AssemblyName outputDir |> ignore
+                    // DotnetProjectGen.generateHostStub compilation.AssemblyName outputDir |> ignore
+                    Ps1Gen.generateHostStub compilation.AssemblyName outputDir |> ignore
                     
                     Ok this
                 | false -> EmitError(message="Emitting failed, see diagnostics for info.", diagnostics=(Some emitResult.Diagnostics)) :> Exception |> Error
@@ -147,6 +148,7 @@ type FrontendApi() =
             
         let syntaxTrees = Array.map snd fileSyntaxTreePairs
         
+        (*
         // TEMP, TODO REMOVE
         let temp = CSharpSyntaxTree.ParseText(
             """
@@ -162,6 +164,7 @@ type FrontendApi() =
             
             """)
         let syntaxTrees = [| temp |]
+        *)
             
         // list of references provided during parsing and 'refined' during binding
         // TODO: find a better way of doin this shi
