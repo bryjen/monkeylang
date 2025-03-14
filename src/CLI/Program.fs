@@ -30,7 +30,9 @@ let rec main argv =
     match programArguments with
     | _ when programArguments.Contains Build ->
         let buildParseResults = programArguments.GetResult Build
-        performBuild buildParseResults
+        // performBuild buildParseResults
+        performDotnetBuild buildParseResults
+        // performDotnetBuildAlt buildParseResults
     | _ when programArguments.Contains New ->
         printfn "New"
         0

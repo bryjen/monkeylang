@@ -1059,7 +1059,7 @@ type ArrayParsingTests() =
     
     member this.TestCases : (string * SyntaxNode) list = [
         (
-            """[1, 2, 3, 4, 5]""",
+            """[1, 2, 3, 4, 5];""",
             ExpressionStatement(
                 ArrayCreationExpression(
                     Token(SyntaxKind.NewKeyword),
@@ -1087,6 +1087,84 @@ type ArrayParsingTests() =
                         |]),
                         Token(SyntaxKind.CloseBraceToken))
                 ))
+        ) 
+        (
+            """let arr = [1, 2, 3, 4, 5];""",
+            SyntaxFactory.LocalDeclarationStatement(
+                SyntaxFactory.VariableDeclaration(
+                    IdentifierName("var"),
+                    SyntaxFactory.SeparatedList(
+                        [|
+                        SyntaxFactory.VariableDeclarator(SyntaxFactory.Identifier("arr"))
+                            .WithInitializer(
+                                SyntaxFactory.EqualsValueClause(
+                                    ArrayCreationExpression(
+                                        Token(SyntaxKind.NewKeyword),
+                                        ArrayType(
+                                            PredefinedType(Token(SyntaxKind.IntKeyword)),
+                                            SyntaxFactory.List<ArrayRankSpecifierSyntax>([|
+                                                ArrayRankSpecifier(
+                                                    Token(SyntaxKind.OpenBraceToken),
+                                                    SeparatedList([|
+                                                        LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(5)) :> ExpressionSyntax
+                                                    |]),
+                                                    Token(SyntaxKind.CloseBraceToken)
+                                                    )
+                                                |])
+                                            ),
+                                        InitializerExpression(
+                                            SyntaxKind.ArrayInitializerExpression,
+                                            Token(SyntaxKind.OpenBraceToken),
+                                            SeparatedList<ExpressionSyntax>([|
+                                                LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(1)) :> ExpressionSyntax
+                                                LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(2)) :> ExpressionSyntax
+                                                LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(3)) :> ExpressionSyntax
+                                                LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(4)) :> ExpressionSyntax
+                                                LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(5)) :> ExpressionSyntax
+                                            |]),
+                                            Token(SyntaxKind.CloseBraceToken)))
+                                    ))
+                        |]
+                        )))
+        ) 
+        (
+            """let arr: int[10];""",
+            SyntaxFactory.LocalDeclarationStatement(
+                SyntaxFactory.VariableDeclaration(
+                    IdentifierName("var"),
+                    SyntaxFactory.SeparatedList(
+                        [|
+                        SyntaxFactory.VariableDeclarator(SyntaxFactory.Identifier("arr"))
+                            .WithInitializer(
+                                SyntaxFactory.EqualsValueClause(
+                                    ArrayCreationExpression(
+                                        Token(SyntaxKind.NewKeyword),
+                                        ArrayType(
+                                            PredefinedType(Token(SyntaxKind.IntKeyword)),
+                                            SyntaxFactory.List<ArrayRankSpecifierSyntax>([|
+                                                ArrayRankSpecifier(
+                                                    Token(SyntaxKind.OpenBraceToken),
+                                                    SeparatedList([|
+                                                        LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(5)) :> ExpressionSyntax
+                                                    |]),
+                                                    Token(SyntaxKind.CloseBraceToken)
+                                                    )
+                                                |])
+                                            ),
+                                        InitializerExpression(
+                                            SyntaxKind.ArrayInitializerExpression,
+                                            Token(SyntaxKind.OpenBraceToken),
+                                            SeparatedList<ExpressionSyntax>([|
+                                                LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(1)) :> ExpressionSyntax
+                                                LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(2)) :> ExpressionSyntax
+                                                LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(3)) :> ExpressionSyntax
+                                                LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(4)) :> ExpressionSyntax
+                                                LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(5)) :> ExpressionSyntax
+                                            |]),
+                                            Token(SyntaxKind.CloseBraceToken)))
+                                    ))
+                        |]
+                        )))
         ) 
     ]
     
