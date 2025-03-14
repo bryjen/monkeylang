@@ -1,7 +1,7 @@
 namespace Monkey.Backend.Tests.VirtualMachine
 
 open FsToolkit.ErrorHandling
-open Monkey.Backend.VirtualMachine
+open Monkey.Backend.VM
 open Monkey.Backend.Compiler
 open Monkey.Backend.Tests.Compiler
 open Monkey.Frontend.Parser
@@ -13,7 +13,7 @@ type VMTestCase =
       Expected: obj }
 
 
-type VirtualMachineTests() =
+type VmTests() =
     
     static member ``A: Test Basic Integer Arithmetic Case`` = [|
         { Input = "1"; Expected = 1 }
@@ -303,28 +303,28 @@ type VirtualMachineTests() =
     
         
     static member TestCasesToExecute = Array.concat [
-        VirtualMachineTests.``A: Test Basic Integer Arithmetic Case``
-        VirtualMachineTests.``B: Test Complex Integer Arithmetic Case 1``
-        VirtualMachineTests.``C: Test Complex Integer Arithmetic Case 2``
-        VirtualMachineTests.``D: Test Basic Boolean Evaluation``
-        VirtualMachineTests.``E: Test Boolean Evaluation``
-        VirtualMachineTests.``F: Test Prefix Expression Evaluation``
-        VirtualMachineTests.``G: Test Boolean Expression Evaluation``
-        VirtualMachineTests.``H: Test Prefix and Infix Expression Evaluation``
-        VirtualMachineTests.``I: Test If Expression Evaluation``
-        VirtualMachineTests.``J: Test Let Statement Evaluation``
-        VirtualMachineTests.``K: Test String Evaluation``
-        VirtualMachineTests.``L: Test Array Literal Evaluation``
-        VirtualMachineTests.``M: Test Hash Literal Evaluation``
-        VirtualMachineTests.``N: Test Array & Hash Indexing Evaluation``
+        VmTests.``A: Test Basic Integer Arithmetic Case``
+        VmTests.``B: Test Complex Integer Arithmetic Case 1``
+        VmTests.``C: Test Complex Integer Arithmetic Case 2``
+        VmTests.``D: Test Basic Boolean Evaluation``
+        VmTests.``E: Test Boolean Evaluation``
+        VmTests.``F: Test Prefix Expression Evaluation``
+        VmTests.``G: Test Boolean Expression Evaluation``
+        VmTests.``H: Test Prefix and Infix Expression Evaluation``
+        VmTests.``I: Test If Expression Evaluation``
+        VmTests.``J: Test Let Statement Evaluation``
+        VmTests.``K: Test String Evaluation``
+        VmTests.``L: Test Array Literal Evaluation``
+        VmTests.``M: Test Hash Literal Evaluation``
+        VmTests.``N: Test Array & Hash Indexing Evaluation``
         
-        VirtualMachineTests.``O: Test Function Call evaluation - without arguments - 1 ``
+        VmTests.``O: Test Function Call evaluation - without arguments - 1 ``
         // Ignored because parser does not parse 'stacked calls' in a single statement
         // VirtualMachineTests.``P: Test Higher Function Call evaluation - without arguments``
         // VirtualMachineTests.``R: Test first class function evaluation``
-        VirtualMachineTests.``Q: Test Local Variable Binding evaluation - without arguments - 1``
-        VirtualMachineTests.``S: Test Function Call evaluation - with arguments - 1``
-        VirtualMachineTests.``T: Test builtin function evaluation 1``
+        VmTests.``Q: Test Local Variable Binding evaluation - without arguments - 1``
+        VmTests.``S: Test Function Call evaluation - with arguments - 1``
+        VmTests.``T: Test builtin function evaluation 1``
     ]
             
     [<TestCaseSource("TestCasesToExecute")>]
@@ -361,7 +361,7 @@ type VirtualMachineTests() =
     // Builtin Functions
     [<TestCase("len(1);")>]
     [<TestCase("""len("one", "two");""")>]
-    [<TestCase("head(1);")>]
+    [<TestCase("head(1);")>]    
     [<TestCase("last(1);")>]
     [<TestCase("push(1, 1);")>]
     member this.``Assert Errors with invalid number of arguments passed``(input: string) =

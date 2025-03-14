@@ -26,11 +26,11 @@
       <Compile Include="Compiler\Helpers.fs" />
       <Compile Include="Compiler\CompilerTests.fs" />
       <Compile Include="VirtualMachine\Helpers.fs" />
-      <Compile Include="VirtualMachine\VirtualMachineTests.fs" />
+      <Compile Include="VirtualMachine\VmTests.fs" />
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\src\Backend\Backend.fsproj" />
+      <ProjectReference Include="..\..\..\src\legacy\Backend\Backend.fsproj" />
     </ItemGroup>
 
 </Project>
