@@ -63,17 +63,24 @@ with
 and NewArguments =
     | [<Unique; AltCommandLine("-n")>]
         Name of string
-    | InitGit
+    | [<Unique; AltCommandLine("-o")>]
+        Output of string
     | [<Unique; AltCommandLine("-t")>]
-        Template 
+        Template of string
+    | [<Unique; AltCommandLine("-v")>]
+        Verbose
+    | [<Unique>]
+        InitGit
     
 with
     interface IArgParserTemplate with
         member this.Usage =
             match this with
             | Name _ -> "The name of the project."
-            | InitGit -> "Initializes git and creation of .gitignore, .git/* and .github/* files."
-            | Template -> "The application template."
+            | Output _ -> "The output directory of the generated project files."
+            | Template _ -> "The application template."
+            | Verbose -> "Flag. Emits extra generation information."
+            | InitGit -> "Flag. Initializes git and creation of .gitignore, .git/* and .github/* files."
     
     
 /// <summary>

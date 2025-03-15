@@ -25,6 +25,8 @@ open Monkey.Frontend.CLR.Api
 
 
 
+    
+
 let rec performDotnetBuildAlt (buildArguments: ParseResults<BuildArguments>) : int =
     // further argument post-processing
     let files = buildArguments.GetResult (Files, defaultValue=[])
@@ -34,69 +36,15 @@ let rec performDotnetBuildAlt (buildArguments: ParseResults<BuildArguments>) : i
     let isStrict = buildArguments.Contains WarningsAsErrors
     let isVerbose = buildArguments.Contains BuildArguments.Verbose
     
-    // Sample C# code: a console app with a Main method.
-    let sourceCode = """
-    using System;
-    public class Program {
-        public static void Main() {
-            Console.WriteLine("Hello from compiled code!");
+    let debug = 
+        result {
+            let csOutput = Path.Join(outputDir, "generated_cs")
+            let! scanResults = CsharpProjectConverter.scanMonkeyProject workDir
+            let! tempCsprojFileInfo = CsharpProjectConverter.generateTempCSharpProject csOutput scanResults
+            CsharpProjectConverter.runMsBuild outputDir tempCsprojFileInfo.FullName
+            return ()
         }
-    }
-    """
-
-    // Parse the source into a syntax tree.
-    let syntaxTree = CSharpSyntaxTree.ParseText(sourceCode)
-
-    // Set up necessary references.
-    let net9DllsDir = DirectoryInfo(@"C:\Program Files\dotnet\shared\Microsoft.NETCore.App\9.0.3")
-    let references: MetadataReference array = 
-        [|
-            MetadataReference.CreateFromFile(typeof<Object>.Assembly.Location)
-            MetadataReference.CreateFromFile(typeof<Console>.Assembly.Location)
-            MetadataReference.CreateFromFile(Path.Combine(net9DllsDir.FullName, "System.Runtime.dll"))
-            MetadataReference.CreateFromFile(Path.Combine(net9DllsDir.FullName, "mscorlib.dll"))
-        |]
-        
-    references |> Seq.iter (fun reference -> printfn $"{reference.Display}")
-
-    // Create a compilation. (OutputKind.ConsoleApplication for an exe)
-    let compilation = 
-        CSharpCompilation.Create("DynamicAssembly",
-                                  syntaxTrees = [| syntaxTree |],
-                                  references = references,
-                                  options = CSharpCompilationOptions(OutputKind.ConsoleApplication))
-
-    // Emit the assembly to a MemoryStream.
-    use ms = new MemoryStream()
-    let emitResult = compilation.Emit(ms)
     
-    let path = Path.Combine(outputDir, "DynamicAssembly.exe")
-    use fs = new FileStream(path, FileMode.Create)
-    let emitResult = compilation.Emit(fs)
-    
-    emitResult.Diagnostics 
-    |> Seq.filter (fun diag -> diag.Severity = DiagnosticSeverity.Error)
-    |> Seq.iter (fun diag -> printfn "%s" (diag.ToString()))
-    
-
-    (*
-    if emitResult.Success then
-        ms.Seek(0L, SeekOrigin.Begin) |> ignore
-        // Load the assembly.
-        let assembly = Assembly.Load(ms.ToArray())
-        // Get the entry point (Main method).
-        let entryPoint = assembly.EntryPoint
-        // Invoke Main. If it has parameters, pass an empty array.
-        let parameters = 
-            if entryPoint.GetParameters().Length > 0 then [| box [||] |]
-            else [||]
-        entryPoint.Invoke(null, parameters) |> ignore
-    else
-        // Print diagnostics if compilation failed.
-        emitResult.Diagnostics 
-        |> Seq.filter (fun diag -> diag.Severity = DiagnosticSeverity.Error)
-        |> Seq.iter (fun diag -> printfn "%s" (diag.ToString()))
-    *)
     0
         
         
