@@ -2,6 +2,13 @@
 
 open Argu
 
+type Verbosity =
+    | Quiet
+    | Minimal
+    | Normal
+    | Detailed
+    | Diagnostic
+
 /// <summary>
 /// CLI arguments as a DU type.
 /// </summary>
@@ -15,6 +22,8 @@ type ProgramArguments =
         New of ParseResults<NewArguments>
     | [<CliPrefix(CliPrefix.None)>]
         Run of ParseResults<RunArguments>
+    | [<CliPrefix(CliPrefix.None)>]
+        Test // TODO
     | [<AltCommandLine("-v")>]
         Version
     
@@ -32,29 +41,25 @@ with
 /// Arguments for the 'build' subcommand.
 /// </summary>
 and BuildArguments =
-    | [<Mandatory; Unique; Last; AltCommandLine("-f")>]
-        Files of string list
+    | [<MainCommand; First>]
+        Project of project: string
+    | [<Unique; AltCommandLine("-v")>]
+        Verbosity of verbosity: Verbosity
     | [<Unique; AltCommandLine("-o")>]
-        OutputDir of string
-    | [<Unique; AltCommandLine("-w")>]
-        WorkDir of string
+        OutputDir of output: string
     | [<Unique; AltCommandLine("-t")>]
         Target of CompileTarget
     | [<Unique; AltCommandLine("-strict")>]
         WarningsAsErrors
-    | [<Unique; AltCommandLine("-v")>]
-        Verbose
-
 with
     interface IArgParserTemplate with
         member this.Usage =
             match this with
-            | Files _ -> "Files to build."
-            | OutputDir _ -> "Output directory for build files."
-            | WorkDir _ -> "Working directory for build files."
+            | Project _ -> "The '*mkproj' file to operate on. If a file is not specified, the command will search the current directory for one."
+            | Verbosity _ -> "Set the MSBuild verbosity level. Allowed values are q[uiet], m[inimal], n[ormal], d[etailed], and diag[nostic]."
+            | OutputDir _ -> "The output directory to place built artifacts in."
             | Target _ -> "The platform to target."
             | WarningsAsErrors -> "Flag. Emits warnings as errors."
-            | Verbose -> "Flag. Emits extra build information."
     
     
 /// <summary>
@@ -87,19 +92,25 @@ with
 /// Arguments for the 'run' subcommand.
 /// </summary>
 and RunArguments =
-    | [<Mandatory; Unique; AltCommandLine("-f")>]
-        File of string
+    | [<MainCommand; First>]
+        Project of project: string
+    | [<Unique; AltCommandLine("-v")>]
+        Verbosity of verbosity: Verbosity
+    | [<Unique; AltCommandLine("-o")>]
+        BuildOutputDir of buildOutput: string
     | [<Unique; AltCommandLine("-t")>]
         Target of CompileTarget
-    | [<Unique; AltCommandLine("-v")>]
-        Verbose
+    | [<Unique; AltCommandLine("-strict")>]
+        WarningsAsErrors
 with
     interface IArgParserTemplate with
         member this.Usage =
             match this with
-            | File _ -> "The file to run."
+            | Project _ -> "The '*mkproj' file to operate on. If a file is not specified, the command will search the current directory for one."
+            | Verbosity _ -> "Set the MSBuild verbosity level. Allowed values are q[uiet], m[inimal], n[ormal], d[etailed], and diag[nostic]."
+            | BuildOutputDir _ -> "The output directory to place built artifacts in."
             | Target _ -> "The platform to target."
-            | Verbose -> "Flag. Emits extra build information."
+            | WarningsAsErrors -> "Flag. Emits warnings as errors."
             
             
 /// <summary>

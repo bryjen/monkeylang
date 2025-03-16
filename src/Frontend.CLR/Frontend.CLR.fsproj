@@ -11,6 +11,8 @@
         <Compile Include="Helpers\Numbers.fs" />
         <Compile Include="Token.fs" />
         <Compile Include="Lexer.fs" />
+        <Compile Include="Syntax\Ast.fs" />
+        <Compile Include="Syntax\Tokenizer.fs" />
         <Compile Include="Parsers\ParseErrors.fs" />
         <Compile Include="Parsers\ModifiedRecursiveDescentHelpers.fs" />
         <Compile Include="Parsers\ModifiedRecursiveDescent.fs" />

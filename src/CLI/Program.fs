@@ -11,8 +11,6 @@ open Monkey.CLI
 
 [<EntryPoint>]
 let rec main argv =
-    
-    
     let parser = ArgumentParser.Create<ProgramArguments>(programName = "monkey")
     
     if argv.Length = 0 then
