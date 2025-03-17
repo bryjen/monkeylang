@@ -3,7 +3,24 @@ module rec Monkey.Frontend.CLR.Syntax.Ast
 
 open Microsoft.CodeAnalysis
 open Microsoft.CodeAnalysis.CSharp
+open Microsoft.CodeAnalysis.Text
 
+
+
+type SyntaxToken =
+    { Kind: SyntaxKind
+      Text: string
+      Value: obj option
+      
+      TextSpan: TextSpan  // excludes trivia
+      FullTextSpan: TextSpan  // includes trivia
+      
+      LeadingTrivia: SyntaxTriviaList
+      TrailingTrivia: SyntaxTriviaList }
+with
+    override this.ToString() =
+        $"{this.LeadingTrivia.ToFullString()}{this.Text}{this.TrailingTrivia.ToFullString()}"
+    
 
 
 /// <summary>

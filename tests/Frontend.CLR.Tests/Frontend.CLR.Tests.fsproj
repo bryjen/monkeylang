@@ -10,7 +10,9 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <Compile Include="LexerTests.fs" />
+        <Compile Include="Tokenizer\OldTokenizerTests.fs" />
+        <Compile Include="Tokenizer\TokenizerTests.fs" />
+        <Compile Include="Tokenizer\RoundtrippableTests.fs" />
         <Compile Include="Parser\Helpers.fs" />
         <Compile Include="Parser\ParserTests.fs" />
         <Compile Include="Program.fs"/>

@@ -1,3 +1,6 @@
+(*
+Tests for the old lexer which outputs 'custom' token types.
+*)
 namespace Monkey.Frontend.CLR.Tests
 
 open NUnit.Framework
@@ -75,7 +78,7 @@ module private LexerHelpers =
 
 
 [<TestFixture>]
-type LexerTests() =
+type OldTokenizerTests() =
     [<Test>]
     member this.``Test next token 1``() =
         let testInput = "=+(){},;"
