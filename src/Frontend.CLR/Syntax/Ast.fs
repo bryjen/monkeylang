@@ -89,9 +89,9 @@ with
 type ExpressionSyntax =
     // | ArrayInitializationExpression
     | ParenthesizedExpressionSyntax of ParenthesizedExpressionSyntax
-    | FunctionExpression of FunctionExpression
-    | BinaryExpression of BinaryExpression
-    | InterpolatedStringExpression of InterpolatedStringExpression
+    | FunctionExpressionSyntax of FunctionExpressionSyntax
+    | BinaryExpressionSyntax of BinaryExpressionSyntax
+    | InterpolatedStringExpressionSyntax of InterpolatedStringExpressionSyntax
     | InvocationExpressionSyntax of InvocationExpressionSyntax
     | LiteralExpressionSyntax of LiteralExpressionSyntax
     | PostfixExpressionSyntax of PostfixExpressionSyntax
@@ -102,9 +102,9 @@ with
     override this.ToString() =
         match this with
         | ParenthesizedExpressionSyntax parenthesizedExpressionSyntax -> parenthesizedExpressionSyntax.ToString()
-        | FunctionExpression functionExpression -> functionExpression.ToString()
-        | BinaryExpression binaryExpression -> binaryExpression.ToString()
-        | InterpolatedStringExpression interpolatedStringExpression -> interpolatedStringExpression.ToString()
+        | FunctionExpressionSyntax functionExpression -> functionExpression.ToString()
+        | BinaryExpressionSyntax binaryExpression -> binaryExpression.ToString()
+        | InterpolatedStringExpressionSyntax interpolatedStringExpression -> interpolatedStringExpression.ToString()
         | InvocationExpressionSyntax invocationExpressionSyntax -> invocationExpressionSyntax.ToString()
         | LiteralExpressionSyntax literalExpressionSyntax -> literalExpressionSyntax.ToString()
         | PostfixExpressionSyntax postfixExpressionSyntax -> postfixExpressionSyntax.ToString()
@@ -116,12 +116,12 @@ with
         match es1, es2 with
         | ParenthesizedExpressionSyntax pes1, ParenthesizedExpressionSyntax pes2 ->
             ParenthesizedExpressionSyntax.AreEquivalent(pes1, pes2)
-        | FunctionExpression fe1, FunctionExpression fe2 ->
-            FunctionExpression.AreEquivalent(fe1, fe2)
-        | BinaryExpression be1, BinaryExpression be2 ->
-            BinaryExpression.AreEquivalent(be1, be2)
-        | InterpolatedStringExpression ise1, InterpolatedStringExpression ise2 ->
-            InterpolatedStringExpression.AreEquivalent(ise1, ise2)
+        | FunctionExpressionSyntax fe1, FunctionExpressionSyntax fe2 ->
+            FunctionExpressionSyntax.AreEquivalent(fe1, fe2)
+        | BinaryExpressionSyntax be1, BinaryExpressionSyntax be2 ->
+            BinaryExpressionSyntax.AreEquivalent(be1, be2)
+        | InterpolatedStringExpressionSyntax ise1, InterpolatedStringExpressionSyntax ise2 ->
+            InterpolatedStringExpressionSyntax.AreEquivalent(ise1, ise2)
         | InvocationExpressionSyntax ies1, InvocationExpressionSyntax ies2 -> 
             InvocationExpressionSyntax.AreEquivalent(ies1, ies2)
         | LiteralExpressionSyntax les1, LiteralExpressionSyntax les2 ->
@@ -288,7 +288,7 @@ with
     
 (* #REGION Expressions *)
 
-type FunctionExpression =
+type FunctionExpressionSyntax =
     { FunctionKeywordToken: SyntaxToken
       OpenParenToken: SyntaxToken
       ParameterList: ParameterListSyntax
@@ -302,13 +302,13 @@ with
     override this.ToString() =
         $"{this.FunctionKeywordToken.ToString()}{this.OpenParenToken.ToString()}{this.ParameterList.ToString()}{this.CloseParenToken.ToString()}{this.ReturnType.ToString()}{this.OpenBraceToken.ToString()}{this.Body.ToString()}{this.CloseBraceToken.ToString()}"
         
-    static member AreEquivalent(fe1: FunctionExpression, fe2: FunctionExpression) =
+    static member AreEquivalent(fe1: FunctionExpressionSyntax, fe2: FunctionExpressionSyntax) =
         ParameterListSyntax.AreEquivalent(fe1.ParameterList, fe2.ParameterList)
             && TypeSyntax.AreEquivalent(fe1.ReturnType, fe2.ReturnType)
             && BlockSyntax.AreEquivalent(fe1.Body, fe2.Body)
     
     
-type BinaryExpression =
+type BinaryExpressionSyntax =
     { Left: ExpressionSyntax
       OperatorToken: SyntaxToken
       Right: ExpressionSyntax }
@@ -316,21 +316,21 @@ with
     override this.ToString() =
         $"{this.Left.ToString()}{this.OperatorToken.ToString()}{this.Right.ToString()}"
         
-    static member AreEquivalent(bs1: BinaryExpression, bs2: BinaryExpression) =
+    static member AreEquivalent(bs1: BinaryExpressionSyntax, bs2: BinaryExpressionSyntax) =
         ExpressionSyntax.AreEquivalent(bs1.Left, bs2.Left)
             && SyntaxToken.AreEquivalent(bs1.OperatorToken, bs2.OperatorToken)
             && ExpressionSyntax.AreEquivalent(bs1.Right, bs2.Right)
             
     
     
-type InterpolatedStringExpression =
+type InterpolatedStringExpressionSyntax =
     { InterpolatedStringStartToken: SyntaxToken
       Contents: InterpolatedStringContent array }
 with
     override this.ToString() =
         $"{this.InterpolatedStringStartToken.ToString()}{this.Contents.ToString()}"
         
-    static member AreEquivalent(bs1: InterpolatedStringExpression, bs2: InterpolatedStringExpression) =
+    static member AreEquivalent(bs1: InterpolatedStringExpressionSyntax, bs2: InterpolatedStringExpressionSyntax) =
         Array.zip bs1.Contents bs2.Contents
         |> Array.map InterpolatedStringContent.AreEquivalent
         |> Array.forall id
@@ -478,7 +478,7 @@ type IfStatementSyntax =
     { IfKeyword: SyntaxToken
       Condition: ExpressionSyntax
       Clause: BlockSyntax
-      ElseIfClauses: ElseIfStatementSyntax array
+      ElseIfClauses: ElseIfClauseSyntax array
       ElseClause: ElseClauseSyntax option }
 with
     override this.ToString() =
@@ -489,7 +489,7 @@ with
     static member AreEquivalent(iss1: IfStatementSyntax, iss2: IfStatementSyntax) =
         let areElseIfClausesEquivalent =
             Array.zip iss1.ElseIfClauses iss2.ElseIfClauses
-            |> Array.map ElseIfStatementSyntax.AreEquivalent
+            |> Array.map ElseIfClauseSyntax.AreEquivalent
             |> Array.forall id
             
         let isElseClauseEquivalent =
@@ -503,7 +503,7 @@ with
             && areElseIfClausesEquivalent
             && isElseClauseEquivalent
             
-and ElseIfStatementSyntax =
+and ElseIfClauseSyntax =
     { ElseKeyword: SyntaxToken
       IfKeyword: SyntaxToken
       Condition: ExpressionSyntax
@@ -512,7 +512,7 @@ with
     override this.ToString() =
         $"{this.ElseKeyword.ToString()}{this.IfKeyword.ToString()}{this.Condition.ToString()}{this.Clause.ToString()}"
         
-    static member AreEquivalent(eiss1: ElseIfStatementSyntax, eiss2: ElseIfStatementSyntax) =
+    static member AreEquivalent(eiss1: ElseIfClauseSyntax, eiss2: ElseIfClauseSyntax) =
         ExpressionSyntax.AreEquivalent(eiss1.Condition, eiss2.Condition)
             && BlockSyntax.AreEquivalent(eiss1.Clause, eiss2.Clause)
             

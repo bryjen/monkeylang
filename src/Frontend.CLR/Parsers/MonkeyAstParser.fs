@@ -193,9 +193,11 @@ module internal PrefixExpressions =
         let currentToken = parserState.PopToken()
         match currentToken.Kind with
         | SyntaxKind.TrueKeyword -> 
-            { Kind = SyntaxKind.TrueLiteralExpression; Token = currentToken } |> ExpressionSyntax.LiteralExpressionSyntax |> Ok
+            let updatedToken = { currentToken with Value = Some true }
+            { Kind = SyntaxKind.TrueLiteralExpression; Token = updatedToken } |> ExpressionSyntax.LiteralExpressionSyntax |> Ok
         | SyntaxKind.FalseKeyword ->
-            { Kind = SyntaxKind.FalseLiteralExpression; Token = currentToken } |> ExpressionSyntax.LiteralExpressionSyntax |> Ok
+            let updatedToken = { currentToken with Value = Some false }
+            { Kind = SyntaxKind.FalseLiteralExpression; Token = updatedToken } |> ExpressionSyntax.LiteralExpressionSyntax |> Ok
         | _ ->
             failwith "todo"
             
@@ -282,7 +284,7 @@ module internal InfixExpressions =
                 | None -> Precedence.LOWEST
                 
             let! rightExpr = tryParseExpression parserState precedence
-            return { Left = leftExpr; OperatorToken = token; Right = rightExpr } |> ExpressionSyntax.BinaryExpression
+            return { Left = leftExpr; OperatorToken = token; Right = rightExpr } |> ExpressionSyntax.BinaryExpressionSyntax
         }
         
         

@@ -3,6 +3,7 @@
 
 open Microsoft.CodeAnalysis.CSharp
 
+open Monkey.Frontend.CLR.Syntax.AstTraverser
 open NUnit.Framework
 
 open Frontend.CLR.Syntax
@@ -43,22 +44,19 @@ module private MonkeyAstParserTestsHelpers =
         printfn "```"
         printfn "---------------------------------------------------------"
         
-        // TODO: Find a way to have a tree visualization of the AST
-        (*
         printfn "\n\nSyntax Tree Visualization"
         printfn "---------------------------------------------------------"
         printfn "```csharp (expected)"
         for expected in expectedSyntaxNodes do
-            printfn $"{expected.ToString()}"
+            printMonkeySyntaxNodeTree expected
         printfn "```"
         printfn ""
         
         printfn "```csharp (actual)"
         for actual in actualSyntaxNodes do
-            printfn $"{actual.ToString()}"
+            printMonkeySyntaxNodeTree actual
         printfn "```"
         printfn "---------------------------------------------------------"
-        *)
         
         pass 
 
