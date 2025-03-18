@@ -13,10 +13,14 @@
         <Compile Include="Lexer.fs" />
         <Compile Include="Syntax\Ast.fs" />
         <Compile Include="Syntax\SyntaxFactory\SyntaxToken.fs" />
+        <Compile Include="Syntax\SyntaxFactory\Expressions.fs" />
+        <Compile Include="Syntax\SyntaxFactory\Statements.fs" />
         <Compile Include="Syntax\Tokenizer.fs" />
-        <Compile Include="Parsers\ParseErrors.fs" />
-        <Compile Include="Parsers\ModifiedRecursiveDescentHelpers.fs" />
-        <Compile Include="Parsers\ModifiedRecursiveDescent.fs" />
+        <Compile Include="Parsers\CSharpAstErrors.fs" />
+        <Compile Include="Parsers\MonkeyAstErrors.fs" />
+        <Compile Include="Parsers\ParserHelpers.fs" />
+        <Compile Include="Parsers\CSharpAstParser.fs" />
+        <Compile Include="Parsers\MonkeyAstParser.fs" />
         <Compile Include="Binding\Binder.fs" />
         <Compile Include="Binding\Optimizer.fs" />
         <Compile Include="HostStubGenerator.fs" />

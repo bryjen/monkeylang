@@ -7,7 +7,7 @@ open Microsoft.CodeAnalysis.Text
 
 open FsToolkit.ErrorHandling
 
-open type Monkey.Frontend.CLR.Syntax.SyntaxFactory.SyntaxTokenFactory
+open type Monkey.Frontend.CLR.Syntax.SyntaxFactory.MonkeySyntaxTokenFactory
 
 
 type private TokenizerState (sourceText: SourceText) =
@@ -126,12 +126,15 @@ and private parseToken (tokenizerState: TokenizerState) (chars: char array) : Mo
         
         let stringPredicate c = (c <> '"')
         let startIndex, endIndex = readCharacterSequence chars stringPredicate tokenizerState
-        let textSpan = TextSpan(startIndex, endIndex - startIndex)
-        let asString = tokenizerState.SourceText.GetSubText(textSpan).ToString()
+        let textSpan = TextSpan(startIndex - 1, endIndex - startIndex + 2)  // to include the quotation marks
         let fullTextSpan = TextSpan(triviaTextSpan.Start, triviaTextSpan.Length + textSpan.Length)
+        let valueSpan = TextSpan(startIndex, endIndex - startIndex)
+        
+        let text = tokenizerState.SourceText.GetSubText(textSpan).ToString()
+        let value = tokenizerState.SourceText.GetSubText(valueSpan).ToString()
         
         tokenizerState.Next() |> ignore  // consume the ending double quote
-        StringLiteral(asString, textSpan, fullTextSpan, leadingTriviaList)
+        StringLiteral(value, text, textSpan, fullTextSpan, leadingTriviaList)
         
     | _ ->
         tryParseAsOperatorOrDelimiter chars leadingTriviaList triviaTextSpan tokenizerState

@@ -17,7 +17,7 @@ open Monkey.Frontend.CLR.Api.Errors
 open Monkey.Frontend.CLR.HostStubGenerator
 open Monkey.Frontend.CLR.Lexer
 open Monkey.Frontend.CLR.Parsers
-open Monkey.Frontend.CLR.Parsers.ParseErrors
+open Monkey.Frontend.CLR.Parsers.CSharpAstErrors
 
         
         
@@ -141,7 +141,7 @@ module CsharpProjectConverter =
         result {
             let monkeySourceCode = File.ReadAllText(fileInfo.FullName)
             let tokens = Lexer.parseIntoTokens monkeySourceCode
-            let statements, errors = ModifiedRecursiveDescent.parseTokens (List.toArray tokens)
+            let statements, errors = CSharpAstParser.parseTokens (List.toArray tokens)
             
             do! match errors with
                 | [] -> Ok ()

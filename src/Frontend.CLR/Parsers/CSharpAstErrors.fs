@@ -1,4 +1,4 @@
-﻿module Monkey.Frontend.CLR.Parsers.ParseErrors
+﻿module Monkey.Frontend.CLR.Parsers.CSharpAstErrors
 
 open System
 open Microsoft.CodeAnalysis.CSharp

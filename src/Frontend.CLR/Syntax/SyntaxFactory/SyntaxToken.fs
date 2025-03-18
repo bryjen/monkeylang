@@ -15,7 +15,7 @@ module private SyntaxTokenFactoryHelpers =
         ()
 
 [<AbstractClass; Sealed>]
-type SyntaxTokenFactory () =
+type MonkeySyntaxTokenFactory () =
     static member Token(
             syntaxKind: SyntaxKind,
             ?text: string,
@@ -41,28 +41,21 @@ type SyntaxTokenFactory () =
           TrailingTrivia = trailingTriviaValue }
         
     static member Identifier(value: string, textSpan: TextSpan, fullTextSpan: TextSpan, leadingTrivia: SyntaxTriviaList) =
-        SyntaxTokenFactory.Token(SyntaxKind.IdentifierToken, text=value, value=value, textSpan=textSpan, fullTextSpan=fullTextSpan, leadingTrivia=leadingTrivia)
+        MonkeySyntaxTokenFactory.Token(SyntaxKind.IdentifierToken, text=value, value=value, textSpan=textSpan, fullTextSpan=fullTextSpan, leadingTrivia=leadingTrivia)
         
-    static member StringLiteral(value: string, textSpan: TextSpan, fullTextSpan: TextSpan, leadingTrivia: SyntaxTriviaList) =
-        SyntaxTokenFactory.Token(SyntaxKind.StringLiteralToken, text=($"\"{value}\""), value=value, textSpan=textSpan, fullTextSpan=fullTextSpan, leadingTrivia=leadingTrivia)
+    static member StringLiteral(value: string, text: string, textSpan: TextSpan, fullTextSpan: TextSpan, leadingTrivia: SyntaxTriviaList) =
+        MonkeySyntaxTokenFactory.Token(SyntaxKind.StringLiteralToken, text=text, value=value, textSpan=textSpan, fullTextSpan=fullTextSpan, leadingTrivia=leadingTrivia)
+        
         
     static member NumericLiteral(value: obj, textSpan: TextSpan, fullTextSpan: TextSpan, leadingTrivia: SyntaxTriviaList) =
-        SyntaxTokenFactory.Token(SyntaxKind.NumericLiteralToken, text=(string value), value=value, textSpan=textSpan, fullTextSpan=fullTextSpan, leadingTrivia=leadingTrivia)
-       
-       
-       
-[<Extension>] 
-type SyntaxTokenExtensions =
-    /// <summary>
-    /// 
-    /// </summary>
-    /// <remarks>
-    /// <ul>
-    ///     <li>
-    ///     </li>
-    /// </ul>
-    /// </remarks>
-    [<Extension>]
-    static member ToRoslynSyntaxToken (syntaxToken: SyntaxToken) : Microsoft.CodeAnalysis.SyntaxToken =
-        SyntaxFactory.Token(SyntaxKind.Argument).WithLeadingTrivia(SyntaxTriviaList()) |> ignore
-        failwith "todo"
+        MonkeySyntaxTokenFactory.Token(SyntaxKind.NumericLiteralToken, text=(string value), value=value, textSpan=textSpan, fullTextSpan=fullTextSpan, leadingTrivia=leadingTrivia)
+        
+    static member NumericLiteral(value: obj) =
+        MonkeySyntaxTokenFactory.Token(SyntaxKind.NumericLiteralToken, text=(string value), value=value)
+        
+        
+    static member FalseKeyword() =
+        MonkeySyntaxTokenFactory.Token(SyntaxKind.FalseKeyword, text="false", value=false)
+        
+    static member TrueKeyword() =
+        MonkeySyntaxTokenFactory.Token(SyntaxKind.TrueKeyword, text="true", value=true)

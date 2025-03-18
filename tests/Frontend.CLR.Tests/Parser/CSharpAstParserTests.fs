@@ -1,86 +1,19 @@
-﻿module Monkey.Frontend.CLR.Tests.Parser.ParserTests
+﻿namespace Monkey.Frontend.CLR.Tests.Parser.CSharpAstParserTests
 
 open System
+
 open Microsoft.CodeAnalysis
 open Microsoft.CodeAnalysis.CSharp
 open Microsoft.CodeAnalysis.CSharp.Syntax
 open type Microsoft.CodeAnalysis.CSharp.SyntaxFactory
+
+open NUnit.Framework
+
 open Monkey.Frontend.CLR.Lexer
 open Monkey.Frontend.CLR.Parsers
 open Monkey.Frontend.CLR.Tests.Parser.Helpers
-open NUnit.Framework
 
 
-(*
-A reference of Monkey source code in "Writing a compiler in Go"
-
-```Monkey
-let name = "Monkey";
-let age = 1;
-let inspirations = ["Scheme", "Lisp", "JavaScript", "Clojure"];
-let book = {
-    "title": "Writing A Compiler In Go",
-    "author": "Thorsten Ball",
-    "prequel": "Writing An Interpreter In Go"
-};
-
-let printBookName = fn(book) {
-    let title = book["title"];
-    let author = book["author"];
-    puts(author + "- " + title);
-};
-
-printBookName(book);
-// => prints: "Thorsten Ball - Writing A Compiler In Go"
-
-let fibonacci = fn(x) {
-    if (x == 0) {
-        0
-    } else {
-        if (x == 1) {
-            return 1;
-        } else {
-            fibonacci(x- 1) + fibonacci(x- 2);
-        }
-    }
-};
-
-let map = fn(arr, f) {
-    let iter = fn(arr, accumulated) {
-        if (len(arr) == 0) {
-            accumulated
-        } else {
-            iter(rest(arr), push(accumulated, f(first(arr))));
-        }
-    };
-    
-    iter(arr, []);
-};
-
-let numbers = [1, 1 + 1, 4- 1, 2 * 2, 2 + 3, 12 / 2];
-map(numbers, fibonacci);
-// => returns: [1, 1, 2, 3, 5, 8]
-```
-*)
-
-(*
-// Examples of updated statements that can be done with C#'s exposed functionality
-
-```Monkey
-let foobar: int = 5;  
-// optional type annotations
-// "int foobar = 5;"
-
-let partial_app_demo = fn([int -> int -> int] multi_transform, int initialValue) { ... };
-// taking functions as parameters, as well as being able to typedef them as above
-// "Func<Func<int, int, int>, int, Func<int, int>> partial_app_demo = (Func<int, int, int> transform, int initialValue) => { ... }"
-
-let full_transform: [int -> int -> int] = fn(int x, int y) { ... };
-partial_app_demo(full_transform, foobar)
-// TODO: passing functions as arguments
-// "Func<int, int, int> full_transform = (int x, int y) => { ... };"
-// "partial_app_demo(full_transform, foobar);"
- *)
 
 [<TestFixture>]
 [<ParserComponent(ParserComponentType.Expressions)>]
@@ -141,7 +74,7 @@ type NumericExpressionParsingTests() =
         let input, expectedSyntaxTree = List.item testCaseIndex this.TestCases
         let tokens = Lexer.parseIntoTokens input |> List.toArray
         
-        let syntaxNodes, parseErrors = ModifiedRecursiveDescent.parseTokens tokens
+        let syntaxNodes, parseErrors = CSharpAstParser.parseTokens tokens
         match List.length parseErrors with
         | 0 ->
             let actualSyntaxNodes = List.toArray syntaxNodes |> Array.map (fun x -> x :> SyntaxNode)
@@ -195,7 +128,7 @@ type BooleanExpressionParsingTests() =
         let input, expectedSyntaxTree = List.item testCaseIndex this.TestCases
         let tokens = Lexer.parseIntoTokens input |> List.toArray
         
-        let syntaxNodes, parseErrors = ModifiedRecursiveDescent.parseTokens tokens
+        let syntaxNodes, parseErrors = CSharpAstParser.parseTokens tokens
         match List.length parseErrors with
         | 0 ->
             let actualSyntaxNodes = List.toArray syntaxNodes |> Array.map (fun x -> x :> SyntaxNode)
@@ -333,7 +266,7 @@ type BasicInfixExpressionParsingTests() =
         let input, expectedSyntaxTree = List.item testCaseIndex this.TestCases
         let tokens = Lexer.parseIntoTokens input |> List.toArray
         
-        let syntaxNodes, parseErrors = ModifiedRecursiveDescent.parseTokens tokens
+        let syntaxNodes, parseErrors = CSharpAstParser.parseTokens tokens
         match List.length parseErrors with
         | 0 ->
             let actualSyntaxNodes = List.toArray syntaxNodes |> Array.map (fun x -> x :> SyntaxNode)
@@ -513,7 +446,7 @@ type BasicVariableAssignmentParsingTests() =
         let input, expectedSyntaxTree = List.item testCaseIndex this.TestCases
         let tokens = Lexer.parseIntoTokens input |> List.toArray
         
-        let syntaxNodes, parseErrors = ModifiedRecursiveDescent.parseTokens tokens
+        let syntaxNodes, parseErrors = CSharpAstParser.parseTokens tokens
         match List.length parseErrors with
         | 0 ->
             let actualSyntaxNodes = List.toArray syntaxNodes |> Array.map (fun x -> x :> SyntaxNode)
@@ -663,7 +596,7 @@ type IfStatementParsingTests() =
         let input, expectedSyntaxNodes = List.item testCaseIndex this.TestCases
         let tokens = Lexer.parseIntoTokens input |> List.toArray
         
-        let syntaxNodes, parseErrors = ModifiedRecursiveDescent.parseTokens tokens
+        let syntaxNodes, parseErrors = CSharpAstParser.parseTokens tokens
         match List.length parseErrors with
         | 0 ->
             let actualSyntaxNodes = List.toArray syntaxNodes |> Array.map (fun x -> x :> SyntaxNode)
@@ -1029,7 +962,7 @@ type FunctionParsingTests() =
         let input, expectedSyntaxNodes = List.item testCaseIndex this.TestCases
         let tokens = Lexer.parseIntoTokens input |> List.toArray
         
-        let syntaxNodes, parseErrors = ModifiedRecursiveDescent.parseTokens tokens
+        let syntaxNodes, parseErrors = CSharpAstParser.parseTokens tokens
         match List.length parseErrors with
         | 0 ->
             let actualSyntaxNodes = List.toArray syntaxNodes |> Array.map (fun x -> x :> SyntaxNode)
@@ -1172,7 +1105,7 @@ type ArrayParsingTests() =
         let input, expectedSyntaxNodes = List.item testCaseIndex this.TestCases
         let tokens = Lexer.parseIntoTokens input |> List.toArray
         
-        let syntaxNodes, parseErrors = ModifiedRecursiveDescent.parseTokens tokens
+        let syntaxNodes, parseErrors = CSharpAstParser.parseTokens tokens
         match List.length parseErrors with
         | 0 ->
             let actualSyntaxNodes = List.toArray syntaxNodes |> Array.map (fun x -> x :> SyntaxNode)
@@ -1242,7 +1175,7 @@ type FunctionCallParsingTests () =
         let input, expectedSyntaxNodes = List.item testCaseIndex this.TestCases
         let tokens = Lexer.parseIntoTokens input |> List.toArray
         
-        let syntaxNodes, parseErrors = ModifiedRecursiveDescent.parseTokens tokens
+        let syntaxNodes, parseErrors = CSharpAstParser.parseTokens tokens
         match List.length parseErrors with
         | 0 ->
             let actualSyntaxNodes = List.toArray syntaxNodes |> Array.map (fun x -> x :> SyntaxNode)

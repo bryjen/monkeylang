@@ -1,5 +1,6 @@
 ﻿[<AutoOpen>]
-module Monkey.Frontend.CLR.Parsers.ModifiedRecursiveDescentHelpers
+[<System.Obsolete>]
+module Monkey.Frontend.CLR.Parsers.ParserHelpers
 
 open System
 
@@ -10,13 +11,13 @@ open type Microsoft.CodeAnalysis.CSharp.SyntaxFactory
 open FsToolkit.ErrorHandling
 
 open Monkey.Frontend.CLR.Token
-open Monkey.Frontend.CLR.Parsers.ParseErrors
+open Monkey.Frontend.CLR.Parsers.CSharpAstErrors
 
 
 /// <summary>
 /// Mutable type containing the main parser state.
 /// </summary>
-type internal ParserState(tokens: Token array) =
+type internal CSharpAstParserState(tokens: Token array) =
     let mutable currentIdx: int = 0
     let mutable parseErrors: ParseError list = []
     let mutable statements: StatementSyntax list = []
@@ -84,7 +85,7 @@ module ParserStateHelpers =
 
     let isRParen (tokenType: TokenType) = tokenType = TokenType.RPAREN
             
-    let rec internal consumeUntilTokenType (tokenTypePredicate: TokenType -> bool) (parserState: ParserState) =
+    let rec internal consumeUntilTokenType (tokenTypePredicate: TokenType -> bool) (parserState: CSharpAstParserState) =
         match parserState.IsEof() with
         | true ->
             parserState
@@ -137,7 +138,7 @@ let internal onUnexpectedToken (expectedTokenType: TokenType) (actualToken: Toke
     let errorMsg = $"Expected a/an \"{expectedTokenType}\", but received \"{actualToken.Literal}\" of type \"{actualToken.Type}\""
     Error (ParseError(message=errorMsg))
 
-let internal assertAndPop (expectedTokenType: TokenType) (parserState: ParserState) =
+let internal assertAndPop (expectedTokenType: TokenType) (parserState: CSharpAstParserState) =
     let currentToken = parserState.PopToken()
     match currentToken.Type with
     | tokenType when tokenType = expectedTokenType -> Ok ()

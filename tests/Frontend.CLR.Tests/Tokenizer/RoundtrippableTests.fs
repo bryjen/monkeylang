@@ -1,8 +1,6 @@
 ﻿namespace Monkey.Frontend.CLR.Tests.Tokenizer
 
-open Frontend.CLR.Syntax
 open Frontend.CLR.Syntax.Tokenizer
-open Microsoft.CodeAnalysis.CSharp
 open Microsoft.CodeAnalysis.Text
 open Monkey.Frontend.CLR.Syntax.Ast
 open NUnit.Framework
@@ -10,7 +8,7 @@ open NUnit.Framework
 [<AutoOpen>]
 module private RoundtrippableTestsHelpers =
     
-    let escapeWhitespaceCharacters (s: string) =
+    let internal escapeWhitespaceCharacters (s: string) =
         s
         |> Seq.map (function
             | '\n' -> "\\n"
@@ -20,7 +18,7 @@ module private RoundtrippableTestsHelpers =
             | c    -> c.ToString())
         |> String.concat ""
     
-    let rec printTokens (tokens: SyntaxToken array) : unit =
+    let rec internal printTokens (tokens: SyntaxToken array) : unit =
         let counts = [1..tokens.Length] |> List.toArray
         for (count, token) in Array.zip counts tokens do
             printToken count token
@@ -31,8 +29,29 @@ module private RoundtrippableTestsHelpers =
         printfn $"\tKIND:\t\t{token.Kind}"
         printfn $"\tTEXT:\t\t{token.Kind}"
         printfn $"\tVALUE:\t\t{token.Value}"
+        printfn $"\tSPAN:\t\t\"{token.TextSpan}\""
+        printfn $"\tFULL_SPAN:\t\"{token.FullTextSpan}\""
         printfn $"\tLEAD_TRIV:\t\"{escapeWhitespaceCharacters (token.LeadingTrivia.ToFullString())}\""
         printfn $"\tTRAIL_TRIV:\t\"{escapeWhitespaceCharacters (token.TrailingTrivia.ToFullString())}\""
+        
+    let assertSpanEqualsText (sourceText: SourceText) (tokens: SyntaxToken array) =
+        let tokenCounts = [1..tokens.Length] |> List.toArray
+        let zipped = Array.zip tokenCounts tokens
+        
+        let errors = ResizeArray<string>()
+        for (count, token) in zipped do
+            try
+                let textFromSource = sourceText.GetSubText(token.TextSpan).ToString()
+                if textFromSource <> token.Text then
+                    errors.Add($"[{count}] The textspan {token.TextSpan} has an incorrect snippet. Expected \"{token.Text}\" (token.Text), but got \"{textFromSource}\"")
+            with
+            | ex -> ()  // ignored
+                
+        if (errors.Count > 0) then
+            let errorsList = System.String.Join("\n", errors)
+            Assert.Fail($"Some textspans don't match the token's text:\n{errorsList}")
+        
+        
         
     let testCore (testInput: string) : unit =
         let originalSourceText = SourceText.From(testInput)
@@ -54,7 +73,9 @@ module private RoundtrippableTestsHelpers =
         printTokens reconstructedTokens
         
         match originalSourceText.ContentEquals(reconstructedSourceTest) && reconstructedSourceTest.ContentEquals(originalSourceText) with
-        | true -> Assert.Pass()
+        | true ->
+            assertSpanEqualsText originalSourceText tokens
+            Assert.Pass()
         | false -> Assert.Fail("The reconstructed text does not equal the original. Examine the logs to see the differences.")
 
 
