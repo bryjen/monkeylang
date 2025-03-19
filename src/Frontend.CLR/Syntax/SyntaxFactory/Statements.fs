@@ -8,8 +8,32 @@ open type Monkey.Frontend.CLR.Syntax.SyntaxFactory.MonkeySyntaxTokenFactory
 
 [<AbstractClass; Sealed>]
 type MonkeyStatementSyntaxFactory() =
-    static member ExpressionStatement(expression: ExpressionSyntax, semicolonToken: SyntaxToken) =
+    static member ExpressionStatementNoBox(expression: ExpressionSyntax, semicolonToken: SyntaxToken) =
         { Expression = expression; SemicolonToken = semicolonToken }
+        
+    static member ExpressionStatementNoBox(expression: ExpressionSyntax) =
+        MonkeyStatementSyntaxFactory.ExpressionStatementNoBox(expression, Token(SyntaxKind.SemicolonToken, text=";", value=";"))
+        
+        
+    static member ExpressionStatement(expression: ExpressionSyntax, semicolonToken: SyntaxToken) =
+        MonkeyStatementSyntaxFactory.ExpressionStatementNoBox(expression, semicolonToken)
+        |> StatementSyntax.ExpressionStatementSyntax
         
     static member ExpressionStatement(expression: ExpressionSyntax) =
         MonkeyStatementSyntaxFactory.ExpressionStatement(expression, Token(SyntaxKind.SemicolonToken, text=";", value=";"))
+        
+        
+        
+    static member BlockStatement(openBraceToken: SyntaxToken, statements: StatementSyntax array, closeBraceToken: SyntaxToken) =
+        { OpenBraceToken = openBraceToken; Statements = statements; CloseBraceToken = closeBraceToken }
+        |> StatementSyntax.BlockSyntax
+
+    static member BlockStatement(statements: StatementSyntax array) =
+        MonkeyStatementSyntaxFactory.BlockStatement(OpenBraceToken(), statements, CloseBraceToken())
+        
+        
+    static member BlockStatementNoBox(openBraceToken: SyntaxToken, statements: StatementSyntax array, closeBraceToken: SyntaxToken) =
+        { OpenBraceToken = openBraceToken; Statements = statements; CloseBraceToken = closeBraceToken }
+
+    static member BlockStatementNoBox(statements: StatementSyntax array) =
+        MonkeyStatementSyntaxFactory.BlockStatementNoBox(OpenBraceToken(), statements, CloseBraceToken())

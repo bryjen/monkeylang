@@ -1,4 +1,4 @@
-﻿module Frontend.CLR.Tests.Tokenizer.AstEquivalenceTests
+﻿namespace Monkey.Frontend.CLR.Tests.Tokenizer
 
 open Monkey.Frontend.CLR.Syntax.Ast
 open NUnit.Framework
@@ -26,8 +26,8 @@ module private AstEquivalenceTests =
 type AstEquivalenceTests() =
     [<Test>]
     member this.``Equivalence Test 1``() =
-        let es1 = ExpressionStatement(NumericLiteralExpression(5))
-        let es2 = ExpressionStatement(NumericLiteralExpression(5))
+        let es1 = ExpressionStatementNoBox(NumericLiteralExpression(5))
+        let es2 = ExpressionStatementNoBox(NumericLiteralExpression(5))
         
         printfn $"NODE 1:\n```\n{es1}\n```\n"
         printfn $"NODE 2:\n```\n{es1}\n```\n"
@@ -36,8 +36,8 @@ type AstEquivalenceTests() =
         
     [<Test>]
     member this.``Equivalence Test 2``() =
-        let es1 = ExpressionStatement(ParenthesizedExpression(MinusPrefixExpression(NumericLiteralExpression(5))))
-        let es2 = ExpressionStatement(ParenthesizedExpression(MinusPrefixExpression(NumericLiteralExpression(5))))
+        let es1 = ExpressionStatementNoBox(ParenthesizedExpression(MinusPrefixExpression(NumericLiteralExpression(5))))
+        let es2 = ExpressionStatementNoBox(ParenthesizedExpression(MinusPrefixExpression(NumericLiteralExpression(5))))
         
         printfn $"NODE 1:\n```\n{es1}\n```\n"
         printfn $"NODE 2:\n```\n{es1}\n```\n"

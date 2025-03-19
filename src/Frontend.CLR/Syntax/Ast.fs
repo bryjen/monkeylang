@@ -7,7 +7,7 @@ open Microsoft.CodeAnalysis.CSharp
 open Microsoft.CodeAnalysis.Text
 
 
-let private interleave (xs: string[]) (ys: string[]) =
+let internal interleave (xs: string[]) (ys: string[]) =
     let m = min xs.Length ys.Length
     let head = [| for i in 0 .. m - 1 do yield xs.[i]; yield ys.[i] |]
     let tail = if xs.Length > m then xs.[m..] else [||]
@@ -98,6 +98,7 @@ type ExpressionSyntax =
     | PrefixExpressionSyntax of PrefixExpressionSyntax
     | IdentifierNameSyntax of IdentifierNameSyntax
     | TypeSyntax of TypeSyntax
+    | IfExpressionSyntax of IfExpressionSyntax
 with
     override this.ToString() =
         match this with
@@ -111,6 +112,7 @@ with
         | PrefixExpressionSyntax prefixExpressionSyntax -> prefixExpressionSyntax.ToString()
         | IdentifierNameSyntax identifierNameSyntax -> identifierNameSyntax.ToString()
         | TypeSyntax typeSyntax -> typeSyntax.ToString()
+        | IfExpressionSyntax ifExpressionSyntax -> ifExpressionSyntax.ToString()
         
     static member AreEquivalent(es1: ExpressionSyntax, es2: ExpressionSyntax) =
         match es1, es2 with
@@ -134,6 +136,8 @@ with
             IdentifierNameSyntax.AreEquivalent(ins1, ins2)
         | TypeSyntax ts1, TypeSyntax ts2 ->
             TypeSyntax.AreEquivalent(ts1, ts2)
+        | IfExpressionSyntax ifs1, IfExpressionSyntax ifs2 ->
+            IfExpressionSyntax.AreEquivalent(ifs1, ifs2)
         | _ -> false
     
     
@@ -144,14 +148,12 @@ with
 type StatementSyntax =
     | BlockSyntax of BlockSyntax
     | ExpressionStatementSyntax of ExpressionStatementSyntax
-    | IfStatementSyntax of IfStatementSyntax
     | VariableDeclarationStatementSyntax of VariableDeclarationStatementSyntax
 with
     override this.ToString() =
         match this with
         | BlockSyntax blockSyntax -> blockSyntax.ToString()
         | ExpressionStatementSyntax expressionStatementSyntax -> expressionStatementSyntax.ToString()
-        | IfStatementSyntax ifStatementSyntax -> ifStatementSyntax.ToString()
         | VariableDeclarationStatementSyntax variableDeclarationStatementSyntax -> variableDeclarationStatementSyntax.ToString()
         
     static member AreEquivalent(ss1: StatementSyntax, ss2: StatementSyntax) =
@@ -160,8 +162,6 @@ with
             BlockSyntax.AreEquivalent(bs1, bs2)
         | ExpressionStatementSyntax ess1, ExpressionStatementSyntax ess2 ->
             ExpressionStatementSyntax.AreEquivalent(ess1, ess2)
-        | IfStatementSyntax iss1, IfStatementSyntax iss2 ->
-            IfStatementSyntax.AreEquivalent(iss1, iss2)
         | VariableDeclarationStatementSyntax vdss1, VariableDeclarationStatementSyntax vdss2 ->
             VariableDeclarationStatementSyntax.AreEquivalent(vdss1, vdss2)
         | _ -> false
@@ -204,13 +204,13 @@ with
 /// Example: <code>int</code>
 /// </remarks>
 and BuiltinTypeSyntax =
-    { Identifier: SyntaxToken }
+    { Token: SyntaxToken }
 with
     override this.ToString() =
-        this.Identifier.ToString()
+        this.Token.ToString()
         
     static member AreEquivalent(bts1: BuiltinTypeSyntax, bts2: BuiltinTypeSyntax) =
-        SyntaxToken.AreEquivalent(bts1.Identifier, bts2.Identifier)
+        SyntaxToken.AreEquivalent(bts1.Token, bts2.Token)
         
 /// <remarks>
 /// Example: <code>[int -> int]</code>
@@ -238,18 +238,18 @@ with
 /// </remarks>
 type ParameterListSyntax =
     { OpenParenToken: SyntaxToken
-      ParameterSyntax: ParameterSyntax array
-      CommaTokens: SyntaxList array
+      Parameters: ParameterSyntax array
+      Commas: SyntaxToken array
       CloseParenToken: SyntaxToken }
 with
     override this.ToString() =
-        let parameterSyntaxStrings = this.ParameterSyntax |> Array.map _.ToString()
-        let commaTokensStrings = this.CommaTokens |> Array.map _.ToString()
+        let parameterSyntaxStrings = this.Parameters |> Array.map _.ToString()
+        let commaTokensStrings = this.Commas |> Array.map _.ToString()
         let paramListCoreStr = (interleave parameterSyntaxStrings commaTokensStrings) |> String.concat ""
         $"{this.OpenParenToken.ToString()}{paramListCoreStr}{this.CloseParenToken.ToString()}"
         
     static member AreEquivalent(ns1: ParameterListSyntax, ns2: ParameterListSyntax) =
-        Array.zip ns1.ParameterSyntax ns2.ParameterSyntax
+        Array.zip ns1.Parameters ns2.Parameters
         |> Array.map ParameterSyntax.AreEquivalent
         |> Array.forall id
         
@@ -258,13 +258,13 @@ with
 /// </remarks>
 and ParameterSyntax =
     { Type: TypeSyntax
-      Identifier: SyntaxToken }
+      Identifier: IdentifierNameSyntax }
 with
     override this.ToString() =
         $"{this.Type.ToString()}{this.Identifier.ToString()}"
         
     static member AreEquivalent(ps1: ParameterSyntax, ps2: ParameterSyntax) =
-        TypeSyntax.AreEquivalent(ps1.Type, ps2.Type) && SyntaxToken.AreEquivalent(ps1.Identifier, ps2.Identifier)
+        TypeSyntax.AreEquivalent(ps1.Type, ps2.Type) && IdentifierNameSyntax.AreEquivalent(ps1.Identifier, ps2.Identifier)
     
 
 type ArgumentListSyntax =
@@ -290,17 +290,13 @@ with
 
 type FunctionExpressionSyntax =
     { FunctionKeywordToken: SyntaxToken
-      OpenParenToken: SyntaxToken
       ParameterList: ParameterListSyntax
-      CloseParenToken: SyntaxToken
+      ColonToken: SyntaxToken
       ReturnType: TypeSyntax
-      
-      OpenBraceToken: SyntaxToken
-      Body: BlockSyntax
-      CloseBraceToken: SyntaxToken }
+      Body: BlockSyntax }
 with
     override this.ToString() =
-        $"{this.FunctionKeywordToken.ToString()}{this.OpenParenToken.ToString()}{this.ParameterList.ToString()}{this.CloseParenToken.ToString()}{this.ReturnType.ToString()}{this.OpenBraceToken.ToString()}{this.Body.ToString()}{this.CloseBraceToken.ToString()}"
+        $"{this.FunctionKeywordToken.ToString()}{this.ParameterList.ToString()}{this.ColonToken.ToString()}{this.ReturnType.ToString()}{this.Body.ToString()}"
         
     static member AreEquivalent(fe1: FunctionExpressionSyntax, fe2: FunctionExpressionSyntax) =
         ParameterListSyntax.AreEquivalent(fe1.ParameterList, fe2.ParameterList)
@@ -309,7 +305,8 @@ with
     
     
 type BinaryExpressionSyntax =
-    { Left: ExpressionSyntax
+    { Kind: SyntaxKind
+      Left: ExpressionSyntax
       OperatorToken: SyntaxToken
       Right: ExpressionSyntax }
 with
@@ -320,6 +317,7 @@ with
         ExpressionSyntax.AreEquivalent(bs1.Left, bs2.Left)
             && SyntaxToken.AreEquivalent(bs1.OperatorToken, bs2.OperatorToken)
             && ExpressionSyntax.AreEquivalent(bs1.Right, bs2.Right)
+            && bs1.Kind = bs2.Kind
             
     
     
@@ -442,51 +440,21 @@ with
     static member AreEquivalent(pes1: ParenthesizedExpressionSyntax, pes2: ParenthesizedExpressionSyntax) =
         ExpressionSyntax.AreEquivalent(pes1.Expression, pes2.Expression)
     
-
-    
-    
-
-
-
-(* #REGION Statements *)
-
-type BlockSyntax =
-    { OpenBraceToken: SyntaxToken
-      Statements: StatementSyntax array
-      CloseBraceToken: SyntaxToken }
-with
-    override this.ToString() =
-        let statementsStr = this.Statements |> Array.map _.ToString()
-        $"{this.OpenBraceToken.ToString()}{statementsStr}{this.CloseBraceToken.ToString()}"
-        
-    static member AreEquivalent(bs1: BlockSyntax, bs2: BlockSyntax) =
-        Array.zip bs1.Statements bs2.Statements
-        |> Array.map StatementSyntax.AreEquivalent
-        |> Array.forall id
-    
-type ExpressionStatementSyntax =
-    { Expression: ExpressionSyntax
-      SemicolonToken: SyntaxToken }
-with
-    override this.ToString() =
-        $"{this.Expression.ToString()}{this.SemicolonToken.ToString()}"
-        
-    static member AreEquivalent(ess1: ExpressionStatementSyntax, ess2: ExpressionStatementSyntax) =
-        ExpressionSyntax.AreEquivalent(ess1.Expression, ess2.Expression)
-    
-type IfStatementSyntax =
+type IfExpressionSyntax =
     { IfKeyword: SyntaxToken
+      OpenParenToken: SyntaxToken
       Condition: ExpressionSyntax
+      CloseParenToken: SyntaxToken
       Clause: BlockSyntax
       ElseIfClauses: ElseIfClauseSyntax array
       ElseClause: ElseClauseSyntax option }
 with
     override this.ToString() =
-        let elseIfClausesStr = this.ElseIfClauses |> Array.map _.ToString()
+        let elseIfClausesStr = this.ElseIfClauses |> Array.map _.ToString() |> Array.fold (fun acc str -> acc + str) ""
         let elseClauseStr = defaultArg (this.ElseClause |> Option.map _.ToString()) ""
-        $"{this.IfKeyword.ToString()}{this.Condition.ToString()}{this.Clause.ToString()}{elseIfClausesStr}{elseClauseStr}"
+        $"{this.IfKeyword.ToString()}{this.OpenParenToken.ToString()}{this.Condition.ToString()}{this.CloseParenToken.ToString()}{this.Clause.ToString()}{elseIfClausesStr}{elseClauseStr}"
         
-    static member AreEquivalent(iss1: IfStatementSyntax, iss2: IfStatementSyntax) =
+    static member AreEquivalent(iss1: IfExpressionSyntax, iss2: IfExpressionSyntax) =
         let areElseIfClausesEquivalent =
             Array.zip iss1.ElseIfClauses iss2.ElseIfClauses
             |> Array.map ElseIfClauseSyntax.AreEquivalent
@@ -526,6 +494,35 @@ with
     static member AreEquivalent(ecs1: ElseClauseSyntax, ecs2: ElseClauseSyntax) =
         BlockSyntax.AreEquivalent(ecs1.ElseClause, ecs2.ElseClause)
     
+    
+
+
+
+(* #REGION Statements *)
+
+type BlockSyntax =
+    { OpenBraceToken: SyntaxToken
+      Statements: StatementSyntax array
+      CloseBraceToken: SyntaxToken }
+with
+    override this.ToString() =
+        let statementsStr = this.Statements |> Array.map _.ToString() |> Array.fold (fun acc str -> acc + str) ""
+        $"{this.OpenBraceToken.ToString()}{statementsStr}{this.CloseBraceToken.ToString()}"
+        
+    static member AreEquivalent(bs1: BlockSyntax, bs2: BlockSyntax) =
+        Array.zip bs1.Statements bs2.Statements
+        |> Array.map StatementSyntax.AreEquivalent
+        |> Array.forall id
+    
+type ExpressionStatementSyntax =
+    { Expression: ExpressionSyntax
+      SemicolonToken: SyntaxToken }
+with
+    override this.ToString() =
+        $"{this.Expression.ToString()}{this.SemicolonToken.ToString()}"
+        
+    static member AreEquivalent(ess1: ExpressionStatementSyntax, ess2: ExpressionStatementSyntax) =
+        ExpressionSyntax.AreEquivalent(ess1.Expression, ess2.Expression)
     
 type VariableDeclarationStatementSyntax =
     { LetKeyword: SyntaxToken

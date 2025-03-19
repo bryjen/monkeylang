@@ -40,8 +40,12 @@ type MonkeySyntaxTokenFactory () =
           LeadingTrivia = leadingTriviaValue 
           TrailingTrivia = trailingTriviaValue }
         
+        
     static member Identifier(value: string, textSpan: TextSpan, fullTextSpan: TextSpan, leadingTrivia: SyntaxTriviaList) =
         MonkeySyntaxTokenFactory.Token(SyntaxKind.IdentifierToken, text=value, value=value, textSpan=textSpan, fullTextSpan=fullTextSpan, leadingTrivia=leadingTrivia)
+        
+    static member Identifier(value: string) =
+        MonkeySyntaxTokenFactory.Token(SyntaxKind.IdentifierToken, text=value, value=value)
         
     static member StringLiteral(value: string, text: string, textSpan: TextSpan, fullTextSpan: TextSpan, leadingTrivia: SyntaxTriviaList) =
         MonkeySyntaxTokenFactory.Token(SyntaxKind.StringLiteralToken, text=text, value=value, textSpan=textSpan, fullTextSpan=fullTextSpan, leadingTrivia=leadingTrivia)
@@ -54,8 +58,73 @@ type MonkeySyntaxTokenFactory () =
         MonkeySyntaxTokenFactory.Token(SyntaxKind.NumericLiteralToken, text=(string value), value=value)
         
         
+    static member IntKeyword() =
+        MonkeySyntaxTokenFactory.Token(SyntaxKind.IntKeyword, text="int", value="int")
+        
     static member FalseKeyword() =
         MonkeySyntaxTokenFactory.Token(SyntaxKind.FalseKeyword, text="false", value=false)
         
     static member TrueKeyword() =
         MonkeySyntaxTokenFactory.Token(SyntaxKind.TrueKeyword, text="true", value=true)
+        
+    static member IfKeyword() =
+        MonkeySyntaxTokenFactory.Token(SyntaxKind.IfKeyword, text="if", value="if")
+        
+    static member ElseKeyword() =
+        MonkeySyntaxTokenFactory.Token(SyntaxKind.ElseKeyword, text="else", value="else")
+        
+    static member FnKeyword() =
+        MonkeySyntaxTokenFactory.Token(SyntaxKind.IdentifierToken, text="fn", value="fn")
+        
+        
+        
+    static member PlusToken() =
+        MonkeySyntaxTokenFactory.Token(SyntaxKind.PlusToken, text="+", value="+")
+        
+    static member MinusToken() =
+        MonkeySyntaxTokenFactory.Token(SyntaxKind.MinusToken, text="-", value="-")
+        
+    static member AsteriskToken() =
+        MonkeySyntaxTokenFactory.Token(SyntaxKind.AsteriskToken, text="*", value="*")
+        
+    static member SlashToken() =
+        MonkeySyntaxTokenFactory.Token(SyntaxKind.SlashToken, text="/", value="/")
+        
+    static member DoubleEqualsToken() =
+        MonkeySyntaxTokenFactory.Token(SyntaxKind.EqualsEqualsToken, text="==", value="==")
+        
+    static member NotEqualsToken() =
+        MonkeySyntaxTokenFactory.Token(SyntaxKind.ExclamationEqualsToken, text="!=", value="!=")
+        
+    static member GreaterThanToken() =
+        MonkeySyntaxTokenFactory.Token(SyntaxKind.GreaterThanToken, text=">", value=">")
+        
+    static member LessThanToken() =
+        MonkeySyntaxTokenFactory.Token(SyntaxKind.LessThanToken, text="<", value="<")
+        
+    static member GreaterThanOrEqToken() =
+        MonkeySyntaxTokenFactory.Token(SyntaxKind.GreaterThanEqualsToken, text=">=", value=">=")
+        
+    static member LessThanOrEqToken() =
+        MonkeySyntaxTokenFactory.Token(SyntaxKind.LessThanEqualsToken, text="<=", value="<=")
+        
+        
+    static member OpenParenToken() =
+        MonkeySyntaxTokenFactory.Token(SyntaxKind.OpenParenToken, text="(", value="(")
+        
+    static member CloseParenToken() =
+        MonkeySyntaxTokenFactory.Token(SyntaxKind.CloseParenToken, text=")", value=")")
+        
+        
+    static member OpenBraceToken() =
+        MonkeySyntaxTokenFactory.Token(SyntaxKind.OpenBraceToken, text="{", value="{")
+        
+    static member CloseBraceToken() =
+        MonkeySyntaxTokenFactory.Token(SyntaxKind.CloseBraceToken, text="}", value="}")
+        
+        
+    static member CommaToken() =
+        MonkeySyntaxTokenFactory.Token(SyntaxKind.CommaToken, text=",", value=",")
+        
+    static member ColonToken() =
+        MonkeySyntaxTokenFactory.Token(SyntaxKind.ColonToken, text=":", value=":")

@@ -17,13 +17,7 @@ open type Monkey.Frontend.CLR.Syntax.SyntaxFactory.MonkeyStatementSyntaxFactory
 [<AutoOpen>]
 module private MonkeyAstParserTestsHelpers =
     let compareMonkeyStatements (monkeyInput: string) (expectedSyntaxNodes: MonkeySyntaxNode array) (actualSyntaxNodes: MonkeySyntaxNode array) : bool =
-        let mutable pass = true
-        for expected, actual in Array.zip expectedSyntaxNodes actualSyntaxNodes do
-            let eq1 = MonkeySyntaxNode.AreEquivalent(actual, expected)
-            let eq2 = MonkeySyntaxNode.AreEquivalent(expected, actual)
-            if not eq1 || not eq2 then
-                pass <- false
-            
+        
         printfn "Input/Output"
         printfn "---------------------------------------------------------"
         
@@ -58,57 +52,73 @@ module private MonkeyAstParserTestsHelpers =
         printfn "```"
         printfn "---------------------------------------------------------"
         
-        pass 
+        
+        let mutable pass = true
+        for expected, actual in Array.zip expectedSyntaxNodes actualSyntaxNodes do
+            try
+                let eq1 = MonkeySyntaxNode.AreEquivalent(actual, expected)
+                let eq2 = MonkeySyntaxNode.AreEquivalent(expected, actual)
+                if not eq1 || not eq2 then
+                    pass <- false
+            with
+            | _ ->
+                pass <- false
+            
+        
+        pass
+        
+        
+    let emptyBlock () =
+        { OpenBraceToken = OpenBraceToken(); Statements = [||]; CloseBraceToken = CloseBraceToken() }
 
 [<TestFixture>]
 [<ParserComponent(ParserComponentType.Expressions)>]
 type LiteralExpressionStatementParsing() =
-    
     member this.TestCases : (string * ExpressionStatementSyntax) array = [|
         (
             "5;",
-            ExpressionStatement(NumericLiteralExpression(5))
+            ExpressionStatementNoBox(NumericLiteralExpression(5))
         )
         (
             "-5;",
-            ExpressionStatement(MinusPrefixExpression(NumericLiteralExpression(5)))
+            ExpressionStatementNoBox(MinusPrefixExpression(NumericLiteralExpression(5)))
         )
         (
             "(5);",
-            ExpressionStatement(ParenthesizedExpression(NumericLiteralExpression(5)))
+            ExpressionStatementNoBox(ParenthesizedExpression(NumericLiteralExpression(5)))
         )
         (
             "-(5);",
-            ExpressionStatement(MinusPrefixExpression(ParenthesizedExpression(NumericLiteralExpression(5))))
+            ExpressionStatementNoBox(MinusPrefixExpression(ParenthesizedExpression(NumericLiteralExpression(5))))
         )
         (
             "(-5);",
-            ExpressionStatement(ParenthesizedExpression(MinusPrefixExpression(NumericLiteralExpression(5))))
+            ExpressionStatementNoBox(ParenthesizedExpression(MinusPrefixExpression(NumericLiteralExpression(5))))
         )
         
         (
             "true;",
-            ExpressionStatement(TrueLiteralExpression())
+            ExpressionStatementNoBox(TrueLiteralExpression())
         )
         (
             "false;",
-            ExpressionStatement(FalseLiteralExpression())
+            ExpressionStatementNoBox(FalseLiteralExpression())
         )
         (
             "!true;",
-            ExpressionStatement(LogicalNotPrefixExpression(TrueLiteralExpression()))
+            ExpressionStatementNoBox(LogicalNotPrefixExpression(TrueLiteralExpression()))
         )
         (
             "!false;",
-            ExpressionStatement(LogicalNotPrefixExpression(FalseLiteralExpression()))
+            ExpressionStatementNoBox(LogicalNotPrefixExpression(FalseLiteralExpression()))
         )
         (
             "!(true);",
-            ExpressionStatement(LogicalNotPrefixExpression(ParenthesizedExpression(TrueLiteralExpression())))
+            ExpressionStatementNoBox(LogicalNotPrefixExpression(ParenthesizedExpression(TrueLiteralExpression())))
         )
         (
             "!(false);",
-            ExpressionStatement(LogicalNotPrefixExpression(ParenthesizedExpression(FalseLiteralExpression())))
+            ExpressionStatementNoBox(LogicalNotPrefixExpression(ParenthesizedExpression(FalseLiteralExpression())))
         )
     |]
     
@@ -125,6 +135,396 @@ type LiteralExpressionStatementParsing() =
     [<TestCase(9)>]
     [<TestCase(10)>]
     member this.``A: Test Basic Numeric Expression Parsing``(testCaseIndex: int) =
+        // we keep the test case in 'ExpressionStatementSyntax' to avoid having to cast each during declaration
+        let castedTestCases = this.TestCases |> Array.map (fun (input, expected) -> (input, expected |> StatementSyntax.ExpressionStatementSyntax |> MonkeySyntaxNode.StatementSyntax))
+        let input, expectedSyntaxTree = castedTestCases[testCaseIndex]
+        let tokens = Tokenizer.tokenize input
+        
+        let statements, parseErrors = Monkey.Frontend.CLR.Parsers.MonkeyAstParser.parseTokens tokens
+        let asMonkeySyntaxNodes = statements |> Array.map MonkeySyntaxNode.StatementSyntax
+        match Array.length parseErrors with
+        | 0 ->
+            let actualSyntaxNodes = asMonkeySyntaxNodes
+            let expectedSyntaxNodes = [| expectedSyntaxTree |]
+            match compareMonkeyStatements input expectedSyntaxNodes actualSyntaxNodes with
+            | true -> Assert.Pass()
+            | false -> Assert.Fail()
+        | _ ->
+            let mutable count = 1
+            for parseError in parseErrors do
+                printfn $"{count}. {parseError}"
+                count <- count + 1
+            Assert.Fail()
+            
+            
+            
+[<TestFixture>]
+[<ParserComponent(ParserComponentType.Expressions)>]
+type BinaryExpressionStatementParsing() =
+    
+    member this.TestCases : (string * ExpressionStatementSyntax) array = [|
+        (
+            "5;",
+            ExpressionStatementNoBox(NumericLiteralExpression(5))
+        )
+        (
+            "5 + 5;",
+            ExpressionStatementNoBox(AddExpression(NumericLiteralExpression(5), NumericLiteralExpression(5)))
+        )
+        (
+            "5 - 5;",
+            ExpressionStatementNoBox(SubtractExpression(NumericLiteralExpression(5), NumericLiteralExpression(5)))
+        )
+        (
+            "5 * 5;",
+            ExpressionStatementNoBox(MultiplicationExpression(NumericLiteralExpression(5), NumericLiteralExpression(5)))
+        )
+        (
+            "5 / 5;",
+            ExpressionStatementNoBox(DivideExpression(NumericLiteralExpression(5), NumericLiteralExpression(5)))
+        )
+        (
+            "5 > 5;",
+            ExpressionStatementNoBox(GreaterThanExpression(NumericLiteralExpression(5), NumericLiteralExpression(5)))
+        )
+        (
+            "5 < 5;",
+            ExpressionStatementNoBox(LessThanExpression(NumericLiteralExpression(5), NumericLiteralExpression(5)))
+        )
+        (
+            "5 >= 5;",
+            ExpressionStatementNoBox(GreaterThanOrEqExpression(NumericLiteralExpression(5), NumericLiteralExpression(5)))
+        )
+        (
+            "5 <= 5;",
+            ExpressionStatementNoBox(LessThanOrEqExpression(NumericLiteralExpression(5), NumericLiteralExpression(5)))
+        )
+        (
+            "5 == 5;",
+            ExpressionStatementNoBox(EqualsExpression(NumericLiteralExpression(5), NumericLiteralExpression(5)))
+        )
+        (
+            "5 != 5;",
+            ExpressionStatementNoBox(NotEqualsExpression(NumericLiteralExpression(5), NumericLiteralExpression(5)))
+        )
+        (
+            "3 + 4 * 5 == 3 * 1 + 4 * 5;",
+            ExpressionStatementNoBox(
+                EqualsExpression(
+                    AddExpression(
+                        NumericLiteralExpression(3),
+                        MultiplicationExpression(
+                            NumericLiteralExpression(4),
+                            NumericLiteralExpression(5))),
+                    AddExpression(
+                        MultiplicationExpression(
+                            NumericLiteralExpression(3),
+                            NumericLiteralExpression(1)
+                            ),
+                        MultiplicationExpression(
+                            NumericLiteralExpression(4),
+                            NumericLiteralExpression(5)
+                            )
+                        )
+                    )
+                )
+        )
+        (
+            "1 + (2 + 3) + 4;",
+            ExpressionStatementNoBox(
+                AddExpression(
+                    NumericLiteralExpression(1),
+                    AddExpression(
+                        ParenthesizedExpression(
+                            AddExpression(
+                                NumericLiteralExpression(2),
+                                NumericLiteralExpression(3)
+                                )
+                            ),
+                        NumericLiteralExpression(4)
+                        )
+                    )
+                )
+        )
+        (
+            "(5 + 5) * 2;",
+            ExpressionStatementNoBox(
+                MultiplicationExpression(
+                    ParenthesizedExpression(
+                        AddExpression(
+                            NumericLiteralExpression(5),
+                            NumericLiteralExpression(5)
+                            )
+                        ),
+                    NumericLiteralExpression(2)
+                    )
+                )
+        )
+        (
+            "2/(5+5);",
+            ExpressionStatementNoBox(
+                DivideExpression(
+                    NumericLiteralExpression(2),
+                    ParenthesizedExpression(
+                        AddExpression(
+                            NumericLiteralExpression(5),
+                            NumericLiteralExpression(5)
+                            )
+                        )
+                    )
+                )
+        )
+        (
+            "-(5 + 5);",
+            ExpressionStatementNoBox(
+                MinusPrefixExpression(
+                    ParenthesizedExpression(
+                        AddExpression(
+                            NumericLiteralExpression(5),
+                            NumericLiteralExpression(5)
+                            )
+                        )
+                    )
+                )
+        )
+        (
+            "!(true == true);",
+            ExpressionStatementNoBox(
+                LogicalNotPrefixExpression(
+                    ParenthesizedExpression(
+                        EqualsExpression(
+                            TrueLiteralExpression(),
+                            TrueLiteralExpression()
+                            )
+                        )
+                    )
+                )
+        )
+    |]
+    
+    [<TestCase(0)>]
+    [<TestCase(1)>]
+    [<TestCase(2)>]
+    [<TestCase(3)>]
+    [<TestCase(4)>]
+    [<TestCase(5)>]
+    [<TestCase(6)>]
+    [<TestCase(7)>]
+    [<TestCase(8)>]
+    [<TestCase(9)>]
+    [<TestCase(10)>]
+    [<TestCase(11)>]
+    // [<TestCase(12)>]  TODO: Find a way to figure out comparison for semantically equivalent expressions, ex "1 + (2 + 3)" must be equivalent to "1 + (2 + 3)" even though they aren't considered as of right now
+    [<TestCase(13)>]
+    [<TestCase(14)>]
+    [<TestCase(15)>]
+    [<TestCase(16)>]
+    member this.``B: Test basic infix expression parsing``(testCaseIndex: int) =
+        // we keep the test case in 'ExpressionStatementSyntax' to avoid having to cast each during declaration
+        let castedTestCases = this.TestCases |> Array.map (fun (input, expected) -> (input, expected |> StatementSyntax.ExpressionStatementSyntax |> MonkeySyntaxNode.StatementSyntax))
+        let input, expectedSyntaxTree = castedTestCases[testCaseIndex]
+        let tokens = Tokenizer.tokenize input
+        
+        let statements, parseErrors = Monkey.Frontend.CLR.Parsers.MonkeyAstParser.parseTokens tokens
+        let asMonkeySyntaxNodes = statements |> Array.map MonkeySyntaxNode.StatementSyntax
+        match Array.length parseErrors with
+        | 0 ->
+            let actualSyntaxNodes = asMonkeySyntaxNodes
+            let expectedSyntaxNodes = [| expectedSyntaxTree |]
+            match compareMonkeyStatements input expectedSyntaxNodes actualSyntaxNodes with
+            | true -> Assert.Pass()
+            | false -> Assert.Fail()
+        | _ ->
+            let mutable count = 1
+            for parseError in parseErrors do
+                printfn $"{count}. {parseError}"
+                count <- count + 1
+            Assert.Fail()
+            
+            
+            
+[<TestFixture>]
+[<ParserComponent(ParserComponentType.Expressions)>]
+type IfExpressionParsingTests() =
+    member this.TestCases : (string * ExpressionStatementSyntax) array = [|
+        (
+            "if (5 > 2) { 5; };",
+            ExpressionStatementNoBox(
+                IfExpression(
+                    GreaterThanExpression(NumericLiteralExpression(5), NumericLiteralExpression(2)),
+                    BlockStatementNoBox(
+                        [|
+                            ExpressionStatementNoBox(NumericLiteralExpression(5)) |> StatementSyntax.ExpressionStatementSyntax
+                        |])
+                    )
+                )
+        )
+        (
+            "if (5 > 2) { 5; } else { 10; };",
+            ExpressionStatementNoBox(
+                IfExpression(
+                    GreaterThanExpression(NumericLiteralExpression(5), NumericLiteralExpression(2)),
+                    BlockStatementNoBox(
+                        [|
+                            ExpressionStatementNoBox(NumericLiteralExpression(5)) |> StatementSyntax.ExpressionStatementSyntax
+                        |]),
+                    ElseClause(
+                        BlockStatementNoBox(
+                            [|
+                                ExpressionStatementNoBox(NumericLiteralExpression(10)) |> StatementSyntax.ExpressionStatementSyntax
+                            |]
+                            )
+                        )
+                    )
+                )
+        )
+    |]
+    
+    [<TestCase(0)>]
+    [<TestCase(1)>]
+    member this.``C: If expression parsing tests``(testCaseIndex: int) =
+        // we keep the test case in 'ExpressionStatementSyntax' to avoid having to cast each during declaration
+        let castedTestCases = this.TestCases |> Array.map (fun (input, expected) -> (input, expected |> StatementSyntax.ExpressionStatementSyntax |> MonkeySyntaxNode.StatementSyntax))
+        let input, expectedSyntaxTree = castedTestCases[testCaseIndex]
+        let tokens = Tokenizer.tokenize input
+        
+        let statements, parseErrors = Monkey.Frontend.CLR.Parsers.MonkeyAstParser.parseTokens tokens
+        let asMonkeySyntaxNodes = statements |> Array.map MonkeySyntaxNode.StatementSyntax
+        match Array.length parseErrors with
+        | 0 ->
+            let actualSyntaxNodes = asMonkeySyntaxNodes
+            let expectedSyntaxNodes = [| expectedSyntaxTree |]
+            match compareMonkeyStatements input expectedSyntaxNodes actualSyntaxNodes with
+            | true -> Assert.Pass()
+            | false -> Assert.Fail()
+        | _ ->
+            let mutable count = 1
+            for parseError in parseErrors do
+                printfn $"{count}. {parseError}"
+                count <- count + 1
+            Assert.Fail()
+            
+            
+[<TestFixture>]
+[<ParserComponent(ParserComponentType.Expressions)>]
+type FunctionParsingTests() =
+    member this.TestCases : (string * ExpressionStatementSyntax) array = [|
+        (
+            """fn(int x, int y) : int {
+    x + y;
+};
+""",
+            ExpressionStatementNoBox(
+                FunctionExpression(
+                    ParameterList(
+                        [|
+                            Parameter(BuiltinSyntax(IntKeyword()), IdentifierNameNoBox(Identifier("x")))
+                            Parameter(BuiltinSyntax(IntKeyword()), IdentifierNameNoBox(Identifier("y")))
+                        |]),
+                    BuiltinSyntax(IntKeyword()),
+                    BlockStatementNoBox(
+                        [|
+                            ExpressionStatement(
+                                AddExpression(
+                                    IdentifierName(Identifier("x")),
+                                    IdentifierName(Identifier("y"))
+                                    )
+                                )
+                        |])
+                    )
+                )
+        )
+        (
+            """fn() : int {
+    x + 12;
+}
+""",
+            ExpressionStatementNoBox(
+                IfExpression(
+                    GreaterThanExpression(NumericLiteralExpression(5), NumericLiteralExpression(2)),
+                    BlockStatementNoBox(
+                        [|
+                            ExpressionStatementNoBox(NumericLiteralExpression(5)) |> StatementSyntax.ExpressionStatementSyntax
+                        |]),
+                    ElseClause(
+                        BlockStatementNoBox(
+                            [|
+                                ExpressionStatementNoBox(NumericLiteralExpression(10)) |> StatementSyntax.ExpressionStatementSyntax
+                            |]
+                            )
+                        )
+                    )
+                )
+        )
+        (
+            """fn() : unit {
+}
+""",
+            ExpressionStatementNoBox(
+                IfExpression(
+                    GreaterThanExpression(NumericLiteralExpression(5), NumericLiteralExpression(2)),
+                    BlockStatementNoBox(
+                        [|
+                            ExpressionStatementNoBox(NumericLiteralExpression(5)) |> StatementSyntax.ExpressionStatementSyntax
+                        |]),
+                    ElseClause(
+                        BlockStatementNoBox(
+                            [|
+                                ExpressionStatementNoBox(NumericLiteralExpression(10)) |> StatementSyntax.ExpressionStatementSyntax
+                            |]
+                            )
+                        )
+                    )
+                )
+        )
+        (
+            """fn([int -> int] transform, int init_value) : int {
+    init_value;
+}
+""",
+            ExpressionStatementNoBox(
+                IfExpression(
+                    GreaterThanExpression(NumericLiteralExpression(5), NumericLiteralExpression(2)),
+                    BlockStatementNoBox(
+                        [|
+                            ExpressionStatementNoBox(NumericLiteralExpression(5)) |> StatementSyntax.ExpressionStatementSyntax
+                        |]),
+                    ElseClause(
+                        BlockStatementNoBox(
+                            [|
+                                ExpressionStatementNoBox(NumericLiteralExpression(10)) |> StatementSyntax.ExpressionStatementSyntax
+                            |]
+                            )
+                        )
+                    )
+                )
+        )
+        (
+            """fn([int -> int -> int] full_transform, int init_value) : [int -> int] {
+    init_value;
+}
+""",
+            ExpressionStatementNoBox(
+                IfExpression(
+                    GreaterThanExpression(NumericLiteralExpression(5), NumericLiteralExpression(2)),
+                    BlockStatementNoBox(
+                        [|
+                            ExpressionStatementNoBox(NumericLiteralExpression(5)) |> StatementSyntax.ExpressionStatementSyntax
+                        |]),
+                    ElseClause(
+                        BlockStatementNoBox(
+                            [|
+                                ExpressionStatementNoBox(NumericLiteralExpression(10)) |> StatementSyntax.ExpressionStatementSyntax
+                            |]
+                            )
+                        )
+                    )
+                )
+        )
+    |]
+    
+    [<TestCase(0)>]
+    member this.``D: Fucntion exression parsing tests``(testCaseIndex: int) =
         // we keep the test case in 'ExpressionStatementSyntax' to avoid having to cast each during declaration
         let castedTestCases = this.TestCases |> Array.map (fun (input, expected) -> (input, expected |> StatementSyntax.ExpressionStatementSyntax |> MonkeySyntaxNode.StatementSyntax))
         let input, expectedSyntaxTree = castedTestCases[testCaseIndex]

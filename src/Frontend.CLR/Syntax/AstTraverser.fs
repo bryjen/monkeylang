@@ -33,7 +33,7 @@ let private onSyntaxKind (indentation: int) (syntaxKind: SyntaxKind) =
    
     
 let private normalizeString (str: string) =
-    let normalziedStr = str.Replace("\n", "\\n").Trim()
+    let normalziedStr = str.Replace("\n", "\\n").Replace("\r", "\\r").Trim()
     $"`{normalziedStr}`"
     
     
@@ -59,6 +59,7 @@ let rec private onExpressionSyntax (indentation: int) (expressionSyntax: Express
     | PrefixExpressionSyntax prefixExpressionSyntax -> onPrefixExpressionSyntax indentation prefixExpressionSyntax
     | IdentifierNameSyntax identifierNameSyntax -> onIdentifierNameSyntax indentation identifierNameSyntax
     | TypeSyntax typeSyntax -> onTypeSyntax indentation typeSyntax
+    | IfExpressionSyntax ifExpressionSyntax -> onIfExpressionSyntax indentation ifExpressionSyntax
 
 and private onParenthesizedExpressionSyntax (indentation: int) (parenthesizedExpressionSyntax: ParenthesizedExpressionSyntax) =
     printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(ParenthesizedExpressionSyntax)) (parenthesizedExpressionSyntax.ToString() |> normalizeString)
@@ -123,25 +124,8 @@ and private onFunctionTypeSyntax (indentation: int) (functionTypeSyntax: Functio
     printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(FunctionTypeSyntax)) (functionTypeSyntax.ToString() |> normalizeString)
     
     
-    
-let rec private onStatementSyntax (indentation: int) (statementSyntax: StatementSyntax) =
-    match statementSyntax with
-    | BlockSyntax blockSyntax -> onBlockSyntax indentation blockSyntax
-    | ExpressionStatementSyntax expressionStatementSyntax -> onExpressionStatementSyntax indentation expressionStatementSyntax
-    | IfStatementSyntax ifStatementSyntax -> onIfStatementSyntax indentation ifStatementSyntax
-    | VariableDeclarationStatementSyntax variableDeclarationStatementSyntax -> onVariableDeclarationStatementSyntax indentation variableDeclarationStatementSyntax
-    
-and private onBlockSyntax (indentation: int) (blockSyntax: BlockSyntax) =
-    printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(BlockSyntax)) (blockSyntax.ToString() |> normalizeString)
-    blockSyntax.Statements |> Array.iter (onStatementSyntax (indentation + 1))
-    
-and private onExpressionStatementSyntax (indentation: int) (expressionStatementSyntax: ExpressionStatementSyntax) =
-    printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(ExpressionStatementSyntax)) (expressionStatementSyntax.ToString() |> normalizeString)
-    onExpressionSyntax (indentation + 1) expressionStatementSyntax.Expression 
-    
-    
-and private onIfStatementSyntax (indentation: int) (ifStatementSyntax: IfStatementSyntax) =
-    printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(IfStatementSyntax)) (ifStatementSyntax.ToString() |> normalizeString)
+and private onIfExpressionSyntax (indentation: int) (ifStatementSyntax: IfExpressionSyntax) =
+    printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(IfExpressionSyntax)) (ifStatementSyntax.ToString() |> normalizeString)
     onExpressionSyntax (indentation + 1) ifStatementSyntax.Condition
     onBlockSyntax (indentation + 1) ifStatementSyntax.Clause
     
@@ -159,6 +143,21 @@ and private onElseClauseSyntax (indentation: int) (elseClauseSyntax: ElseClauseS
     printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(ElseClauseSyntax)) (elseClauseSyntax.ToString() |> normalizeString)
     onBlockSyntax (indentation + 1) elseClauseSyntax.ElseClause
     
+    
+    
+let rec private onStatementSyntax (indentation: int) (statementSyntax: StatementSyntax) =
+    match statementSyntax with
+    | BlockSyntax blockSyntax -> onBlockSyntax indentation blockSyntax
+    | ExpressionStatementSyntax expressionStatementSyntax -> onExpressionStatementSyntax indentation expressionStatementSyntax
+    | VariableDeclarationStatementSyntax variableDeclarationStatementSyntax -> onVariableDeclarationStatementSyntax indentation variableDeclarationStatementSyntax
+    
+and private onBlockSyntax (indentation: int) (blockSyntax: BlockSyntax) =
+    printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(BlockSyntax)) (blockSyntax.ToString() |> normalizeString)
+    blockSyntax.Statements |> Array.iter (onStatementSyntax (indentation + 1))
+    
+and private onExpressionStatementSyntax (indentation: int) (expressionStatementSyntax: ExpressionStatementSyntax) =
+    printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(ExpressionStatementSyntax)) (expressionStatementSyntax.ToString() |> normalizeString)
+    onExpressionSyntax (indentation + 1) expressionStatementSyntax.Expression 
     
 and private onVariableDeclarationStatementSyntax (indentation: int) (variableDeclarationStatementSyntax: VariableDeclarationStatementSyntax) =
     printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(VariableDeclarationStatementSyntax)) (variableDeclarationStatementSyntax.ToString() |> normalizeString)
