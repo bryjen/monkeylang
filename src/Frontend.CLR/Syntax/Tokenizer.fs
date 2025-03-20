@@ -111,7 +111,10 @@ and private parseToken (tokenizerState: TokenizerState) (chars: char array) : Mo
         let fullTextSpan = TextSpan(triviaTextSpan.Start, triviaTextSpan.Length + textSpan.Length)
         
         match SyntaxFacts.GetKeywordKind(asString) with
-        | SyntaxKind.None -> Identifier(asString, textSpan, fullTextSpan, leadingTriviaList)
+        | SyntaxKind.None ->
+            match asString with  // further processing for keyword tokens unrecognized by 'SyntaxFacts'
+            | "let" -> Token(SyntaxKind.LetKeyword, text=asString, value=asString, textSpan=textSpan, fullTextSpan=fullTextSpan, leadingTrivia=leadingTriviaList)
+            | _ ->  Identifier(asString, textSpan, fullTextSpan, leadingTriviaList)
         | syntaxKind -> Token(syntaxKind, text=asString, value=asString, textSpan=textSpan, fullTextSpan=fullTextSpan, leadingTrivia=leadingTriviaList)
         
     | c when isDigit c ->

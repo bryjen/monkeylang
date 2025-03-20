@@ -176,13 +176,50 @@ type MonkeyExpressionSyntaxFactory() =
         { ElseKeyword = ElseKeyword(); ElseClause = clause }
         
 
+    static member ArrayTypeNoNox(arrayType: TypeSyntax, openBracketToken: SyntaxToken, closeBracketToken: SyntaxToken) : ArrayTypeSyntax =
+        { Type = arrayType; OpenBracketToken = openBracketToken; CloseBracketToken = closeBracketToken }
+        
+    static member ArrayTypeNoNox(arrayType: TypeSyntax) : ArrayTypeSyntax =
+        { Type = arrayType; OpenBracketToken = OpenBracketToken(); CloseBracketToken = CloseBracketToken() }
+        
+    static member ArrayType(arrayType: TypeSyntax, openBracketToken: SyntaxToken, closeBracketToken: SyntaxToken) : TypeSyntax =
+        MonkeyExpressionSyntaxFactory.ArrayTypeNoNox(arrayType, openBracketToken, closeBracketToken)
+        |> TypeSyntax.ArrayTypeSyntax
+        
+    static member ArrayType(arrayType: TypeSyntax) : TypeSyntax =
+        MonkeyExpressionSyntaxFactory.ArrayTypeNoNox(arrayType, OpenBracketToken(), CloseBracketToken())
+        |> TypeSyntax.ArrayTypeSyntax
+        
+        
+    static member GenericTypeNoBox(typeSyntax: TypeSyntax, genericTypes: TypeSyntax array, commas: SyntaxToken array, lessThanToken: SyntaxToken, greaterThanToken: SyntaxToken) : GenericTypeSyntax =
+        { Type = typeSyntax; LessThanToken = lessThanToken; GenericTypes = genericTypes; Commas = commas; GreaterThanToken = greaterThanToken }
+        
+    static member GenericTypeNoBox(typeSyntax: TypeSyntax, genericTypes: TypeSyntax array) : GenericTypeSyntax =
+        let commas =
+            match genericTypes.Length with
+            | i when i >= 2 -> Array.create (i - 1) (CommaToken())
+            | _ -> [| |]
+        MonkeyExpressionSyntaxFactory.GenericTypeNoBox(typeSyntax, genericTypes, commas, LessThanToken(), GreaterThanToken())
+        
+    static member GenericType(typeSyntax: TypeSyntax, genericTypes: TypeSyntax array, commas: SyntaxToken array, lessThanToken: SyntaxToken, greaterThanToken: SyntaxToken) : TypeSyntax =
+        MonkeyExpressionSyntaxFactory.GenericTypeNoBox(typeSyntax, genericTypes, commas, lessThanToken, greaterThanToken)
+        |> TypeSyntax.GenericTypeSyntax
+        
+    static member GenericType(typeSyntax: TypeSyntax, genericTypes: TypeSyntax array) : TypeSyntax =
+        let commas =
+            match genericTypes.Length with
+            | i when i >= 2 -> Array.create (i - 1) (CommaToken())
+            | _ -> [| |]
+        MonkeyExpressionSyntaxFactory.GenericTypeNoBox(typeSyntax, genericTypes, commas, LessThanToken(), GreaterThanToken())
+        |> TypeSyntax.GenericTypeSyntax
+        
+        
     
     static member BuiltinTypeNoBox(token: SyntaxToken) : BuiltinTypeSyntax =
         { Token = token }
         
     static member BuiltinType(token: SyntaxToken) : TypeSyntax =
         MonkeyExpressionSyntaxFactory.BuiltinTypeNoBox(token) |>  TypeSyntax.BuiltinTypeSyntax
-        
         
     static member NameTypeNoBox(identifier: IdentifierNameSyntax) : NameSyntax =
         { Identifier = identifier }
@@ -305,6 +342,19 @@ type MonkeyExpressionSyntaxFactory() =
     static member internal InvocationExpressionFunctionExpression(parameterList: ParameterListSyntax, returnType: TypeSyntax, body: BlockSyntax) : InvocationExpressionLeftExpression =
         MonkeyExpressionSyntaxFactory.FunctionExpressionNoBox(parameterList, returnType, body)
         |> InvocationExpressionLeftExpression.FunctionExpressionSyntax
+        
+    static member internal InvocationExpressionParenthesizedExpression(expression: InvocationExpressionLeftExpression) : InvocationExpressionLeftExpression =
+        ({ OpenParenToken = OpenParenToken() 
+           Expression = expression
+           CloseParenToken = CloseParenToken() }: InvocationParenthesizedExpressionSyntax)
+        |> InvocationExpressionLeftExpression.ParenthesizedFunctionExpressionSyntax
+        
+    
+    static member VariableTypeAnnotation(colonToken: SyntaxToken, typeSyntax: TypeSyntax) =
+        { ColonToken = colonToken; Type = typeSyntax }
+        
+    static member VariableTypeAnnotation(typeSyntax: TypeSyntax) =
+        { ColonToken = ColonToken(); Type = typeSyntax }
         
         
     static member Parameter(paramType: TypeSyntax, identifierName: IdentifierNameSyntax) =

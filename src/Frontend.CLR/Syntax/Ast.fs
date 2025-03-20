@@ -5,6 +5,7 @@ open System.Runtime.InteropServices
 open Microsoft.CodeAnalysis
 open Microsoft.CodeAnalysis.CSharp
 open Microsoft.CodeAnalysis.Text
+open Monkey.Frontend.CLR.Syntax
 
 
 let internal interleave (xs: string[]) (ys: string[]) =
@@ -174,18 +175,24 @@ type TypeSyntax =
     | NameSyntax of NameSyntax
     | BuiltinTypeSyntax of BuiltinTypeSyntax
     | FunctionTypeSyntax of FunctionTypeSyntax
+    | ArrayTypeSyntax of ArrayTypeSyntax
+    | GenericTypeSyntax of GenericTypeSyntax
 with
     override this.ToString() =
         match this with
         | NameSyntax nameSyntax -> nameSyntax.ToString()
         | BuiltinTypeSyntax builtinTypeSyntax -> builtinTypeSyntax.ToString()
         | FunctionTypeSyntax functionTypeSyntax -> functionTypeSyntax.ToString()
+        | ArrayTypeSyntax arrayTypeSyntax -> arrayTypeSyntax.ToString()
+        | GenericTypeSyntax genericTypeSyntax -> genericTypeSyntax.ToString()
         
     static member AreEquivalent(ts1: TypeSyntax, ts2: TypeSyntax) =
         match ts1, ts2 with
         | NameSyntax ns1, NameSyntax ns2 -> NameSyntax.AreEquivalent(ns1, ns2)
         | BuiltinTypeSyntax bts1, BuiltinTypeSyntax bts2 -> BuiltinTypeSyntax.AreEquivalent(bts1, bts2)
         | FunctionTypeSyntax fts1, FunctionTypeSyntax fts2 -> FunctionTypeSyntax.AreEquivalent(fts1, fts2)
+        | ArrayTypeSyntax ats1, ArrayTypeSyntax ats2 -> ArrayTypeSyntax.AreEquivalent(ats1, ats2)
+        | GenericTypeSyntax gts1, GenericTypeSyntax gts2 -> GenericTypeSyntax.AreEquivalent(gts1, gts2)
         | _ -> false
         
 /// <remarks>
@@ -229,6 +236,41 @@ with
         
     static member AreEquivalent(fts1: FunctionTypeSyntax, fts2: FunctionTypeSyntax) =
         Array.zip fts1.ParameterTypes fts2.ParameterTypes
+        |> Array.map TypeSyntax.AreEquivalent
+        |> Array.forall id
+        
+/// <remarks>
+/// Example: <code>[int -> int]</code>
+/// </remarks>
+and ArrayTypeSyntax =
+    { Type: TypeSyntax
+      OpenBracketToken: SyntaxToken
+      CloseBracketToken: SyntaxToken }
+with
+    override this.ToString() =
+        $"{this.Type.ToString()}{this.OpenBracketToken.ToString()}{this.CloseBracketToken.ToString()}"
+        
+    static member AreEquivalent(ats1: ArrayTypeSyntax, ats2: ArrayTypeSyntax) =
+        TypeSyntax.AreEquivalent(ats1.Type, ats2.Type)
+        
+/// <remarks>
+/// Example: <code>[int -> int]</code>
+/// </remarks>
+and GenericTypeSyntax =
+    { Type: TypeSyntax
+      LessThanToken: SyntaxToken
+      GenericTypes: TypeSyntax array
+      Commas: SyntaxToken array
+      GreaterThanToken: SyntaxToken }
+with
+    override this.ToString() =
+        let genericTypesString = this.GenericTypes |> Array.map _.ToString()
+        let commasString = this.Commas |> Array.map _.ToString()
+        let genericTypeCoreStr = (interleave genericTypesString commasString) |> String.concat ""
+        $"{this.Type.ToString()}{this.LessThanToken.ToString()}{genericTypeCoreStr}{this.GreaterThanToken.ToString()}"
+        
+    static member AreEquivalent(gts1: GenericTypeSyntax, gts2: GenericTypeSyntax) =
+        Array.zip gts1.GenericTypes gts2.GenericTypes
         |> Array.map TypeSyntax.AreEquivalent
         |> Array.forall id
     
@@ -381,6 +423,7 @@ with
         InvocationExpressionLeftExpression.AreEquivalent(ies1.Expression, ies2.Expression) && ArgumentListSyntax.AreEquivalent(ies1.Arguments, ies2.Arguments)
         
 and InvocationExpressionLeftExpression =
+    | ParenthesizedFunctionExpressionSyntax of InvocationParenthesizedExpressionSyntax
     | FunctionExpressionSyntax of FunctionExpressionSyntax
     | IdentifierNameSyntax of IdentifierNameSyntax
 with 
@@ -388,12 +431,49 @@ with
         match this with
         | FunctionExpressionSyntax functionExpressionSyntax -> functionExpressionSyntax.ToString()
         | IdentifierNameSyntax identifierNameSyntax -> identifierNameSyntax.ToString()
+        | ParenthesizedFunctionExpressionSyntax parenthesizedFunctionExpressionSyntax -> parenthesizedFunctionExpressionSyntax.ToString()
         
     static member AreEquivalent(ies1: InvocationExpressionLeftExpression, ies2: InvocationExpressionLeftExpression) =
         match ies1, ies2 with
         | FunctionExpressionSyntax fes1, FunctionExpressionSyntax fes2 -> FunctionExpressionSyntax.AreEquivalent(fes1, fes2)
         | IdentifierNameSyntax ins1, IdentifierNameSyntax ins2 -> IdentifierNameSyntax.AreEquivalent(ins1, ins2)
+        | ParenthesizedFunctionExpressionSyntax pfes1, ParenthesizedFunctionExpressionSyntax pfes2 -> InvocationParenthesizedExpressionSyntax.AreEquivalent(pfes1, pfes2)
         | _ -> false
+        
+    static member FromParenthesizedExpression(parenthesizedExpression: ParenthesizedExpressionSyntax) =
+        match parenthesizedExpression.Expression with
+        | ExpressionSyntax.FunctionExpressionSyntax functionExpressionSyntax ->
+            ({ OpenParenToken = parenthesizedExpression.OpenParenToken
+               Expression = InvocationExpressionLeftExpression.FunctionExpressionSyntax functionExpressionSyntax
+               CloseParenToken = parenthesizedExpression.CloseParenToken }: InvocationParenthesizedExpressionSyntax)
+            |> Some
+        | ExpressionSyntax.IdentifierNameSyntax identifierNameSyntax ->
+            ({ OpenParenToken = parenthesizedExpression.OpenParenToken
+               Expression = InvocationExpressionLeftExpression.IdentifierNameSyntax identifierNameSyntax
+               CloseParenToken = parenthesizedExpression.CloseParenToken }: InvocationParenthesizedExpressionSyntax)
+            |> Some
+        | ParenthesizedExpressionSyntax parenthesizedExpressionSyntax ->
+            match InvocationExpressionLeftExpression.FromParenthesizedExpression(parenthesizedExpressionSyntax) with
+            | Some invocationExpressionExpression ->
+                ({ OpenParenToken = parenthesizedExpression.OpenParenToken
+                   Expression = InvocationExpressionLeftExpression.ParenthesizedFunctionExpressionSyntax invocationExpressionExpression
+                   CloseParenToken = parenthesizedExpression.CloseParenToken }: InvocationParenthesizedExpressionSyntax)
+                |> Some
+            | None ->
+                None
+        | _ -> None
+            
+and InvocationParenthesizedExpressionSyntax =
+    { OpenParenToken: SyntaxToken
+      Expression: InvocationExpressionLeftExpression
+      CloseParenToken: SyntaxToken }
+with
+    override this.ToString() =
+        $"{this.OpenParenToken.ToString()}{this.Expression.ToString()}{this.CloseParenToken.ToString()}"
+        
+    static member AreEquivalent(pes1: InvocationParenthesizedExpressionSyntax, pes2: InvocationParenthesizedExpressionSyntax) =
+        InvocationExpressionLeftExpression.AreEquivalent(pes1.Expression, pes2.Expression)
+        
     
     
 type LiteralExpressionSyntax =
@@ -540,12 +620,14 @@ with
 type VariableDeclarationStatementSyntax =
     { LetKeyword: SyntaxToken
       Name: SyntaxToken
+      TypeAnnotation: VariableTypeAnnotation option
       EqualsToken: SyntaxToken
-      TypeAnnotation: VariableTypeAnnotation option }
+      Expression: ExpressionSyntax
+      SemicolonToken: SyntaxToken }
 with
     override this.ToString() =
         let typeAnnotationStr = defaultArg (this.TypeAnnotation |> Option.map _.ToString()) ""
-        $"{this.LetKeyword.ToString()}{this.Name.ToString()}{this.EqualsToken.ToString()}{typeAnnotationStr}"
+        $"{this.LetKeyword.ToString()}{this.Name.ToString()}{typeAnnotationStr}{this.EqualsToken.ToString()}{this.Expression.ToString()}{this.SemicolonToken.ToString()}"
         
     static member AreEquivalent(vdss1: VariableDeclarationStatementSyntax, vdss2: VariableDeclarationStatementSyntax) =
         let isTypeAnnotationEquivalent =

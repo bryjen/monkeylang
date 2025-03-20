@@ -64,6 +64,12 @@ type MonkeySyntaxTokenFactory () =
         MonkeySyntaxTokenFactory.Token(SyntaxKind.NumericLiteralToken, text=(string value), value=value)
         
         
+    static member LetKeyword() =
+        MonkeySyntaxTokenFactory.Token(SyntaxKind.LetKeyword, text="let", value="let")
+        
+    static member BoolKeyword() =
+        MonkeySyntaxTokenFactory.Token(SyntaxKind.BoolKeyword, text="bool", value="bool")
+        
     static member StringKeyword() =
         MonkeySyntaxTokenFactory.Token(SyntaxKind.StringKeyword, text="string", value="string")
         
@@ -86,6 +92,12 @@ type MonkeySyntaxTokenFactory () =
         MonkeySyntaxTokenFactory.Token(SyntaxKind.IdentifierToken, text="fn", value="fn")
         
         
+        
+    static member SemicolonToken() =
+        MonkeySyntaxTokenFactory.Token(SyntaxKind.SemicolonToken, text=";", value=";")
+        
+    static member EqualsToken() =
+        MonkeySyntaxTokenFactory.Token(SyntaxKind.EqualsToken, text="=", value="=")
         
     static member PlusToken() =
         MonkeySyntaxTokenFactory.Token(SyntaxKind.PlusToken, text="+", value="+")

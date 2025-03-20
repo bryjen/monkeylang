@@ -90,8 +90,26 @@ and private onInvocationExpressionSyntax (indentation: int) (invocationExpressio
         onFunctionExpressionSyntax (indentation + 1) functionExpressionSyntax
     | InvocationExpressionLeftExpression.IdentifierNameSyntax identifierNameSyntax ->
         onIdentifierNameSyntax (indentation + 1) identifierNameSyntax
+    | InvocationExpressionLeftExpression.ParenthesizedFunctionExpressionSyntax parenthesizedExpressionSyntax ->
+        onInvocationParenthesizedExpressionSyntax (indentation + 1) parenthesizedExpressionSyntax
         
     onArgumentListSyntax (indentation + 1) invocationExpressionSyntax.Arguments
+    
+and private onInvocationParenthesizedExpressionSyntax (indentation: int) (invocationParenthesizedExpressionSyntax: InvocationParenthesizedExpressionSyntax) =
+    printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(InvocationParenthesizedExpressionSyntax)) (invocationParenthesizedExpressionSyntax.ToString() |> normalizeString)
+    onSyntaxToken (indentation + 1) invocationParenthesizedExpressionSyntax.OpenParenToken
+    
+    match invocationParenthesizedExpressionSyntax.Expression with
+    | InvocationExpressionLeftExpression.FunctionExpressionSyntax functionExpressionSyntax ->
+        onFunctionExpressionSyntax (indentation + 1) functionExpressionSyntax
+    | InvocationExpressionLeftExpression.IdentifierNameSyntax identifierNameSyntax ->
+        onIdentifierNameSyntax (indentation + 1) identifierNameSyntax
+    | InvocationExpressionLeftExpression.ParenthesizedFunctionExpressionSyntax parenthesizedExpressionSyntax ->
+        onInvocationParenthesizedExpressionSyntax (indentation + 1) parenthesizedExpressionSyntax
+        
+    onSyntaxToken (indentation + 1) invocationParenthesizedExpressionSyntax.CloseParenToken
+    
+
     
 and private onLiteralExpressionSyntax (indentation: int) (literalExpressionSyntax: LiteralExpressionSyntax) =
     printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(LiteralExpressionSyntax)) (literalExpressionSyntax.ToString() |> normalizeString)
@@ -119,6 +137,8 @@ and private onTypeSyntax (indentation: int) (typeSyntax: TypeSyntax) =
     | NameSyntax nameSyntax -> onNameSyntax indentation nameSyntax
     | BuiltinTypeSyntax builtinTypeSyntax -> onBuiltinTypeSyntax indentation builtinTypeSyntax
     | FunctionTypeSyntax functionTypeSyntax -> onFunctionTypeSyntax indentation functionTypeSyntax
+    | ArrayTypeSyntax arrayTypeSyntax -> onArrayTypeSyntax indentation arrayTypeSyntax
+    | GenericTypeSyntax genericTypeSyntax -> onGenericTypeSyntax indentation genericTypeSyntax
     
 and private onNameSyntax (indentation: int) (nameSyntax: NameSyntax) =
     printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(NameSyntax)) (nameSyntax.ToString() |> normalizeString)
@@ -128,6 +148,17 @@ and private onBuiltinTypeSyntax (indentation: int) (builtinTypeSyntax: BuiltinTy
     
 and private onFunctionTypeSyntax (indentation: int) (functionTypeSyntax: FunctionTypeSyntax) =
     printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(FunctionTypeSyntax)) (functionTypeSyntax.ToString() |> normalizeString)
+    Seq.iter (onTypeSyntax (indentation + 1)) functionTypeSyntax.ParameterTypes
+    
+and private onArrayTypeSyntax (indentation: int) (arrayTypeSyntax: ArrayTypeSyntax) =
+    printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(ArrayTypeSyntax)) (arrayTypeSyntax.ToString() |> normalizeString)
+    onTypeSyntax (indentation + 1) arrayTypeSyntax.Type
+    
+and private onGenericTypeSyntax (indentation: int) (genericTypeSyntax: GenericTypeSyntax) =
+    printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(GenericTypeSyntax)) (genericTypeSyntax.ToString() |> normalizeString)
+    onTypeSyntax (indentation + 1) genericTypeSyntax.Type
+    Seq.iter (onTypeSyntax (indentation + 1)) genericTypeSyntax.GenericTypes
+
     
     
 and private onIfExpressionSyntax (indentation: int) (ifStatementSyntax: IfExpressionSyntax) =

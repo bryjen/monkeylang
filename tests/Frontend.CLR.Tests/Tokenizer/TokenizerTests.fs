@@ -151,7 +151,7 @@ let add = fn(int x, int y) : int {
 let result = add(five, ten);"""
 
         let testCases: (SyntaxKind * obj) array = [|
-            ( SyntaxKind.IdentifierToken,
+            ( SyntaxKind.LetKeyword,
               "let")
             ( SyntaxKind.IdentifierToken,
               "five")
@@ -162,7 +162,7 @@ let result = add(five, ten);"""
             ( SyntaxKind.SemicolonToken,
               ";")
             
-            ( SyntaxKind.IdentifierToken,
+            ( SyntaxKind.LetKeyword,
               "let")
             ( SyntaxKind.IdentifierToken,
               "ten")
@@ -173,7 +173,7 @@ let result = add(five, ten);"""
             ( SyntaxKind.SemicolonToken,
               ";")
             
-            ( SyntaxKind.IdentifierToken,
+            ( SyntaxKind.LetKeyword,
               "let")
             ( SyntaxKind.IdentifierToken,
               "add")
@@ -216,7 +216,7 @@ let result = add(five, ten);"""
             ( SyntaxKind.SemicolonToken,
               ";")
             
-            ( SyntaxKind.IdentifierToken,
+            ( SyntaxKind.LetKeyword,
               "let")
             ( SyntaxKind.IdentifierToken,
               "result")
@@ -273,7 +273,7 @@ if (5 < 10) {
 [int -> int];"""
 
         let testCases: (SyntaxKind * obj) array = [|
-            ( SyntaxKind.IdentifierToken,
+            ( SyntaxKind.LetKeyword,
               "let")
             ( SyntaxKind.IdentifierToken,
               "five")
@@ -284,7 +284,7 @@ if (5 < 10) {
             ( SyntaxKind.SemicolonToken,
               ";")
             
-            ( SyntaxKind.IdentifierToken,
+            ( SyntaxKind.LetKeyword,
               "let")
             ( SyntaxKind.IdentifierToken,
               "ten")
@@ -295,7 +295,7 @@ if (5 < 10) {
             ( SyntaxKind.SemicolonToken,
               ";")
             
-            ( SyntaxKind.IdentifierToken,
+            ( SyntaxKind.LetKeyword,
               "let")
             ( SyntaxKind.IdentifierToken,
               "add")
@@ -338,7 +338,7 @@ if (5 < 10) {
             ( SyntaxKind.SemicolonToken,
               ";")
             
-            ( SyntaxKind.IdentifierToken,
+            ( SyntaxKind.LetKeyword,
               "let")
             ( SyntaxKind.IdentifierToken,
               "result")
@@ -489,7 +489,7 @@ if (5 < 10) {
         let testInput = "let foo: string = \"bar\";"
         
         let testCases: (SyntaxKind * obj) array = [|
-            ( SyntaxKind.IdentifierToken,
+            ( SyntaxKind.LetKeyword,
               "let")
             ( SyntaxKind.IdentifierToken,
               "foo")
@@ -517,7 +517,7 @@ if (5 < 10) {
         let testInput = "let foo: string[] = [\"bar\", \"pluh\"];"
         
         let testCases: (SyntaxKind * obj) array = [|
-            ( SyntaxKind.IdentifierToken,
+            ( SyntaxKind.LetKeyword,
               "let")
             ( SyntaxKind.IdentifierToken,
               "foo")
@@ -557,7 +557,7 @@ if (5 < 10) {
         let testInput = "let foo = { \"bar\": 1, \"pluh\": 2 };"
         
         let testCases: (SyntaxKind * obj) array = [|
-            ( SyntaxKind.IdentifierToken,
+            ( SyntaxKind.LetKeyword,
               "let")
             ( SyntaxKind.IdentifierToken,
               "foo")

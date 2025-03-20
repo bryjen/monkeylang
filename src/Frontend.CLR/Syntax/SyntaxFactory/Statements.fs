@@ -37,3 +37,27 @@ type MonkeyStatementSyntaxFactory() =
 
     static member BlockStatementNoBox(statements: StatementSyntax array) =
         MonkeyStatementSyntaxFactory.BlockStatementNoBox(OpenBraceToken(), statements, CloseBraceToken())
+        
+        
+        
+    static member VariableDeclarationStatement(letKeyword: SyntaxToken, name: SyntaxToken, equalsToken: SyntaxToken, expression: ExpressionSyntax, semicolonToken: SyntaxToken, typeAnnotation: VariableTypeAnnotation option) =
+        MonkeyStatementSyntaxFactory.VariableDeclarationStatementNoBox(letKeyword , name, equalsToken, expression, semicolonToken, typeAnnotation)
+        |> StatementSyntax.VariableDeclarationStatementSyntax
+
+    static member VariableDeclarationStatement(name: SyntaxToken, expression: ExpressionSyntax, typeAnnotation: VariableTypeAnnotation option) =
+        MonkeyStatementSyntaxFactory.VariableDeclarationStatement(LetKeyword(), name, EqualsToken(), expression, SemicolonToken(), typeAnnotation)
+        
+    static member VariableDeclarationStatement(name: SyntaxToken, expression: ExpressionSyntax) =
+        MonkeyStatementSyntaxFactory.VariableDeclarationStatement(LetKeyword(), name, EqualsToken(), expression, SemicolonToken(), None)
+        
+        
+    static member VariableDeclarationStatementNoBox(letKeyword: SyntaxToken, name: SyntaxToken, equalsToken: SyntaxToken, expression: ExpressionSyntax, semicolonToken: SyntaxToken, typeAnnotation: VariableTypeAnnotation option) : VariableDeclarationStatementSyntax =
+        { LetKeyword = letKeyword
+          Name = name
+          EqualsToken = equalsToken
+          TypeAnnotation = typeAnnotation
+          Expression = expression
+          SemicolonToken = semicolonToken }
+
+    static member VariableDeclarationStatementNoBox(name: SyntaxToken, expression: ExpressionSyntax, typeAnnotation: VariableTypeAnnotation option) =
+        MonkeyStatementSyntaxFactory.VariableDeclarationStatementNoBox(LetKeyword(), name, EqualsToken(), expression, SemicolonToken(), typeAnnotation)
