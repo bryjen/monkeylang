@@ -113,6 +113,14 @@ with
     member this.PeekToken() : SyntaxToken =
         this.Tokens[this.CurrentIdx]
         
+    member this.PeekToken(offset: int) : SyntaxToken =
+        this.Tokens[this.CurrentIdx + offset]
+        
+    member this.CanPeek(offset: int) : bool =
+        match offset + this.CurrentIdx with
+        | i when i >= 0 && i <= this.Tokens.Length - 1 -> true
+        | _ -> false
+        
     member this.PopToken() : SyntaxToken =
         let token = this.Tokens[this.CurrentIdx]
         this.CurrentIdx <- this.CurrentIdx + 1
@@ -212,7 +220,7 @@ module internal PrefixExpressions =
         
     let tryParseStringLiteralExpression (parserState: MonkeyAstParserState) : Result<ExpressionSyntax, ParseError> =
         let currentToken = parserState.PopToken()
-        { Token = currentToken } |> ExpressionSyntax.IdentifierNameSyntax |> Ok
+        { Kind = SyntaxKind.StringLiteralExpression; Token = currentToken } |> ExpressionSyntax.LiteralExpressionSyntax |> Ok
         
     let tryParseNumericLiteralExpression (parserState: MonkeyAstParserState) : Result<ExpressionSyntax, ParseError> =
         let currentToken = parserState.PopToken()
@@ -355,9 +363,9 @@ module internal PrefixExpressions =
                 return FunctionType(openBracketToken, types, arrows, closeBracketToken)
             }
         | SyntaxKind.IntKeyword | SyntaxKind.StringKeyword ->
-            BuiltinSyntax(currentToken) |> Ok
+            BuiltinType(currentToken) |> Ok
         | SyntaxKind.IdentifierToken ->
-            NameSyntax(currentToken) |> Ok
+            NameType(IdentifierNameNoBox(currentToken)) |> Ok
         | _ ->
             Error onInvalid
             
@@ -386,7 +394,6 @@ module internal PrefixExpressions =
                 let peekToken = parserState.PeekToken()
                 match peekToken.Kind with
                 | SyntaxKind.CloseBracketToken ->
-                    parserState.PopToken() |> ignore  // consume the ']'
                     let typeSyntaxArr = newFuncSigTypes |> List.toArray |> Array.rev
                     let arrowTokensArr = arrowTokens |> List.toArray |> Array.rev
                     Ok (typeSyntaxArr, arrowTokensArr)
@@ -403,7 +410,6 @@ module internal PrefixExpressions =
     let rec tryParseFunctionExpression (parserState: MonkeyAstParserState) : Result<ExpressionSyntax, ParseError> =
         result {
             let fnKeywordToken = parserState.PopToken()  // we assert this from the syntax kind to (prefix) parse function map
-            
             
             // #1. parse parameters list
             let openParenToken = parserState.PopToken()
@@ -510,6 +516,84 @@ module internal PrefixExpressions =
                    Error (ParseError(message=($"Invalid token type \"{tokenType}\" detected")))
            | Error error ->
                Error error
+               
+    let rec tryParseInvocationExpression (parserState: MonkeyAstParserState) : Result<ExpressionSyntax, ParseError> =
+        result {
+            let peekToken = parserState.PeekToken()
+            let! leftExpressionRaw =
+                match peekToken.Kind, peekToken.Value with
+                | SyntaxKind.IdentifierToken, value when isFnKeyword value ->
+                    parserState |> tryParseFunctionExpression
+                | SyntaxKind.IdentifierToken, _ ->
+                    parserState |> tryParseIdentifier
+                | _ -> failwith "todo"
+            let leftExpression =
+                match leftExpressionRaw with
+                | ExpressionSyntax.FunctionExpressionSyntax functionExpressionSyntax ->
+                    InvocationExpressionLeftExpression.FunctionExpressionSyntax functionExpressionSyntax
+                | ExpressionSyntax.IdentifierNameSyntax identifierNameSyntax ->
+                    InvocationExpressionLeftExpression.IdentifierNameSyntax identifierNameSyntax
+                | _ -> failwith "todo"
+            
+            // parse parameters list
+            let openParenToken = parserState.PopToken()
+            do! match openParenToken.Kind with
+                | SyntaxKind.OpenParenToken -> Ok ()
+                | kind ->
+                    consumeUntilTokenType isSemicolon parserState |> ignore
+                    onUnexpectedSyntaxKind SyntaxKind.OpenParenToken kind
+            
+            let! argumentListParseResults =
+                match parserState.PeekToken().Kind with
+                | SyntaxKind.CloseParenToken -> Ok ([||], [||])  // no parameters
+                | _ -> parseArgumentsList [] [] parserState
+                
+            let closeParenToken = parserState.PopToken()
+            do! match closeParenToken.Kind with
+                | SyntaxKind.CloseParenToken -> Ok ()
+                | kind ->
+                    consumeUntilTokenType isSemicolon parserState |> ignore
+                    onUnexpectedSyntaxKind SyntaxKind.CloseParenToken kind
+                    
+            let arguments, commas = argumentListParseResults
+            let argumentList = ArgumentList(openParenToken, arguments, commas, closeParenToken)
+            return InvocationExpression(leftExpression, argumentList)
+        }
+        
+    /// Expected input ""
+    /// <example>
+    /// example input:
+    /// <code>
+    /// EXPRESSION_1, EXPRESSION_2, ..., EXPRESSION_N
+    /// </code>
+    /// the 'closeParenToken' is assumed to be consumed by the caller function
+    /// </example>
+    /// <returns>
+    /// <code>(ExpressionSyntax array) * (SyntaxToken array)</code>
+    /// (Argument expressions * commas between those expressions)
+    /// </returns>
+    and private parseArgumentsList
+        (commas: SyntaxToken list)
+        (arguments: ExpressionSyntax list)
+        (parserState: MonkeyAstParserState)
+        : Result<(ExpressionSyntax array) * (SyntaxToken array), ParseError> =
+            
+        tryParseExpression parserState Precedence.LOWEST
+        |> function
+           | Ok expression ->
+               let newArguments = expression :: arguments 
+               match parserState.PeekToken().Kind with
+               | SyntaxKind.CommaToken ->
+                   let commaToken = parserState.PopToken()
+                   parseArgumentsList (commaToken :: commas) newArguments parserState
+               | SyntaxKind.CloseParenToken ->
+                   let parametersArr = newArguments |> List.toArray |> Array.rev
+                   let commasArr = commas |> List.toArray |> Array.rev
+                   Ok (parametersArr, commasArr)
+               | tokenType ->
+                   Error (ParseError(message=($"Invalid token type \"{tokenType}\" detected")))
+           | Error error ->
+               Error error
 
         
     let rec getPrefixParseFunc (parserState: MonkeyAstParserState) : Result<MonkeyAstParserState -> Result<ExpressionSyntax, ParseError>, ParseError> =
@@ -521,27 +605,50 @@ module internal PrefixExpressions =
         | false ->
             let token = parserState.PeekToken()
             match token.Kind, token.Value with
-            | SyntaxKind.IdentifierToken, value when isFnKeyword value -> tryParseFunctionExpression |> Ok
-            | SyntaxKind.IdentifierToken, _ ->  tryParseIdentifier |> Ok
-            | SyntaxKind.StringLiteralToken, _ ->  tryParseStringLiteralExpression |> Ok
-            | SyntaxKind.NumericLiteralToken, _ ->  tryParseNumericLiteralExpression |> Ok
-            | SyntaxKind.TrueKeyword, _ ->  tryParseBooleanLiteralExpression |> Ok
-            | SyntaxKind.FalseKeyword, _ ->  tryParseBooleanLiteralExpression |> Ok
-            | SyntaxKind.ExclamationToken, _ ->  tryParsePrefixExpression |> Ok
-            | SyntaxKind.MinusToken, _ ->  tryParsePrefixExpression |> Ok
-            | SyntaxKind.OpenParenToken, _ ->  tryParseParenthesizedExpression |> Ok
-            | SyntaxKind.IfKeyword, _ ->  tryParseIfExpression |> Ok
+            | SyntaxKind.IdentifierToken, value when isFnKeyword value ->
+                tryParseFunctionExpression |> Ok
+            | SyntaxKind.IdentifierToken, _ when precedesOpenParenToken parserState ->
+                tryParseInvocationExpression |> Ok
+            | SyntaxKind.IdentifierToken, _ ->
+                tryParseIdentifier |> Ok
+                
+            | SyntaxKind.StringLiteralToken, _ ->  
+                tryParseStringLiteralExpression |> Ok
+            | SyntaxKind.NumericLiteralToken, _ ->  
+                tryParseNumericLiteralExpression |> Ok
+            | SyntaxKind.TrueKeyword, _ ->  
+                tryParseBooleanLiteralExpression |> Ok
+            | SyntaxKind.FalseKeyword, _ ->  
+                tryParseBooleanLiteralExpression |> Ok
+            | SyntaxKind.ExclamationToken, _ ->  
+                tryParsePrefixExpression |> Ok
+            | SyntaxKind.MinusToken, _ ->  
+                tryParsePrefixExpression |> Ok
+            | SyntaxKind.OpenParenToken, _ ->  
+                tryParseParenthesizedExpression |> Ok
+            | SyntaxKind.IfKeyword, _ ->  
+                tryParseIfExpression |> Ok
             | _ -> 
                 consumeUntilTokenType isSemicolon parserState |> ignore  // pass by reference, properties change 'in-place'
                 Error (ParseError($"Could not find a prefix parse function for the token type \"{token.Kind}\""))
                 
-    and isFnKeyword (value: obj option) : bool =
+    and private isFnKeyword (value: obj option) : bool =
         match value with
         | Some value ->
             match value with
             | :? string as str when str = "fn" -> true
             | _ -> false
         | None -> false
+        
+    and private precedesOpenParenToken (parserState: MonkeyAstParserState) : bool =
+        match parserState.CanPeek(1) with
+        | true ->
+            match parserState.PeekToken(1).Kind with
+            | SyntaxKind.OpenParenToken -> true
+            | _ -> false
+        | false -> false
+        
+        
                 
                 
             

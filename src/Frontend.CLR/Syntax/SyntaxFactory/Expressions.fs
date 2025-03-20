@@ -2,6 +2,7 @@
 
 open System.Linq.Expressions
 open Microsoft.CodeAnalysis.CSharp
+open Microsoft.CodeAnalysis.CSharp.Syntax
 open Monkey.Frontend.CLR.Syntax.Ast
 open type Monkey.Frontend.CLR.Syntax.SyntaxFactory.MonkeySyntaxTokenFactory
 
@@ -19,6 +20,9 @@ type MonkeyExpressionSyntaxFactory() =
         
     static member FalseLiteralExpression() =
         { Kind = SyntaxKind.FalseLiteralExpression; Token = FalseKeyword() } |> ExpressionSyntax.LiteralExpressionSyntax
+        
+    static member StringLiteralExpression(value: string) =
+        { Kind = SyntaxKind.StringLiteralExpression; Token = StringLiteral(value) } |> ExpressionSyntax.LiteralExpressionSyntax
         
         
     static member IdentifierName(token: SyntaxToken) =
@@ -173,19 +177,30 @@ type MonkeyExpressionSyntaxFactory() =
         
 
     
-    static member BuiltinSyntaxNoBox(token: SyntaxToken) : BuiltinTypeSyntax =
+    static member BuiltinTypeNoBox(token: SyntaxToken) : BuiltinTypeSyntax =
         { Token = token }
         
-    static member BuiltinSyntax(token: SyntaxToken) : TypeSyntax =
-        MonkeyExpressionSyntaxFactory.BuiltinSyntaxNoBox(token) |>  TypeSyntax.BuiltinTypeSyntax
+    static member BuiltinType(token: SyntaxToken) : TypeSyntax =
+        MonkeyExpressionSyntaxFactory.BuiltinTypeNoBox(token) |>  TypeSyntax.BuiltinTypeSyntax
         
         
-    static member NameSyntaxNoBox(identifierToken: SyntaxToken) : NameSyntax =
-        { Identifier = identifierToken }
+    static member NameTypeNoBox(identifier: IdentifierNameSyntax) : NameSyntax =
+        { Identifier = identifier }
         
-    static member NameSyntax(identifierToken: SyntaxToken) : TypeSyntax =
-        MonkeyExpressionSyntaxFactory.NameSyntaxNoBox(identifierToken) |>  TypeSyntax.NameSyntax
+    static member NameType(identifier: IdentifierNameSyntax) : TypeSyntax =
+        MonkeyExpressionSyntaxFactory.NameTypeNoBox(identifier) |>  TypeSyntax.NameSyntax
         
+        
+    static member FunctionTypeNoBox(
+            openBracketToken: SyntaxToken,
+            parameterTypes: TypeSyntax array,
+            arrowTokens: SyntaxToken array,
+            closeBracketToken: SyntaxToken)
+            : FunctionTypeSyntax =
+        { OpenBracketToken = openBracketToken
+          ParameterTypes = parameterTypes
+          ArrowTokens = arrowTokens
+          CloseBracketToken = closeBracketToken }
         
     static member FunctionType(
             openBracketToken: SyntaxToken,
@@ -193,11 +208,13 @@ type MonkeyExpressionSyntaxFactory() =
             arrowTokens: SyntaxToken array,
             closeBracketToken: SyntaxToken)
             : TypeSyntax =
-        { OpenBracketToken = openBracketToken
-          ParameterTypes = parameterTypes
-          ArrowTokens = arrowTokens
-          CloseBracketToken = closeBracketToken }
+        MonkeyExpressionSyntaxFactory.FunctionTypeNoBox(openBracketToken, parameterTypes, arrowTokens, closeBracketToken)
         |>  TypeSyntax.FunctionTypeSyntax
+        
+    static member FunctionType(parameterTypes: TypeSyntax array) =
+        let arrowTokens = Array.create (parameterTypes.Length - 1) (ArrowToken())
+        MonkeyExpressionSyntaxFactory.FunctionTypeNoBox(OpenBracketToken(), parameterTypes, arrowTokens, CloseBracketToken())
+        |> TypeSyntax.FunctionTypeSyntax
         
         
         
@@ -213,8 +230,30 @@ type MonkeyExpressionSyntaxFactory() =
           CloseParenToken = closeParenToken }
         
     static member ParameterList(parameters: ParameterSyntax array) : ParameterListSyntax =
-        let commas = Array.create ((Array.length parameters) - 1) (CommaToken())
+        let commas =
+            match parameters.Length with
+            | i when i >= 2 -> Array.create ((Array.length parameters) - 1) (CommaToken())
+            | _ -> [| |]
         MonkeyExpressionSyntaxFactory.ParameterList(OpenParenToken(), parameters, commas, CloseParenToken())
+        
+        
+    static member ArgumentList(
+            openParenToken: SyntaxToken,
+            arguments: ExpressionSyntax array,
+            commas: SyntaxToken array,
+            closeParenToken: SyntaxToken)
+            : ArgumentListSyntax =
+        { OpenParenToken = openParenToken 
+          Arguments = arguments
+          Commas = commas
+          CloseParenToken = closeParenToken }
+        
+    static member ArgumentList(arguments: ExpressionSyntax array) : ArgumentListSyntax =
+        let commas =
+            match arguments.Length with
+            | i when i >= 2 -> Array.create ((Array.length arguments) - 1) (CommaToken())
+            | _ -> [| |]
+        MonkeyExpressionSyntaxFactory.ArgumentList(OpenParenToken(), arguments, commas, CloseParenToken())
         
         
     static member FunctionExpression(
@@ -247,6 +286,25 @@ type MonkeyExpressionSyntaxFactory() =
         
     static member FunctionExpressionNoBox(parameterList: ParameterListSyntax, colonToken: SyntaxToken, returnType: TypeSyntax, body: BlockSyntax) : FunctionExpressionSyntax =
         MonkeyExpressionSyntaxFactory.FunctionExpressionNoBox(FnKeyword(), parameterList, colonToken, returnType, body)
+        
+    static member FunctionExpressionNoBox(parameterList: ParameterListSyntax, returnType: TypeSyntax, body: BlockSyntax) : FunctionExpressionSyntax =
+        MonkeyExpressionSyntaxFactory.FunctionExpressionNoBox(FnKeyword(), parameterList, ColonToken(), returnType, body)
+        
+        
+    static member InvocationExpressionNoBox(expression: InvocationExpressionLeftExpression, arguments: ArgumentListSyntax) : InvocationExpressionSyntax =
+        { Expression = expression; Arguments = arguments }
+        
+    static member InvocationExpression(expression: InvocationExpressionLeftExpression, arguments: ArgumentListSyntax) : ExpressionSyntax =
+        MonkeyExpressionSyntaxFactory.InvocationExpressionNoBox(expression, arguments) |> ExpressionSyntax.InvocationExpressionSyntax
+        
+        
+    static member internal InvocationExpressionIdentifierName(token: SyntaxToken) : InvocationExpressionLeftExpression =
+        let identifierName: IdentifierNameSyntax = { Token = token }
+        identifierName |> InvocationExpressionLeftExpression.IdentifierNameSyntax
+        
+    static member internal InvocationExpressionFunctionExpression(parameterList: ParameterListSyntax, returnType: TypeSyntax, body: BlockSyntax) : InvocationExpressionLeftExpression =
+        MonkeyExpressionSyntaxFactory.FunctionExpressionNoBox(parameterList, returnType, body)
+        |> InvocationExpressionLeftExpression.FunctionExpressionSyntax
         
         
     static member Parameter(paramType: TypeSyntax, identifierName: IdentifierNameSyntax) =

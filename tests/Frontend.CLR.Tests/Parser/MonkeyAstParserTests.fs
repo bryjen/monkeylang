@@ -418,10 +418,10 @@ type FunctionParsingTests() =
                 FunctionExpression(
                     ParameterList(
                         [|
-                            Parameter(BuiltinSyntax(IntKeyword()), IdentifierNameNoBox(Identifier("x")))
-                            Parameter(BuiltinSyntax(IntKeyword()), IdentifierNameNoBox(Identifier("y")))
+                            Parameter(BuiltinType(IntKeyword()), IdentifierNameNoBox(Identifier("x")))
+                            Parameter(BuiltinType(IntKeyword()), IdentifierNameNoBox(Identifier("y")))
                         |]),
-                    BuiltinSyntax(IntKeyword()),
+                    BuiltinType(IntKeyword()),
                     BlockStatementNoBox(
                         [|
                             ExpressionStatement(
@@ -437,94 +437,371 @@ type FunctionParsingTests() =
         (
             """fn() : int {
     x + 12;
-}
+};
 """,
             ExpressionStatementNoBox(
-                IfExpression(
-                    GreaterThanExpression(NumericLiteralExpression(5), NumericLiteralExpression(2)),
+                FunctionExpression(
+                    ParameterList(
+                        [|
+                        |]),
+                    BuiltinType(IntKeyword()),
                     BlockStatementNoBox(
                         [|
-                            ExpressionStatementNoBox(NumericLiteralExpression(5)) |> StatementSyntax.ExpressionStatementSyntax
-                        |]),
-                    ElseClause(
-                        BlockStatementNoBox(
-                            [|
-                                ExpressionStatementNoBox(NumericLiteralExpression(10)) |> StatementSyntax.ExpressionStatementSyntax
-                            |]
-                            )
-                        )
+                            ExpressionStatement(
+                                AddExpression(
+                                    IdentifierName(Identifier("x")),
+                                    NumericLiteralExpression(12)
+                                    )
+                                )
+                        |])
                     )
                 )
         )
         (
             """fn() : unit {
-}
+};
 """,
             ExpressionStatementNoBox(
-                IfExpression(
-                    GreaterThanExpression(NumericLiteralExpression(5), NumericLiteralExpression(2)),
+                FunctionExpression(
+                    ParameterList(
+                        [|
+                        |]),
+                    NameType(IdentifierNameNoBox(Identifier("unit"))),
                     BlockStatementNoBox(
                         [|
-                            ExpressionStatementNoBox(NumericLiteralExpression(5)) |> StatementSyntax.ExpressionStatementSyntax
-                        |]),
-                    ElseClause(
-                        BlockStatementNoBox(
-                            [|
-                                ExpressionStatementNoBox(NumericLiteralExpression(10)) |> StatementSyntax.ExpressionStatementSyntax
-                            |]
-                            )
-                        )
+                        |])
                     )
                 )
         )
         (
             """fn([int -> int] transform, int init_value) : int {
     init_value;
-}
+};
 """,
             ExpressionStatementNoBox(
-                IfExpression(
-                    GreaterThanExpression(NumericLiteralExpression(5), NumericLiteralExpression(2)),
+                FunctionExpression(
+                    ParameterList(
+                        [|
+                            Parameter(
+                                FunctionType(
+                                    [|
+                                        BuiltinType(IntKeyword())
+                                        BuiltinType(IntKeyword())
+                                    |]),
+                                IdentifierNameNoBox(Identifier("transform")))
+                            Parameter(
+                                BuiltinType(IntKeyword()),
+                                IdentifierNameNoBox(Identifier("init_value")))
+                        |]),
+                    BuiltinType(IntKeyword()),
                     BlockStatementNoBox(
                         [|
-                            ExpressionStatementNoBox(NumericLiteralExpression(5)) |> StatementSyntax.ExpressionStatementSyntax
-                        |]),
-                    ElseClause(
-                        BlockStatementNoBox(
-                            [|
-                                ExpressionStatementNoBox(NumericLiteralExpression(10)) |> StatementSyntax.ExpressionStatementSyntax
-                            |]
-                            )
-                        )
+                            ExpressionStatement(IdentifierName(Identifier("init_value")))
+                        |])
                     )
                 )
         )
         (
             """fn([int -> int -> int] full_transform, int init_value) : [int -> int] {
     init_value;
-}
+};
 """,
             ExpressionStatementNoBox(
-                IfExpression(
-                    GreaterThanExpression(NumericLiteralExpression(5), NumericLiteralExpression(2)),
+                FunctionExpression(
+                    ParameterList(
+                        [|
+                            Parameter(
+                                FunctionType(
+                                    [|
+                                        BuiltinType(IntKeyword())
+                                        BuiltinType(IntKeyword())
+                                        BuiltinType(IntKeyword())
+                                    |]),
+                                IdentifierNameNoBox(Identifier("full_transform")))
+                            Parameter(
+                                BuiltinType(IntKeyword()),
+                                IdentifierNameNoBox(Identifier("init_value")))
+                        |]),
+                    FunctionType(
+                        [|
+                            BuiltinType(IntKeyword())
+                            BuiltinType(IntKeyword())
+                        |]),
                     BlockStatementNoBox(
                         [|
-                            ExpressionStatementNoBox(NumericLiteralExpression(5)) |> StatementSyntax.ExpressionStatementSyntax
-                        |]),
-                    ElseClause(
-                        BlockStatementNoBox(
-                            [|
-                                ExpressionStatementNoBox(NumericLiteralExpression(10)) |> StatementSyntax.ExpressionStatementSyntax
-                            |]
-                            )
-                        )
+                            ExpressionStatement(IdentifierName(Identifier("init_value")))
+                        |])
                     )
                 )
         )
     |]
     
     [<TestCase(0)>]
-    member this.``D: Fucntion exression parsing tests``(testCaseIndex: int) =
+    [<TestCase(1)>]
+    [<TestCase(2)>]
+    [<TestCase(3)>]
+    [<TestCase(4)>]
+    member this.``D: Function expression parsing tests``(testCaseIndex: int) =
+        // we keep the test case in 'ExpressionStatementSyntax' to avoid having to cast each during declaration
+        let castedTestCases = this.TestCases |> Array.map (fun (input, expected) -> (input, expected |> StatementSyntax.ExpressionStatementSyntax |> MonkeySyntaxNode.StatementSyntax))
+        let input, expectedSyntaxTree = castedTestCases[testCaseIndex]
+        let tokens = Tokenizer.tokenize input
+        
+        let statements, parseErrors = Monkey.Frontend.CLR.Parsers.MonkeyAstParser.parseTokens tokens
+        let asMonkeySyntaxNodes = statements |> Array.map MonkeySyntaxNode.StatementSyntax
+        match Array.length parseErrors with
+        | 0 ->
+            let actualSyntaxNodes = asMonkeySyntaxNodes
+            let expectedSyntaxNodes = [| expectedSyntaxTree |]
+            match compareMonkeyStatements input expectedSyntaxNodes actualSyntaxNodes with
+            | true -> Assert.Pass()
+            | false -> Assert.Fail()
+        | _ ->
+            let mutable count = 1
+            for parseError in parseErrors do
+                printfn $"{count}. {parseError}"
+                count <- count + 1
+            Assert.Fail()
+            
+            
+[<TestFixture>]
+[<ParserComponent(ParserComponentType.Expressions)>]
+type InvocationExpressionParsingTests() =
+    member this.TestCases : (string * ExpressionStatementSyntax) array = [|
+        (
+            "some_function(5, 5);",
+            ExpressionStatementNoBox(
+                InvocationExpression(
+                    InvocationExpressionIdentifierName(Identifier("some_function")),
+                    ArgumentList(
+                        [|
+                            NumericLiteralExpression(5)
+                            NumericLiteralExpression(5)
+                        |])
+                    )
+                )
+        )
+        (
+            "some_function(some_function(5, 5, 5), 5);",
+            ExpressionStatementNoBox(
+                InvocationExpression(
+                    InvocationExpressionIdentifierName(Identifier("some_function")),
+                    ArgumentList(
+                        [|
+                            InvocationExpression(
+                                InvocationExpressionIdentifierName(Identifier("some_function")),
+                                ArgumentList(
+                                    [|
+                                        NumericLiteralExpression(5)
+                                        NumericLiteralExpression(5)
+                                        NumericLiteralExpression(5)
+                                    |])
+                                )
+                            NumericLiteralExpression(5)
+                        |])
+                    )
+                )
+        )
+        (
+            "some_function(if (5 > 2) { 5; } else { 10; }, 5);",
+            ExpressionStatementNoBox(
+                InvocationExpression(
+                    InvocationExpressionIdentifierName(Identifier("some_function")),
+                    ArgumentList(
+                        [|
+                            IfExpression(
+                                GreaterThanExpression(NumericLiteralExpression(5), NumericLiteralExpression(2)),
+                                BlockStatementNoBox(
+                                    [|
+                                        ExpressionStatementNoBox(NumericLiteralExpression(5)) |> StatementSyntax.ExpressionStatementSyntax
+                                    |]),
+                                ElseClause(
+                                    BlockStatementNoBox(
+                                        [|
+                                            ExpressionStatementNoBox(NumericLiteralExpression(10)) |> StatementSyntax.ExpressionStatementSyntax
+                                        |]
+                                        )
+                                    )
+                                )
+                            NumericLiteralExpression(5)
+                        |])
+                    )
+                )
+        )
+        (
+            "some_function(if (5 > 2) { 5; } else { 10; }, if (5 > 2) { 5; } else { 10; });",
+            ExpressionStatementNoBox(
+                InvocationExpression(
+                    InvocationExpressionIdentifierName(Identifier("some_function")),
+                    ArgumentList(
+                        [|
+                            IfExpression(
+                                GreaterThanExpression(NumericLiteralExpression(5), NumericLiteralExpression(2)),
+                                BlockStatementNoBox(
+                                    [|
+                                        ExpressionStatementNoBox(NumericLiteralExpression(5)) |> StatementSyntax.ExpressionStatementSyntax
+                                    |]),
+                                ElseClause(
+                                    BlockStatementNoBox(
+                                        [|
+                                            ExpressionStatementNoBox(NumericLiteralExpression(10)) |> StatementSyntax.ExpressionStatementSyntax
+                                        |]
+                                        )
+                                    )
+                                )
+                            IfExpression(
+                                GreaterThanExpression(NumericLiteralExpression(5), NumericLiteralExpression(2)),
+                                BlockStatementNoBox(
+                                    [|
+                                        ExpressionStatementNoBox(NumericLiteralExpression(5)) |> StatementSyntax.ExpressionStatementSyntax
+                                    |]),
+                                ElseClause(
+                                    BlockStatementNoBox(
+                                        [|
+                                            ExpressionStatementNoBox(NumericLiteralExpression(10)) |> StatementSyntax.ExpressionStatementSyntax
+                                        |]
+                                        )
+                                    )
+                                )
+                        |])
+                    )
+                )
+        )
+        (
+            "perform_hook(fn(string str) : unit { log(str); }, \"SOME STATE\");",
+            ExpressionStatementNoBox(
+                InvocationExpression(
+                    InvocationExpressionIdentifierName(Identifier("perform_hook")),
+                    ArgumentList(
+                        [|
+                            FunctionExpression(
+                                ParameterList(
+                                    [|
+                                        Parameter(
+                                            BuiltinType(StringKeyword()),
+                                            IdentifierNameNoBox(Identifier("str"))
+                                            )
+                                    |]),
+                                NameType(IdentifierNameNoBox(Identifier("unit"))),
+                                BlockStatementNoBox(
+                                    [|
+                                        ExpressionStatement(
+                                            InvocationExpression(
+                                                InvocationExpressionIdentifierName(Identifier("log")),
+                                                ArgumentList(
+                                                    [|
+                                                        IdentifierName(Identifier("str"))
+                                                    |])
+                                                )
+                                            )
+                                    |])
+                                )
+                            StringLiteralExpression("SOME STATE")
+                        |])
+                    )
+                )
+        )
+        (
+            "perform_hook(fn(string str) : unit { log(str); }, if (5 > 2) { 5; } else { 10; }, 3 + 4 * 5 == 3 * 1 + 4 * 5);",
+            ExpressionStatementNoBox(
+                InvocationExpression(
+                    InvocationExpressionIdentifierName(Identifier("perform_hook")),
+                    ArgumentList(
+                        [|
+                            FunctionExpression(
+                                ParameterList(
+                                    [|
+                                        Parameter(
+                                            BuiltinType(StringKeyword()),
+                                            IdentifierNameNoBox(Identifier("str"))
+                                            )
+                                    |]),
+                                NameType(IdentifierNameNoBox(Identifier("unit"))),
+                                BlockStatementNoBox(
+                                    [|
+                                        ExpressionStatement(
+                                            InvocationExpression(
+                                                InvocationExpressionIdentifierName(Identifier("log")),
+                                                ArgumentList(
+                                                    [|
+                                                        IdentifierName(Identifier("str"))
+                                                    |])
+                                                )
+                                            )
+                                    |])
+                                )
+                            IfExpression(
+                                GreaterThanExpression(NumericLiteralExpression(5), NumericLiteralExpression(2)),
+                                BlockStatementNoBox(
+                                    [|
+                                        ExpressionStatementNoBox(NumericLiteralExpression(5)) |> StatementSyntax.ExpressionStatementSyntax
+                                    |]),
+                                ElseClause(
+                                    BlockStatementNoBox(
+                                        [|
+                                            ExpressionStatementNoBox(NumericLiteralExpression(10)) |> StatementSyntax.ExpressionStatementSyntax
+                                        |]
+                                        )
+                                    )
+                                )
+                            EqualsExpression(
+                                AddExpression(
+                                    NumericLiteralExpression(3),
+                                    MultiplicationExpression(
+                                        NumericLiteralExpression(4),
+                                        NumericLiteralExpression(5))),
+                                AddExpression(
+                                    MultiplicationExpression(
+                                        NumericLiteralExpression(3),
+                                        NumericLiteralExpression(1)
+                                        ),
+                                    MultiplicationExpression(
+                                        NumericLiteralExpression(4),
+                                        NumericLiteralExpression(5)
+                                        )
+                                    )
+                                )
+                        |])
+                    )
+                )
+        )
+        (
+            "(fn(int x, int y) : int { x + y; })(5, 5);",
+            ExpressionStatementNoBox(
+                InvocationExpression(
+                    InvocationExpressionFunctionExpression(
+                        ParameterList(
+                            [|
+                                Parameter(BuiltinType(IntKeyword()), IdentifierNameNoBox(Identifier("x")))
+                                Parameter(BuiltinType(IntKeyword()), IdentifierNameNoBox(Identifier("y")))
+                            |]),
+                        BuiltinType(IntKeyword()),
+                        BlockStatementNoBox(
+                            [|
+                                
+                            |])
+                        ),
+                    ArgumentList(
+                        [|
+                            NumericLiteralExpression(5)
+                            NumericLiteralExpression(5)
+                        |])
+                    )
+                )
+        )
+    |]
+    
+    // call function by identifier nam
+    [<TestCase(0)>]
+    [<TestCase(1)>]
+    [<TestCase(2)>]
+    [<TestCase(3)>]
+    [<TestCase(4)>]
+    [<TestCase(5)>]
+    
+    // inline function invocation
+    [<TestCase(6)>]
+    member this.``E: Invocation expression parsing tests``(testCaseIndex: int) =
         // we keep the test case in 'ExpressionStatementSyntax' to avoid having to cast each during declaration
         let castedTestCases = this.TestCases |> Array.map (fun (input, expected) -> (input, expected |> StatementSyntax.ExpressionStatementSyntax |> MonkeySyntaxNode.StatementSyntax))
         let input, expectedSyntaxTree = castedTestCases[testCaseIndex]

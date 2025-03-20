@@ -39,7 +39,7 @@ let private normalizeString (str: string) =
     
 let private onArgumentListSyntax (indentation: int) (argumentListSyntax: ArgumentListSyntax) =
     printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(ArgumentListSyntax)) (argumentListSyntax.ToString() |> normalizeString)
-    argumentListSyntax.ArgumentSyntax |> Array.iter (onExpressionSyntax (indentation + 1))
+    argumentListSyntax.Arguments |> Array.iter (onExpressionSyntax (indentation + 1))
     
 let private onParameterListSyntax (indentation: int) (parameterListSyntax: ParameterListSyntax) =
     printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(ParameterListSyntax)) (parameterListSyntax.ToString() |> normalizeString)
@@ -50,14 +50,14 @@ let private onParameterListSyntax (indentation: int) (parameterListSyntax: Param
 let rec private onExpressionSyntax (indentation: int) (expressionSyntax: ExpressionSyntax) =
     match expressionSyntax with
     | ParenthesizedExpressionSyntax parenthesizedExpressionSyntax -> onParenthesizedExpressionSyntax indentation parenthesizedExpressionSyntax
-    | FunctionExpressionSyntax functionExpressionSyntax -> onFunctionExpressionSyntax indentation functionExpressionSyntax
+    | ExpressionSyntax.FunctionExpressionSyntax functionExpressionSyntax -> onFunctionExpressionSyntax indentation functionExpressionSyntax
     | BinaryExpressionSyntax binaryExpressionSyntax -> onBinaryExpressionSyntax indentation binaryExpressionSyntax
     | InterpolatedStringExpressionSyntax interpolatedStringExpressionSyntax -> onInterpolatedStringExpressionSyntax indentation interpolatedStringExpressionSyntax
     | InvocationExpressionSyntax invocationExpressionSyntax -> onInvocationExpressionSyntax indentation invocationExpressionSyntax
     | LiteralExpressionSyntax literalExpressionSyntax -> onLiteralExpressionSyntax indentation literalExpressionSyntax
     | PostfixExpressionSyntax postfixExpressionSyntax -> onPostfixExpressionSyntax indentation postfixExpressionSyntax
     | PrefixExpressionSyntax prefixExpressionSyntax -> onPrefixExpressionSyntax indentation prefixExpressionSyntax
-    | IdentifierNameSyntax identifierNameSyntax -> onIdentifierNameSyntax indentation identifierNameSyntax
+    | ExpressionSyntax.IdentifierNameSyntax identifierNameSyntax -> onIdentifierNameSyntax indentation identifierNameSyntax
     | TypeSyntax typeSyntax -> onTypeSyntax indentation typeSyntax
     | IfExpressionSyntax ifExpressionSyntax -> onIfExpressionSyntax indentation ifExpressionSyntax
 
@@ -84,7 +84,13 @@ and private onInterpolatedStringExpressionSyntax (indentation: int) (interpolate
     
 and private onInvocationExpressionSyntax (indentation: int) (invocationExpressionSyntax: InvocationExpressionSyntax) =
     printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(InvocationExpressionSyntax)) (invocationExpressionSyntax.ToString() |> normalizeString)
-    onExpressionSyntax (indentation + 1) invocationExpressionSyntax.LeftExpression
+    
+    match invocationExpressionSyntax.Expression with
+    | InvocationExpressionLeftExpression.FunctionExpressionSyntax functionExpressionSyntax ->
+        onFunctionExpressionSyntax (indentation + 1) functionExpressionSyntax
+    | InvocationExpressionLeftExpression.IdentifierNameSyntax identifierNameSyntax ->
+        onIdentifierNameSyntax (indentation + 1) identifierNameSyntax
+        
     onArgumentListSyntax (indentation + 1) invocationExpressionSyntax.Arguments
     
 and private onLiteralExpressionSyntax (indentation: int) (literalExpressionSyntax: LiteralExpressionSyntax) =

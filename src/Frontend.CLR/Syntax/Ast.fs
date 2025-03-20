@@ -192,13 +192,13 @@ with
 /// Example: <code>TypeSyntax</code>
 /// </remarks>
 and NameSyntax =
-    { Identifier: SyntaxToken }
+    { Identifier: IdentifierNameSyntax }
 with
     override this.ToString() =
         this.Identifier.ToString()
         
     static member AreEquivalent(ns1: NameSyntax, ns2: NameSyntax) =
-        SyntaxToken.AreEquivalent(ns1.Identifier, ns2.Identifier)
+        IdentifierNameSyntax.AreEquivalent(ns1.Identifier, ns2.Identifier)
         
 /// <remarks>
 /// Example: <code>int</code>
@@ -269,18 +269,18 @@ with
 
 type ArgumentListSyntax =
     { OpenParenToken: SyntaxToken
-      ArgumentSyntax: ExpressionSyntax array
-      CommaTokens: SyntaxList array
+      Arguments: ExpressionSyntax array
+      Commas: SyntaxToken array
       CloseParenToken: SyntaxToken }
 with
     override this.ToString() =
-        let argumentSyntaxStrings = this.ArgumentSyntax |> Array.map _.ToString()
-        let commaTokensStrings = this.CommaTokens |> Array.map _.ToString()
+        let argumentSyntaxStrings = this.Arguments |> Array.map _.ToString()
+        let commaTokensStrings = this.Commas |> Array.map _.ToString()
         let argListCoreStr = (interleave argumentSyntaxStrings commaTokensStrings) |> String.concat ""
         $"{this.OpenParenToken.ToString()}{argListCoreStr}{this.CloseParenToken.ToString()}"
         
     static member AreEquivalent(ns1: ArgumentListSyntax, ns2: ArgumentListSyntax) =
-        Array.zip ns1.ArgumentSyntax ns2.ArgumentSyntax
+        Array.zip ns1.Arguments ns2.Arguments
         |> Array.map ExpressionSyntax.AreEquivalent
         |> Array.forall id
     
@@ -371,16 +371,29 @@ with
     
     
 type InvocationExpressionSyntax =
-    { LeftExpression: ExpressionSyntax  // typically a fn identifier or an inline function
-      OpenParenToken: SyntaxToken
-      Arguments: ArgumentListSyntax
-      CloseParenToken: SyntaxToken }
+    { Expression: InvocationExpressionLeftExpression
+      Arguments: ArgumentListSyntax }
 with
     override this.ToString() =
-        $"{this.LeftExpression.ToString()}{this.OpenParenToken.ToString()}{this.Arguments.ToString()}{this.CloseParenToken.ToString()}"
+        $"{this.Expression.ToString()}{this.Arguments.ToString()}"
         
     static member AreEquivalent(ies1: InvocationExpressionSyntax, ies2: InvocationExpressionSyntax) =
-        ExpressionSyntax.AreEquivalent(ies1.LeftExpression, ies2.LeftExpression) && ArgumentListSyntax.AreEquivalent(ies1.Arguments, ies2.Arguments)
+        InvocationExpressionLeftExpression.AreEquivalent(ies1.Expression, ies2.Expression) && ArgumentListSyntax.AreEquivalent(ies1.Arguments, ies2.Arguments)
+        
+and InvocationExpressionLeftExpression =
+    | FunctionExpressionSyntax of FunctionExpressionSyntax
+    | IdentifierNameSyntax of IdentifierNameSyntax
+with 
+    override this.ToString() =
+        match this with
+        | FunctionExpressionSyntax functionExpressionSyntax -> functionExpressionSyntax.ToString()
+        | IdentifierNameSyntax identifierNameSyntax -> identifierNameSyntax.ToString()
+        
+    static member AreEquivalent(ies1: InvocationExpressionLeftExpression, ies2: InvocationExpressionLeftExpression) =
+        match ies1, ies2 with
+        | FunctionExpressionSyntax fes1, FunctionExpressionSyntax fes2 -> FunctionExpressionSyntax.AreEquivalent(fes1, fes2)
+        | IdentifierNameSyntax ins1, IdentifierNameSyntax ins2 -> IdentifierNameSyntax.AreEquivalent(ins1, ins2)
+        | _ -> false
     
     
 type LiteralExpressionSyntax =

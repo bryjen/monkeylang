@@ -50,6 +50,12 @@ type MonkeySyntaxTokenFactory () =
     static member StringLiteral(value: string, text: string, textSpan: TextSpan, fullTextSpan: TextSpan, leadingTrivia: SyntaxTriviaList) =
         MonkeySyntaxTokenFactory.Token(SyntaxKind.StringLiteralToken, text=text, value=value, textSpan=textSpan, fullTextSpan=fullTextSpan, leadingTrivia=leadingTrivia)
         
+    /// <remarks>
+    /// Assumes that the passed string is the contents inside the double quotes
+    /// </remarks>
+    static member internal StringLiteral(value: string) =
+        MonkeySyntaxTokenFactory.Token(SyntaxKind.StringLiteralToken, text=($"\"{value}\""), value=value)
+        
         
     static member NumericLiteral(value: obj, textSpan: TextSpan, fullTextSpan: TextSpan, leadingTrivia: SyntaxTriviaList) =
         MonkeySyntaxTokenFactory.Token(SyntaxKind.NumericLiteralToken, text=(string value), value=value, textSpan=textSpan, fullTextSpan=fullTextSpan, leadingTrivia=leadingTrivia)
@@ -57,6 +63,9 @@ type MonkeySyntaxTokenFactory () =
     static member NumericLiteral(value: obj) =
         MonkeySyntaxTokenFactory.Token(SyntaxKind.NumericLiteralToken, text=(string value), value=value)
         
+        
+    static member StringKeyword() =
+        MonkeySyntaxTokenFactory.Token(SyntaxKind.StringKeyword, text="string", value="string")
         
     static member IntKeyword() =
         MonkeySyntaxTokenFactory.Token(SyntaxKind.IntKeyword, text="int", value="int")
@@ -121,6 +130,15 @@ type MonkeySyntaxTokenFactory () =
         
     static member CloseBraceToken() =
         MonkeySyntaxTokenFactory.Token(SyntaxKind.CloseBraceToken, text="}", value="}")
+        
+    static member OpenBracketToken() =
+        MonkeySyntaxTokenFactory.Token(SyntaxKind.OpenBracketToken, text="[", value="[")
+        
+    static member CloseBracketToken() =
+        MonkeySyntaxTokenFactory.Token(SyntaxKind.CloseBracketToken, text="]", value="]")
+        
+    static member ArrowToken() =
+        MonkeySyntaxTokenFactory.Token(SyntaxKind.MinusGreaterThanToken, text="->", value=">")
         
         
     static member CommaToken() =
