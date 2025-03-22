@@ -10,7 +10,7 @@ module ParseErrorHelpers =
 
 [<AbstractClass>]
 type ParseError () =
-    abstract member GetFormattedMessage : SourceText -> string
+    abstract member GetFormattedMessage : SourceText * string option -> string  // source text -> source text file path -> formatted message
     
     abstract member ErrorType : unit -> string
     
@@ -56,7 +56,7 @@ type ParseError () =
 type PlaceholderError () =
     inherit ParseError()
 with
-    override this.GetFormattedMessage(sourceText: SourceText) = ""
+    override this.GetFormattedMessage(sourceText: SourceText, filePath: string option) = ""
     
     override this.ErrorType() = "Placeholder Error"
     

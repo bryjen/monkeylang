@@ -2,14 +2,12 @@
 [<RequireQualifiedAccess>]
 module rec Monkey.Frontend.CLR.Parsers.MonkeyAstParser
 
-open Frontend.CLR.Parsers.ParsingErrors
 open Microsoft.CodeAnalysis.CSharp
 
 open FsToolkit.ErrorHandling
 
-open Monkey.Frontend.CLR.Parsers.ParsingErrors
 open Monkey.Frontend.CLR.Syntax.Ast
-open Monkey.Frontend.CLR.Parsers.CSharpAstErrors
+open Monkey.Frontend.CLR.Parsers.ParsingErrors
 open type Monkey.Frontend.CLR.Syntax.SyntaxFactory.MonkeySyntaxTokenFactory
 open type Monkey.Frontend.CLR.Syntax.SyntaxFactory.MonkeyStatementSyntaxFactory
 open type Monkey.Frontend.CLR.Syntax.SyntaxFactory.MonkeyExpressionSyntaxFactory
@@ -48,8 +46,6 @@ module ParserStateHelpers =
         | _ ->
             Error parseErrors[0]  // we're guaranteed at least one element
             
-    let internal recoverFromError (parserState: MonkeyAstParserState) =
-        consumeUntilTokenType (fun kind -> kind = SyntaxKind.SemicolonToken || kind = SyntaxKind.EndOfFileToken) parserState
                 
 
 /// <summary>
@@ -134,6 +130,9 @@ with
     member this.GetTokenAt(index: int) : SyntaxToken =
         this.Tokens[index]
         
+    member this.RecoverFromParseError() : unit =
+        consumeUntilTokenType (fun kind -> kind = SyntaxKind.SemicolonToken || kind = SyntaxKind.EndOfFileToken) this
+        |> ignore
         
 
 let parseTokens (tokens: SyntaxToken array) : StatementSyntax array * ParseError array =
@@ -258,13 +257,13 @@ module private Statements =
             let! expression = tryParseExpression parserState Precedence.LOWEST
             
             let! semicolonToken = 
-                match parserState.PopToken() with
+                match parserState.PeekToken() with
                 | token when token.Kind = SyntaxKind.SemicolonToken ->
-                    Ok token
-                | token ->
-                    consumeUntilTokenType isSemicolon parserState |> ignore
-                    let errorMsg = $"Expected a semicolon, but received \"{token.Text}\" of type \"{token.Kind}\""
-                    failwith "todo"
+                    parserState.PopToken() |> Ok
+                | _ ->
+                    let errorTextSpan = parserState.PeekToken().TextSpan
+                    parserState.RecoverFromParseError()
+                    VariableAssignmentStatementErrors.AbsentSemicolonError(errorTextSpan) :> ParseError |> Error
                     
                     
             return VariableDeclarationStatement(letKeywordToken, variableName, equalsToken, expression, semicolonToken, explicitTypeSyntaxOption)
@@ -564,9 +563,9 @@ module internal PrefixExpressions =
             let openParenToken = parserState.PopToken()
             do! match openParenToken.Kind with
                 | SyntaxKind.OpenParenToken -> Ok ()
-                | kind ->
-                    recoverFromError parserState |> ignore
-                    Error (FunctionExpression.ExpectedConditionOpenParenTokenError(fnKeywordToken) :> ParseError)
+                | _ ->
+                    parserState.RecoverFromParseError()
+                    FunctionExpressionErrors.UnexpectedTokenError(fnKeywordToken, "(") :> ParseError |> Error
             
             let! syntaxSeparatedList =
                 match parserState.PeekToken().Kind with
@@ -576,9 +575,9 @@ module internal PrefixExpressions =
             let closeParenToken = parserState.PopToken()
             do! match closeParenToken.Kind with
                 | SyntaxKind.CloseParenToken -> Ok ()
-                | kind ->
-                    consumeUntilTokenType isSemicolon parserState |> ignore
-                    onUnexpectedSyntaxKind SyntaxKind.CloseParenToken kind
+                | _ ->
+                    parserState.RecoverFromParseError()
+                    FunctionExpressionErrors.UnexpectedTokenError(openParenToken, ")") :> ParseError |> Error
                     
             let parameterSyntaxArr, commas = syntaxSeparatedList
             let parameterList = ParameterList(openParenToken, parameterSyntaxArr, commas, closeParenToken)
@@ -588,11 +587,11 @@ module internal PrefixExpressions =
             let colonToken = parserState.PopToken()
             do! match colonToken.Kind with
                 | SyntaxKind.ColonToken -> Ok ()
-                | kind ->
-                    consumeUntilTokenType isSemicolon parserState |> ignore
-                    onUnexpectedSyntaxKind SyntaxKind.ColonToken kind
+                | _ ->
+                    parserState.RecoverFromParseError()
+                    FunctionExpressionErrors.UnexpectedTokenError(closeParenToken, ":", detailedHelpMessage=FunctionExpressionErrors.onNoReturnTypeDefinedHelpMessage) :> ParseError |> Error
             
-            let retTypeToken = parserState.PeekToken()
+            
             let! returnTypeSyntax = tryParseTypeSyntax (PlaceholderError()) parserState
             
             
@@ -600,9 +599,9 @@ module internal PrefixExpressions =
             let openBraceToken = parserState.PopToken()
             do! match openBraceToken.Kind with
                 | SyntaxKind.OpenBraceToken -> Ok ()
-                | kind ->
-                    consumeUntilTokenType isSemicolon parserState |> ignore
-                    onUnexpectedSyntaxKind SyntaxKind.OpenBraceToken kind
+                | _ ->
+                    parserState.RecoverFromParseError()
+                    FunctionExpressionErrors.UnexpectedTokenError(colonToken, "{") :> ParseError |> Error
             
             let stopCondition (parserState: MonkeyAstParserState) = parserState.PeekToken().Kind = SyntaxKind.CloseBraceToken || parserState.IsEof()
             let statements, parseErrors = enterNewScopeAndParseTokens stopCondition parserState
@@ -611,9 +610,9 @@ module internal PrefixExpressions =
             let closeBraceToken = parserState.PopToken()
             do! match closeBraceToken.Kind with
                 | SyntaxKind.CloseBraceToken -> Ok ()
-                | kind ->
-                    consumeUntilTokenType isSemicolon parserState |> ignore
-                    onUnexpectedSyntaxKind SyntaxKind.CloseBraceToken kind
+                | _ ->
+                    parserState.RecoverFromParseError()
+                    FunctionExpressionErrors.UnexpectedTokenError(openBraceToken, "}") :> ParseError |> Error
                     
             let block = BlockStatementNoBox(openBraceToken, statements, closeBraceToken)
             return FunctionExpressionNoBox(fnKeywordToken, parameterList, colonToken, returnTypeSyntax, block) |> ExpressionSyntax.FunctionExpressionSyntax
