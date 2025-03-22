@@ -141,7 +141,7 @@ module CsharpProjectConverter =
         result {
             let monkeySourceCode = File.ReadAllText(fileInfo.FullName)
             let tokens = Lexer.parseIntoTokens monkeySourceCode
-            let statements, errors = CSharpAstParser.parseTokens (List.toArray tokens)
+            let statements, errors = DirectCSharpAstParser.parseTokens (List.toArray tokens)
             
             do! match errors with
                 | [] -> Ok ()

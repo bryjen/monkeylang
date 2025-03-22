@@ -17,6 +17,7 @@
         <Compile Include="Parser\Helpers.fs" />
         <Compile Include="Parser\CSharpAstParserTests.fs" />
         <Compile Include="Parser\MonkeyAstParserTests.fs" />
+        <Compile Include="Parser\MonkeyAstParseErrorTests.fs" />
         <Compile Include="Program.fs"/>
     </ItemGroup>
 

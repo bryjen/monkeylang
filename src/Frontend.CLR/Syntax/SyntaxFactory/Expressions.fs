@@ -350,6 +350,7 @@ type MonkeyExpressionSyntaxFactory() =
         |> InvocationExpressionLeftExpression.ParenthesizedFunctionExpressionSyntax
         
     
+    
     static member VariableTypeAnnotation(colonToken: SyntaxToken, typeSyntax: TypeSyntax) =
         { ColonToken = colonToken; Type = typeSyntax }
         
@@ -359,3 +360,18 @@ type MonkeyExpressionSyntaxFactory() =
         
     static member Parameter(paramType: TypeSyntax, identifierName: IdentifierNameSyntax) =
         { Type = paramType; Identifier = identifierName }
+        
+
+
+    static member ArrayListInitialization(openBracketToken: SyntaxToken, values: ExpressionSyntax array, commas: SyntaxToken array, closeBracketToken: SyntaxToken) =
+        { OpenBracketToken = openBracketToken; Values = values; Commas = commas; CloseBracketToken = closeBracketToken }
+        
+    static member ArrayListInitialization(values: ExpressionSyntax array, commas: SyntaxToken array) =
+        { OpenBracketToken = OpenBracketToken(); Values = values; Commas = commas; CloseBracketToken = CloseBracketToken() }
+        
+    static member ArrayListInitialization(values: ExpressionSyntax array) =
+        let commas =
+            match values.Length with
+            | i when i >= 2 -> Array.create ((Array.length values) - 1) (CommaToken())
+            | _ -> [| |]
+        { OpenBracketToken = OpenBracketToken(); Values = values; Commas = commas; CloseBracketToken = CloseBracketToken() }

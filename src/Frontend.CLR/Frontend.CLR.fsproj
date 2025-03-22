@@ -17,11 +17,13 @@
         <Compile Include="Syntax\SyntaxFactory\Expressions.fs" />
         <Compile Include="Syntax\SyntaxFactory\Statements.fs" />
         <Compile Include="Syntax\Tokenizer.fs" />
+        <Compile Include="Parsers\ParsingErrors\ParseError.fs" />
+        <Compile Include="Parsers\ParsingErrors\FunctionExpression.fs" />
         <Compile Include="Parsers\CSharpAstErrors.fs" />
-        <Compile Include="Parsers\MonkeyAstErrors.fs" />
         <Compile Include="Parsers\ParserHelpers.fs" />
-        <Compile Include="Parsers\CSharpAstParser.fs" />
+        <Compile Include="Parsers\DirectCSharpAstParser.fs" />
         <Compile Include="Parsers\MonkeyAstParser.fs" />
+        <Compile Include="Parsers\MonkeyToCSharpAstConverter.fs" />
         <Compile Include="Binding\Binder.fs" />
         <Compile Include="Binding\Optimizer.fs" />
         <Compile Include="HostStubGenerator.fs" />

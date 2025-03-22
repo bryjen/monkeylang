@@ -60,6 +60,27 @@ let rec private onExpressionSyntax (indentation: int) (expressionSyntax: Express
     | ExpressionSyntax.IdentifierNameSyntax identifierNameSyntax -> onIdentifierNameSyntax indentation identifierNameSyntax
     | TypeSyntax typeSyntax -> onTypeSyntax indentation typeSyntax
     | IfExpressionSyntax ifExpressionSyntax -> onIfExpressionSyntax indentation ifExpressionSyntax
+    | ArrayExpressionSyntax arrayExpressionSyntax -> onArrayExpressionSyntax indentation arrayExpressionSyntax
+    
+    
+and private onArrayExpressionSyntax (indentation: int) (arrayExpressionSyntax: ArrayExpressionSyntax) =
+    match arrayExpressionSyntax with
+    | ListInitialization listInitialization -> onArrayListInitialization indentation listInitialization
+    | SizeBasedInitialization sizeBasedInitialization -> onArraySizeBasedInitialization indentation sizeBasedInitialization
+    
+and private onArrayListInitialization (indentation: int) (onArrayListInitialization: ListInitialization) =
+    printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(ListInitialization)) (onArrayListInitialization.ToString() |> normalizeString)
+    onSyntaxToken (indentation + 1) onArrayListInitialization.OpenBracketToken
+    onSyntaxToken (indentation + 1) onArrayListInitialization.CloseBracketToken
+    onArrayListInitialization.Values |> Array.iter (onExpressionSyntax (indentation + 1))
+    
+and private onArraySizeBasedInitialization (indentation: int) (sizeBasedInitialization: SizeBasedInitialization) =
+    printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(SizeBasedInitialization)) (sizeBasedInitialization.ToString() |> normalizeString)
+    onSyntaxToken (indentation + 1) sizeBasedInitialization.NewToken
+    onSyntaxToken (indentation + 1) sizeBasedInitialization.TypeToken
+    onSyntaxToken (indentation + 1) sizeBasedInitialization.OpenBracketToken
+    onSyntaxToken (indentation + 1) sizeBasedInitialization.CloseBracketToken
+
 
 and private onParenthesizedExpressionSyntax (indentation: int) (parenthesizedExpressionSyntax: ParenthesizedExpressionSyntax) =
     printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(ParenthesizedExpressionSyntax)) (parenthesizedExpressionSyntax.ToString() |> normalizeString)

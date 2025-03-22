@@ -74,7 +74,7 @@ type NumericExpressionParsingTests() =
         let input, expectedSyntaxTree = List.item testCaseIndex this.TestCases
         let tokens = Lexer.parseIntoTokens input |> List.toArray
         
-        let syntaxNodes, parseErrors = CSharpAstParser.parseTokens tokens
+        let syntaxNodes, parseErrors = DirectCSharpAstParser.parseTokens tokens
         match List.length parseErrors with
         | 0 ->
             let actualSyntaxNodes = List.toArray syntaxNodes |> Array.map (fun x -> x :> SyntaxNode)
@@ -128,7 +128,7 @@ type BooleanExpressionParsingTests() =
         let input, expectedSyntaxTree = List.item testCaseIndex this.TestCases
         let tokens = Lexer.parseIntoTokens input |> List.toArray
         
-        let syntaxNodes, parseErrors = CSharpAstParser.parseTokens tokens
+        let syntaxNodes, parseErrors = DirectCSharpAstParser.parseTokens tokens
         match List.length parseErrors with
         | 0 ->
             let actualSyntaxNodes = List.toArray syntaxNodes |> Array.map (fun x -> x :> SyntaxNode)
@@ -266,7 +266,7 @@ type BasicInfixExpressionParsingTests() =
         let input, expectedSyntaxTree = List.item testCaseIndex this.TestCases
         let tokens = Lexer.parseIntoTokens input |> List.toArray
         
-        let syntaxNodes, parseErrors = CSharpAstParser.parseTokens tokens
+        let syntaxNodes, parseErrors = DirectCSharpAstParser.parseTokens tokens
         match List.length parseErrors with
         | 0 ->
             let actualSyntaxNodes = List.toArray syntaxNodes |> Array.map (fun x -> x :> SyntaxNode)
@@ -446,7 +446,7 @@ type BasicVariableAssignmentParsingTests() =
         let input, expectedSyntaxTree = List.item testCaseIndex this.TestCases
         let tokens = Lexer.parseIntoTokens input |> List.toArray
         
-        let syntaxNodes, parseErrors = CSharpAstParser.parseTokens tokens
+        let syntaxNodes, parseErrors = DirectCSharpAstParser.parseTokens tokens
         match List.length parseErrors with
         | 0 ->
             let actualSyntaxNodes = List.toArray syntaxNodes |> Array.map (fun x -> x :> SyntaxNode)
@@ -596,7 +596,7 @@ type IfStatementParsingTests() =
         let input, expectedSyntaxNodes = List.item testCaseIndex this.TestCases
         let tokens = Lexer.parseIntoTokens input |> List.toArray
         
-        let syntaxNodes, parseErrors = CSharpAstParser.parseTokens tokens
+        let syntaxNodes, parseErrors = DirectCSharpAstParser.parseTokens tokens
         match List.length parseErrors with
         | 0 ->
             let actualSyntaxNodes = List.toArray syntaxNodes |> Array.map (fun x -> x :> SyntaxNode)
@@ -962,7 +962,7 @@ type FunctionParsingTests() =
         let input, expectedSyntaxNodes = List.item testCaseIndex this.TestCases
         let tokens = Lexer.parseIntoTokens input |> List.toArray
         
-        let syntaxNodes, parseErrors = CSharpAstParser.parseTokens tokens
+        let syntaxNodes, parseErrors = DirectCSharpAstParser.parseTokens tokens
         match List.length parseErrors with
         | 0 ->
             let actualSyntaxNodes = List.toArray syntaxNodes |> Array.map (fun x -> x :> SyntaxNode)
@@ -1105,7 +1105,7 @@ type ArrayParsingTests() =
         let input, expectedSyntaxNodes = List.item testCaseIndex this.TestCases
         let tokens = Lexer.parseIntoTokens input |> List.toArray
         
-        let syntaxNodes, parseErrors = CSharpAstParser.parseTokens tokens
+        let syntaxNodes, parseErrors = DirectCSharpAstParser.parseTokens tokens
         match List.length parseErrors with
         | 0 ->
             let actualSyntaxNodes = List.toArray syntaxNodes |> Array.map (fun x -> x :> SyntaxNode)
@@ -1175,7 +1175,7 @@ type FunctionCallParsingTests () =
         let input, expectedSyntaxNodes = List.item testCaseIndex this.TestCases
         let tokens = Lexer.parseIntoTokens input |> List.toArray
         
-        let syntaxNodes, parseErrors = CSharpAstParser.parseTokens tokens
+        let syntaxNodes, parseErrors = DirectCSharpAstParser.parseTokens tokens
         match List.length parseErrors with
         | 0 ->
             let actualSyntaxNodes = List.toArray syntaxNodes |> Array.map (fun x -> x :> SyntaxNode)

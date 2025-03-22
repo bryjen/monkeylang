@@ -54,6 +54,7 @@ with
 /// </summary>
 type MonkeySyntaxNode =
     | CompilationUnitSyntax
+    // | NamespaceDeclarationSyntax
     | UsingDeclarationSyntax
     | ArgumentListSyntax of ArgumentListSyntax
     | ParameterListSyntax of ParameterListSyntax
@@ -100,6 +101,7 @@ type ExpressionSyntax =
     | IdentifierNameSyntax of IdentifierNameSyntax
     | TypeSyntax of TypeSyntax
     | IfExpressionSyntax of IfExpressionSyntax
+    | ArrayExpressionSyntax of ArrayExpressionSyntax
 with
     override this.ToString() =
         match this with
@@ -114,6 +116,7 @@ with
         | IdentifierNameSyntax identifierNameSyntax -> identifierNameSyntax.ToString()
         | TypeSyntax typeSyntax -> typeSyntax.ToString()
         | IfExpressionSyntax ifExpressionSyntax -> ifExpressionSyntax.ToString()
+        | ArrayExpressionSyntax arrayExpressionSyntax -> arrayExpressionSyntax.ToString()
         
     static member AreEquivalent(es1: ExpressionSyntax, es2: ExpressionSyntax) =
         match es1, es2 with
@@ -139,6 +142,8 @@ with
             TypeSyntax.AreEquivalent(ts1, ts2)
         | IfExpressionSyntax ifs1, IfExpressionSyntax ifs2 ->
             IfExpressionSyntax.AreEquivalent(ifs1, ifs2)
+        | ArrayExpressionSyntax aes1, ArrayExpressionSyntax aes2 ->
+            ArrayExpressionSyntax.AreEquivalent(aes1, aes2)
         | _ -> false
     
     
@@ -329,6 +334,57 @@ with
     
     
 (* #REGION Expressions *)
+
+type ArrayExpressionSyntax =
+    | ListInitialization of ListInitialization
+    | SizeBasedInitialization of SizeBasedInitialization
+with
+    override this.ToString() =
+        match this with
+        | ListInitialization listInitialization -> listInitialization.ToString()
+        | SizeBasedInitialization sizeBasedInitialization -> sizeBasedInitialization.ToString()
+        
+    static member AreEquivalent(aes1: ArrayExpressionSyntax, aes2: ArrayExpressionSyntax) =
+        match aes1, aes2 with
+        | ListInitialization li1, ListInitialization li2 -> ListInitialization.AreEquivalent(li1, li2)
+        | SizeBasedInitialization sbi1, SizeBasedInitialization sbi2 -> SizeBasedInitialization.AreEquivalent(sbi1, sbi2)
+        | _ -> false
+/// <remarks>
+/// Example:
+/// <code>[EXPRESSION_1, EXPRESSION_2, ..., EXPRESSION_N]</code>
+/// </remarks>
+and ListInitialization =
+    { OpenBracketToken: SyntaxToken
+      Values: ExpressionSyntax array
+      Commas: SyntaxToken array
+      CloseBracketToken: SyntaxToken }
+with
+    override this.ToString() =
+        let valuesStr = this.Values |> Array.map _.ToString() 
+        let commasStr = this.Commas |> Array.map _.ToString()
+        let contentsStr = (interleave valuesStr commasStr) |> Array.fold (fun acc str -> acc + str) ""
+        $"{this.OpenBracketToken.ToString()}{contentsStr}{this.CloseBracketToken.ToString()}"
+        
+    static member AreEquivalent(li1: ListInitialization, li2: ListInitialization) =
+        (Array.zip li1.Values li2.Values) |> Array.map ExpressionSyntax.AreEquivalent |> Array.forall id
+/// <remarks>
+/// Example:
+/// <code>new int[]</code>
+/// </remarks>
+and SizeBasedInitialization =
+    { NewToken: SyntaxToken
+      TypeToken: SyntaxToken
+      OpenBracketToken: SyntaxToken
+      Size: ExpressionSyntax
+      CloseBracketToken: SyntaxToken }
+with
+    override this.ToString() =
+        $"{this.NewToken.ToString()}{this.TypeToken.ToString()}{this.OpenBracketToken.ToString()}{this.CloseBracketToken.ToString()}"
+        
+    static member AreEquivalent(sbi1: SizeBasedInitialization, sbi2: SizeBasedInitialization) =
+        SyntaxToken.AreEquivalent(sbi1.TypeToken, sbi2.TypeToken)
+        && ExpressionSyntax.AreEquivalent(sbi1.Size, sbi2.Size)
+    
 
 type FunctionExpressionSyntax =
     { FunctionKeywordToken: SyntaxToken

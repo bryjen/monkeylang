@@ -5,6 +5,7 @@ open Microsoft.CodeAnalysis.CSharp
 
 open Monkey.Frontend.CLR.Parsers
 open Monkey.Frontend.CLR.Parsers.CSharpAstErrors
+open Monkey.Frontend.CLR.Parsers.ParsingErrors
 open Monkey.Frontend.CLR.Syntax.AstTraverser
 open NUnit.Framework
 
@@ -1404,7 +1405,7 @@ type TypeSyntaxParsing() =
         let tokens = Tokenizer.tokenize input
         
         let parserState = MonkeyAstParser.MonkeyAstParserState(tokens)
-        let typeSyntaxResult = MonkeyAstParser.PrefixExpressions.tryParseTypeSyntax (ParseError()) parserState
+        let typeSyntaxResult = MonkeyAstParser.PrefixExpressions.tryParseTypeSyntax (PlaceholderError()) parserState
         match typeSyntaxResult with
         | Ok typeSyntax ->
             let asMonkeyNode = typeSyntax |> ExpressionSyntax.TypeSyntax |> MonkeySyntaxNode.ExpressionSyntax
@@ -1413,4 +1414,71 @@ type TypeSyntaxParsing() =
             | false -> Assert.Fail()
         | Error error ->
             printfn $"{error.ToString()}"
+            Assert.Fail()
+
+
+
+[<TestFixture>]
+[<ParserComponent(ParserComponentType.Expressions)>]
+type ArrayExpressionParsing() =
+    member this.TestCases : (string * StatementSyntax) array = [|
+        (
+            "[];",
+            ExpressionStatement(
+                ArrayListInitialization(
+                    [|
+                        
+                    |]
+                    ) |> ArrayExpressionSyntax.ListInitialization |> ExpressionSyntax.ArrayExpressionSyntax
+                )
+        )
+        (
+            "[1];",
+            ExpressionStatement(
+                ArrayListInitialization(
+                    [|
+                        NumericLiteralExpression(1)
+                    |]
+                    ) |> ArrayExpressionSyntax.ListInitialization |> ExpressionSyntax.ArrayExpressionSyntax
+                )
+        )
+        (
+            "[1, 2, 3, 4, 5];",
+            ExpressionStatement(
+                ArrayListInitialization(
+                    [|
+                        NumericLiteralExpression(1)
+                        NumericLiteralExpression(2)
+                        NumericLiteralExpression(3)
+                        NumericLiteralExpression(4)
+                        NumericLiteralExpression(5)
+                    |]
+                    ) |> ArrayExpressionSyntax.ListInitialization |> ExpressionSyntax.ArrayExpressionSyntax
+                )
+        )
+    |]
+    
+    [<TestCase(0)>]
+    [<TestCase(1)>]
+    [<TestCase(2)>]
+    member this.``H: Array expression parsing test``(testCaseIndex: int) =
+        // we keep the test case in 'ExpressionStatementSyntax' to avoid having to cast each during declaration
+        let castedTestCases = this.TestCases |> Array.map (fun (input, expected) -> (input, expected |> MonkeySyntaxNode.StatementSyntax))
+        let input, expectedSyntaxTree = castedTestCases[testCaseIndex]
+        let tokens = Tokenizer.tokenize input
+        
+        let statements, parseErrors = Monkey.Frontend.CLR.Parsers.MonkeyAstParser.parseTokens tokens
+        let asMonkeySyntaxNodes = statements |> Array.map MonkeySyntaxNode.StatementSyntax
+        match Array.length parseErrors with
+        | 0 ->
+            let actualSyntaxNodes = asMonkeySyntaxNodes
+            let expectedSyntaxNodes = [| expectedSyntaxTree |]
+            match compareMonkeyStatements input expectedSyntaxNodes actualSyntaxNodes with
+            | true -> Assert.Pass()
+            | false -> Assert.Fail()
+        | _ ->
+            let mutable count = 1
+            for parseError in parseErrors do
+                printfn $"{count}. {parseError}"
+                count <- count + 1
             Assert.Fail()

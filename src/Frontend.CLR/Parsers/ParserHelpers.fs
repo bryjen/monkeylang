@@ -19,7 +19,7 @@ open Monkey.Frontend.CLR.Parsers.CSharpAstErrors
 /// </summary>
 type internal CSharpAstParserState(tokens: Token array) =
     let mutable currentIdx: int = 0
-    let mutable parseErrors: ParseError list = []
+    let mutable parseErrors: CSharpParseError list = []
     let mutable statements: StatementSyntax list = []
     let mutable lambdaTypeMap: Map<string, LambdaFunctionSignature> = Map.empty
     
@@ -136,7 +136,7 @@ let internal generateRandomStringHash n =
     
 let internal onUnexpectedToken (expectedTokenType: TokenType) (actualToken: Token) =
     let errorMsg = $"Expected a/an \"{expectedTokenType}\", but received \"{actualToken.Literal}\" of type \"{actualToken.Type}\""
-    Error (ParseError(message=errorMsg))
+    Error (CSharpParseError(message=errorMsg))
 
 let internal assertAndPop (expectedTokenType: TokenType) (parserState: CSharpAstParserState) =
     let currentToken = parserState.PopToken()
@@ -145,7 +145,7 @@ let internal assertAndPop (expectedTokenType: TokenType) (parserState: CSharpAst
     | _ -> consumeUntilTokenType isSemicolon parserState |> ignore
            onUnexpectedToken expectedTokenType currentToken
 
-let internal assertNoParseErrors (parseErrors: ParseError list) =
+let internal assertNoParseErrors (parseErrors: CSharpParseError list) =
     match parseErrors with
     | [ ] ->
         Ok ()
