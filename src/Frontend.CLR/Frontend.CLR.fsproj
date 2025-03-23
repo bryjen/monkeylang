@@ -11,9 +11,21 @@
         <Compile Include="Helpers\Numbers.fs" />
         <Compile Include="Token.fs" />
         <Compile Include="Lexer.fs" />
-        <Compile Include="Parsers\ParseErrors.fs" />
-        <Compile Include="Parsers\ModifiedRecursiveDescentHelpers.fs" />
-        <Compile Include="Parsers\ModifiedRecursiveDescent.fs" />
+        <Compile Include="Syntax\Ast.fs" />
+        <Compile Include="Syntax\AstTraverser.fs" />
+        <Compile Include="Syntax\SyntaxFactory\SyntaxToken.fs" />
+        <Compile Include="Syntax\SyntaxFactory\Expressions.fs" />
+        <Compile Include="Syntax\SyntaxFactory\Statements.fs" />
+        <Compile Include="Syntax\Tokenizer.fs" />
+        <Compile Include="Parsers\ParsingErrors\ParseError.fs" />
+        <Compile Include="Parsers\ParsingErrors\FunctionExpressionErrors.fs" />
+        <Compile Include="Parsers\ParsingErrors\VariableAssignmentStatementErrors.fs" />
+        <Compile Include="Parsers\ParsingErrors\ParameterListErrors.fs" />
+        <Compile Include="Parsers\CSharpAstErrors.fs" />
+        <Compile Include="Parsers\ParserHelpers.fs" />
+        <Compile Include="Parsers\DirectCSharpAstParser.fs" />
+        <Compile Include="Parsers\MonkeyAstParser.fs" />
+        <Compile Include="Parsers\MonkeyToCSharpAstConverter.fs" />
         <Compile Include="Binding\Binder.fs" />
         <Compile Include="Binding\Optimizer.fs" />
         <Compile Include="HostStubGenerator.fs" />
@@ -24,6 +36,8 @@
 
     <ItemGroup>
         <PackageReference Include="FsToolkit.ErrorHandling" Version="4.15.2" />
+        <PackageReference Include="Microsoft.Build.Locator" Version="1.7.8" />
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.13.0" />
+        <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="4.13.0" />
     </ItemGroup>
 </Project>

@@ -2,6 +2,8 @@
 [<AutoOpen>]
 module internal Monkey.Frontend.CLR.Helpers.Tuple
 
+open System
+
 
 /// Returns the third element in a tuple.
 let trd (_, _, c) = c
@@ -27,6 +29,7 @@ type TuplePrepender =
     // Can add more cases as needed
     
     
+    [<Obsolete>]
     static member AddCountsToTuples (tuples: ('a * 'b) list) : (int * 'a * 'b) list =
         let mutable testCount = 0
         
@@ -36,25 +39,35 @@ type TuplePrepender =
             
         tuples |> List.map addTestCountToTuple
     
-    static member AddCountsToTuples (tuples: ('a * 'b * 'c) list) : (int * 'a * 'b * 'c) list =
+    
+    static member AddCountsToTuples (tuples: ('a * 'b) array) : (int * 'a * 'b) array =
+        let mutable testCount = 0
+        
+        let addTestCountToTuple (tuple: 'a * 'b) : int * 'a * 'b =
+            testCount <- testCount + 1
+            TuplePrepender.Prepend(testCount, tuple)
+            
+        tuples |> Array.map addTestCountToTuple
+    
+    static member AddCountsToTuples (tuples: ('a * 'b * 'c) array) : (int * 'a * 'b * 'c) array =
         let mutable testCount = 0
         
         let addTestCountToTuple (tuple: 'a * 'b * 'c) : int * 'a * 'b * 'c =
             testCount <- testCount + 1
             TuplePrepender.Prepend(testCount, tuple)
             
-        tuples |> List.map addTestCountToTuple
+        tuples |> Array.map addTestCountToTuple
         
-    static member AddCountsToTuples (tuples: ('a * 'b * 'c * 'd) list) : (int * 'a * 'b * 'c * 'd) list =
+    static member AddCountsToTuples (tuples: ('a * 'b * 'c * 'd) array) : (int * 'a * 'b * 'c * 'd) array =
         let mutable testCount = 0
         
         let addTestCountToTuple (tuple: 'a * 'b * 'c * 'd) : int * 'a * 'b * 'c * 'd =
             testCount <- testCount + 1
             TuplePrepender.Prepend(testCount, tuple)
             
-        tuples |> List.map addTestCountToTuple
+        tuples |> Array.map addTestCountToTuple
         
         
-let addCountsToList (tuples: 'a list) : (int * 'a) list =
-    let counts = List.init tuples.Length (fun i -> i + 1)
-    List.zip counts tuples 
+let addCountsToList (tuples: 'a array) : (int * 'a) array =
+    let counts = Array.init tuples.Length (fun i -> i + 1)
+    Array.zip counts tuples 

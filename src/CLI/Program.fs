@@ -1,9 +1,12 @@
 ﻿
 
+open System
 open System.IO
 open Argu
 open CLI.Build
+open CLI.New
 open CLI.Run
+open Microsoft.Build.Locator
 open Monkey.CLI
 
 [<EntryPoint>]
@@ -30,18 +33,21 @@ let rec main argv =
     match programArguments with
     | _ when programArguments.Contains Build ->
         let buildParseResults = programArguments.GetResult Build
-        // performBuild buildParseResults
-        performDotnetBuild buildParseResults
-        // performDotnetBuildAlt buildParseResults
+        
+        // performDotnetBuild buildParseResults
+        performDotnetBuildAlt buildParseResults
+        
     | _ when programArguments.Contains New ->
-        printfn "New"
-        0
+        performNew (programArguments.GetResult New)
+        
     | _ when programArguments.Contains Run ->
         let runParseResults = programArguments.GetResult Run
         performRun runParseResults
+        
     | _ when programArguments.Contains Version ->
         printfn "Version"
         0
+        
     | _ ->
         printfn "An unexpected error occurred."
         -1

@@ -1,4 +1,4 @@
-﻿module Monkey.Frontend.CLR.Parsers.ParseErrors
+﻿module Monkey.Frontend.CLR.Parsers.CSharpAstErrors
 
 open System
 open Microsoft.CodeAnalysis.CSharp
@@ -41,7 +41,7 @@ with
 (* Parser Errors *)
 
 /// Exception type indicating a general exception.
-type ParseError(
+type CSharpParseError(
         ?message: string,
         ?token: Token option,
         ?innerException: Exception) =
@@ -53,29 +53,29 @@ type LiteralExpressionParseError(
         ?message: string,
         ?token: Token option,
         ?innerException: Exception) =
-    inherit ParseError(nullIfNone message, None, nullIfNone innerException)
+    inherit CSharpParseError(nullIfNone message, None, nullIfNone innerException)
     
 ///
 type LetStatementParseError(
         ?message: string,
         ?innerException: Exception) =
-    inherit ParseError(nullIfNone message, None, nullIfNone innerException)
+    inherit CSharpParseError(nullIfNone message, None, nullIfNone innerException)
     
 ///
 type InlineIfExpressionParseError(
         ?message: string,
         ?innerException: Exception) =
-    inherit ParseError(nullIfNone message, None, nullIfNone innerException)
+    inherit CSharpParseError(nullIfNone message, None, nullIfNone innerException)
     
 
 ///
 type FunctionCallExpressionParseError(
         ?message: string,
         ?innerException: Exception) =
-    inherit ParseError(nullIfNone message, None, nullIfNone innerException)
+    inherit CSharpParseError(nullIfNone message, None, nullIfNone innerException)
     
 ///
 type FunctionExpressionParseError(
         ?message: string,
         ?innerException: Exception) =
-    inherit ParseError(nullIfNone message, None, nullIfNone innerException)
+    inherit CSharpParseError(nullIfNone message, None, nullIfNone innerException)

@@ -12,6 +12,7 @@
         <Compile Include="Arguments.fs" />
         <Compile Include="Build.fs" />
         <Compile Include="Run.fs" />
+        <Compile Include="New.fs" />
         <Compile Include="Program.fs"/>
     </ItemGroup>
 
