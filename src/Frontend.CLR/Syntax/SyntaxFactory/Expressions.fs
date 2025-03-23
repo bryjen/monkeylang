@@ -26,10 +26,22 @@ type MonkeyExpressionSyntaxFactory() =
         
         
     static member IdentifierName(token: SyntaxToken) =
-        MonkeyExpressionSyntaxFactory.IdentifierNameNoBox(token) |> ExpressionSyntax.IdentifierNameSyntax
+        MonkeyExpressionSyntaxFactory.IdentifierNameNoBox(token) |> ExpressionSyntax.IdentifierSyntax
         
     static member IdentifierNameNoBox(token: SyntaxToken) =
         { Token = token }
+        |> IdentifierSyntax.SimpleIdentifier
+        
+    static member internal QualifiedName(tokens: SyntaxToken array) =
+        let periods = Array.create (tokens.Length - 1) (DotToken())
+        { Tokens = tokens; Dots = periods }
+        |> IdentifierSyntax.QualifiedIdentifier
+        |> ExpressionSyntax.IdentifierSyntax
+        
+    static member internal QualifiedNameNoBox(tokens: SyntaxToken array) : IdentifierSyntax =
+        let periods = Array.create (tokens.Length - 1) (DotToken())
+        { Tokens = tokens; Dots = periods }
+        |> IdentifierSyntax.QualifiedIdentifier
         
         
         
@@ -221,10 +233,10 @@ type MonkeyExpressionSyntaxFactory() =
     static member BuiltinType(token: SyntaxToken) : TypeSyntax =
         MonkeyExpressionSyntaxFactory.BuiltinTypeNoBox(token) |>  TypeSyntax.BuiltinTypeSyntax
         
-    static member NameTypeNoBox(identifier: IdentifierNameSyntax) : NameSyntax =
+    static member NameTypeNoBox(identifier: IdentifierSyntax) : NameSyntax =
         { Identifier = identifier }
         
-    static member NameType(identifier: IdentifierNameSyntax) : TypeSyntax =
+    static member NameType(identifier: IdentifierSyntax) : TypeSyntax =
         MonkeyExpressionSyntaxFactory.NameTypeNoBox(identifier) |>  TypeSyntax.NameSyntax
         
         
@@ -336,8 +348,15 @@ type MonkeyExpressionSyntaxFactory() =
         
         
     static member internal InvocationExpressionIdentifierName(token: SyntaxToken) : InvocationExpressionLeftExpression =
-        let identifierName: IdentifierNameSyntax = { Token = token }
-        identifierName |> InvocationExpressionLeftExpression.IdentifierNameSyntax
+        { Token = token }
+        |> IdentifierSyntax.SimpleIdentifier
+        |> InvocationExpressionLeftExpression.IdentifierSyntax
+        
+    static member internal InvocationExpressionQualifiedName(tokens: SyntaxToken array) : InvocationExpressionLeftExpression =
+        let periods = Array.create (tokens.Length - 1) (DotToken())
+        { Tokens = tokens; Dots = periods }
+        |> IdentifierSyntax.QualifiedIdentifier
+        |> InvocationExpressionLeftExpression.IdentifierSyntax
         
     static member internal InvocationExpressionFunctionExpression(parameterList: ParameterListSyntax, returnType: TypeSyntax, body: BlockSyntax) : InvocationExpressionLeftExpression =
         MonkeyExpressionSyntaxFactory.FunctionExpressionNoBox(parameterList, returnType, body)
@@ -358,7 +377,7 @@ type MonkeyExpressionSyntaxFactory() =
         { ColonToken = ColonToken(); Type = typeSyntax }
         
         
-    static member Parameter(paramType: TypeSyntax, identifierName: IdentifierNameSyntax) =
+    static member Parameter(paramType: TypeSyntax, identifierName: IdentifierSyntax) =
         { Type = paramType; Identifier = identifierName }
         
 

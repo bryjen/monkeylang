@@ -20,6 +20,7 @@
         <Compile Include="Parsers\ParsingErrors\ParseError.fs" />
         <Compile Include="Parsers\ParsingErrors\FunctionExpressionErrors.fs" />
         <Compile Include="Parsers\ParsingErrors\VariableAssignmentStatementErrors.fs" />
+        <Compile Include="Parsers\ParsingErrors\ParameterListErrors.fs" />
         <Compile Include="Parsers\CSharpAstErrors.fs" />
         <Compile Include="Parsers\ParserHelpers.fs" />
         <Compile Include="Parsers\DirectCSharpAstParser.fs" />

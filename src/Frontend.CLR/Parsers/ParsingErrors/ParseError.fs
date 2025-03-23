@@ -1,5 +1,6 @@
 ﻿namespace Monkey.Frontend.CLR.Parsers.ParsingErrors
 
+open Microsoft.CodeAnalysis.CSharp
 open Microsoft.CodeAnalysis.Text
 
 [<AutoOpen>]
@@ -7,6 +8,16 @@ module ParseErrorHelpers =
     let spaces n = new string(' ', n)
     
     let repeat str n = new string(str, n)
+    
+    let normalizeKindWord (syntaxKind: SyntaxKind) =
+        match syntaxKind.ToString() with
+        | kindWord when kindWord.EndsWith("Token") -> kindWord.Substring(0, kindWord.Length - "Token".Length)
+        | kindWord -> kindWord
+        
+    let isVowel (c: char) =
+        let c = System.Char.ToLower(c)
+        c = 'a' ||  c = 'e' ||  c = 'i' ||  c = 'o' ||  c = 'u' 
+        
 
 [<AbstractClass>]
 type ParseError () =
@@ -41,7 +52,7 @@ type ParseError () =
             match filePath with
             | None -> lines
             | Some value ->
-                let filePathStr = sprintf "%s┌─ %s:%d:%d" (spaces margin) value lineNumber column
+                let filePathStr = sprintf "%s┌─ %s:%d:%d" (spaces margin) value (lineNumber + 1) (column + 1)
                 Array.insertAt 1 filePathStr lines
                 
         // add detailed helper message, if it exists
@@ -51,6 +62,73 @@ type ParseError () =
             | Some detailedHelpMessage -> Array.append lines [| $"\n{detailedHelpMessage}" |]
             
         System.String.Join("\n", lines)
+        
+
+
+type AbsentSemicolonError(textSpan: TextSpan, from: AbsentSemicolonAt) =
+    inherit ParseError()
+with
+    override this.GetFormattedMessage(sourceText: SourceText, filePath: string option) =
+        let updatedTextSpan = TextSpan(textSpan.End, 1)
+        this.Format(sourceText, updatedTextSpan, filePath)
+
+    override this.ErrorType() =
+        match from with
+        | LetStatement -> "Invalid variable assignment statement."
+        | ExpressionStatement -> "Invalid expression statement."
+    
+    override this.ErrorMessage() = "Expected a semicolon ';'."
+    
+    override this.DetailedHelpMessage() = None
+    
+and AbsentSemicolonAt =
+    | LetStatement
+    | ExpressionStatement
+    
+
+type AbsentOrInvalidTokenError(textSpan: TextSpan, expectedKinds: SyntaxKind array, from: AbsentTokenAt) =
+    inherit ParseError()
+with
+    let getExpectedKindString (expectedKind: SyntaxKind) =
+        let kindWord = normalizeKindWord expectedKind
+        let indefiniteArticle =
+            match kindWord.ToCharArray() with
+            | [|  |] -> "a"
+            | arr when isVowel arr[0] -> "an"
+            | _ -> "a"
+        $"{indefiniteArticle} {kindWord} '{SyntaxFacts.GetText(expectedKind)}'"
+        
+    
+    override this.GetFormattedMessage(sourceText: SourceText, filePath: string option) =
+        let updatedTextSpan = TextSpan(textSpan.End, 1)
+        this.Format(sourceText, updatedTextSpan, filePath)
+
+    override this.ErrorType() =
+        match from with
+        | IfExpression -> "Invalid 'If' expression."
+        | GenericTypeSyntax -> "Invalid generic type."
+        | ParameterList -> "Invalid parameter list."
+        | ArgumentsList -> "Invalid arguments list."
+        | InvocationExpression -> "Invalid function call expression."
+        | ListArrayInitialization -> "Invalid array expression."
+        | QualifiedIdentifier -> "Invalid qualified identifier."
+    
+    override this.ErrorMessage() =
+        let strings = expectedKinds |> Array.map getExpectedKindString
+        let asSingleString = System.String.Join(", or ", strings)
+        $"Expected {asSingleString}'."
+    
+    override this.DetailedHelpMessage() = None
+    
+and AbsentTokenAt =
+    | IfExpression
+    | GenericTypeSyntax
+    | ParameterList
+    | ArgumentsList 
+    | InvocationExpression
+    | ListArrayInitialization
+    | QualifiedIdentifier 
+    
         
         
 type PlaceholderError () =

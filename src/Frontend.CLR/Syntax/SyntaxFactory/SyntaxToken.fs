@@ -92,6 +92,8 @@ type MonkeySyntaxTokenFactory () =
         MonkeySyntaxTokenFactory.Token(SyntaxKind.IdentifierToken, text="fn", value="fn")
         
         
+    static member DotToken() =
+        MonkeySyntaxTokenFactory.Token(SyntaxKind.DotToken, text=".", value=".")
         
     static member SemicolonToken() =
         MonkeySyntaxTokenFactory.Token(SyntaxKind.SemicolonToken, text=";", value=";")

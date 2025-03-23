@@ -3,6 +3,7 @@
 
 open Microsoft.CodeAnalysis.CSharp
 
+open Microsoft.CodeAnalysis.Text
 open Monkey.Frontend.CLR.Parsers
 open Monkey.Frontend.CLR.Parsers.CSharpAstErrors
 open Monkey.Frontend.CLR.Parsers.ParsingErrors
@@ -988,6 +989,24 @@ type InvocationExpressionParsingTests() =
                     )
                 )
         )
+        (
+            "System.Console.WriteLine(\"Hello World\");",
+            ExpressionStatementNoBox(
+                InvocationExpression(
+                    InvocationExpressionQualifiedName(
+                        [|
+                            Identifier("System")
+                            Identifier("Console")
+                            Identifier("WriteLine")
+                        |]
+                        ),
+                    ArgumentList(
+                        [|
+                            StringLiteralExpression("Hello World")
+                        |])
+                    )
+                )
+        )
     |]
     
     // call function by identifier nam
@@ -1004,10 +1023,13 @@ type InvocationExpressionParsingTests() =
     [<TestCase(8)>]
     [<TestCase(9)>]
     [<TestCase(10)>]
+    
+    [<TestCase(11)>]
     member this.``E: Invocation expression parsing tests``(testCaseIndex: int) =
         // we keep the test case in 'ExpressionStatementSyntax' to avoid having to cast each during declaration
         let castedTestCases = this.TestCases |> Array.map (fun (input, expected) -> (input, expected |> StatementSyntax.ExpressionStatementSyntax |> MonkeySyntaxNode.StatementSyntax))
         let input, expectedSyntaxTree = castedTestCases[testCaseIndex]
+        let sourceText = SourceText.From(input)
         let tokens = Tokenizer.tokenize input
         
         let statements, parseErrors = Monkey.Frontend.CLR.Parsers.MonkeyAstParser.parseTokens tokens
@@ -1022,7 +1044,8 @@ type InvocationExpressionParsingTests() =
         | _ ->
             let mutable count = 1
             for parseError in parseErrors do
-                printfn $"{count}. {parseError}"
+                let filePath = @"C:\Users\Public\Program.mk"
+                printfn $"{count}\n{parseError.GetFormattedMessage(sourceText, Some filePath)}"
                 count <- count + 1
             Assert.Fail()
             
@@ -1384,6 +1407,28 @@ type TypeSyntaxParsing() =
                 |]
                 )
         )
+        (
+            "Result<string, System.Collections.Generic.List<string>>",
+            GenericType(
+                NameType(IdentifierNameNoBox(Identifier("Result"))),
+                [|
+                    BuiltinType(StringKeyword())
+                    
+                    GenericType(
+                        NameType(QualifiedNameNoBox(
+                            [|
+                                Identifier("System")
+                                Identifier("Collections")
+                                Identifier("Generic")
+                                Identifier("List")
+                            |])),
+                        [|
+                            BuiltinType(StringKeyword())
+                        |]
+                        )
+                |]
+                )
+        )
     |]
     
     [<TestCase(0)>]
@@ -1396,15 +1441,17 @@ type TypeSyntaxParsing() =
     [<TestCase(7)>]
     [<TestCase(8)>]
     [<TestCase(9)>]
+    [<TestCase(10)>]
     member this.``G: Test type syntax parsing``(testCaseIndex: int) =
         // we keep the test case in 'ExpressionStatementSyntax' to avoid having to cast each during declaration
         let castedTestCases =
             this.TestCases
             |> Array.map (fun (input, expected) -> (input, expected |> ExpressionSyntax.TypeSyntax |> MonkeySyntaxNode.ExpressionSyntax))
         let input, expectedNode = castedTestCases[testCaseIndex]
+        let sourceText = SourceText.From(input)
         let tokens = Tokenizer.tokenize input
         
-        let parserState = MonkeyAstParser.MonkeyAstParserState(tokens)
+        let parserState = MonkeyAstParserState(tokens)
         let typeSyntaxResult = MonkeyAstParser.PrefixExpressions.tryParseTypeSyntax (PlaceholderError()) parserState
         match typeSyntaxResult with
         | Ok typeSyntax ->
@@ -1413,7 +1460,8 @@ type TypeSyntaxParsing() =
             | true -> Assert.Pass()
             | false -> Assert.Fail()
         | Error error ->
-            printfn $"{error.ToString()}"
+            let filePath = @"C:\Users\Public\Program.mk"
+            printfn $"{error.GetFormattedMessage(sourceText, Some filePath)}"
             Assert.Fail()
 
 

@@ -57,7 +57,7 @@ let rec private onExpressionSyntax (indentation: int) (expressionSyntax: Express
     | LiteralExpressionSyntax literalExpressionSyntax -> onLiteralExpressionSyntax indentation literalExpressionSyntax
     | PostfixExpressionSyntax postfixExpressionSyntax -> onPostfixExpressionSyntax indentation postfixExpressionSyntax
     | PrefixExpressionSyntax prefixExpressionSyntax -> onPrefixExpressionSyntax indentation prefixExpressionSyntax
-    | ExpressionSyntax.IdentifierNameSyntax identifierNameSyntax -> onIdentifierNameSyntax indentation identifierNameSyntax
+    | ExpressionSyntax.IdentifierSyntax identifierSyntax -> onIdentifierSyntax indentation identifierSyntax
     | TypeSyntax typeSyntax -> onTypeSyntax indentation typeSyntax
     | IfExpressionSyntax ifExpressionSyntax -> onIfExpressionSyntax indentation ifExpressionSyntax
     | ArrayExpressionSyntax arrayExpressionSyntax -> onArrayExpressionSyntax indentation arrayExpressionSyntax
@@ -109,8 +109,8 @@ and private onInvocationExpressionSyntax (indentation: int) (invocationExpressio
     match invocationExpressionSyntax.Expression with
     | InvocationExpressionLeftExpression.FunctionExpressionSyntax functionExpressionSyntax ->
         onFunctionExpressionSyntax (indentation + 1) functionExpressionSyntax
-    | InvocationExpressionLeftExpression.IdentifierNameSyntax identifierNameSyntax ->
-        onIdentifierNameSyntax (indentation + 1) identifierNameSyntax
+    | InvocationExpressionLeftExpression.IdentifierSyntax identifierNameSyntax ->
+        onIdentifierSyntax (indentation + 1) identifierNameSyntax
     | InvocationExpressionLeftExpression.ParenthesizedFunctionExpressionSyntax parenthesizedExpressionSyntax ->
         onInvocationParenthesizedExpressionSyntax (indentation + 1) parenthesizedExpressionSyntax
         
@@ -123,8 +123,8 @@ and private onInvocationParenthesizedExpressionSyntax (indentation: int) (invoca
     match invocationParenthesizedExpressionSyntax.Expression with
     | InvocationExpressionLeftExpression.FunctionExpressionSyntax functionExpressionSyntax ->
         onFunctionExpressionSyntax (indentation + 1) functionExpressionSyntax
-    | InvocationExpressionLeftExpression.IdentifierNameSyntax identifierNameSyntax ->
-        onIdentifierNameSyntax (indentation + 1) identifierNameSyntax
+    | InvocationExpressionLeftExpression.IdentifierSyntax identifierNameSyntax ->
+        onIdentifierSyntax (indentation + 1) identifierNameSyntax
     | InvocationExpressionLeftExpression.ParenthesizedFunctionExpressionSyntax parenthesizedExpressionSyntax ->
         onInvocationParenthesizedExpressionSyntax (indentation + 1) parenthesizedExpressionSyntax
         
@@ -149,8 +149,16 @@ and private onPrefixExpressionSyntax (indentation: int) (prefixExpressionSyntax:
     onSyntaxToken (indentation + 1) prefixExpressionSyntax.OperatorToken
     onExpressionSyntax (indentation + 1) prefixExpressionSyntax.Operand
     
-and private onIdentifierNameSyntax (indentation: int) (identifierNameSyntax: IdentifierNameSyntax) =
-    printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(IdentifierNameSyntax)) (identifierNameSyntax.ToString() |> normalizeString)
+    
+and private onIdentifierSyntax (indentation: int) (identifierNameSyntax: IdentifierSyntax) =
+    printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(IdentifierSyntax)) (identifierNameSyntax.ToString() |> normalizeString)
+    
+and private onSimpleIdentifier (indentation: int) (simpleIdentifier: SimpleIdentifier) =
+    printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(SimpleIdentifier)) (simpleIdentifier.ToString() |> normalizeString)
+    
+and private onQualifiedIdentifier (indentation: int) (qualifiedIdentifier: QualifiedIdentifier) =
+    printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(QualifiedIdentifier)) (qualifiedIdentifier.ToString() |> normalizeString)
+    qualifiedIdentifier.Tokens |> Array.iter (fun token -> onSyntaxToken (indentation + 1) token)
     
     
 and private onTypeSyntax (indentation: int) (typeSyntax: TypeSyntax) =
@@ -163,6 +171,9 @@ and private onTypeSyntax (indentation: int) (typeSyntax: TypeSyntax) =
     
 and private onNameSyntax (indentation: int) (nameSyntax: NameSyntax) =
     printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(NameSyntax)) (nameSyntax.ToString() |> normalizeString)
+    match nameSyntax.Identifier with
+    | SimpleIdentifier simpleIdentifier -> onSimpleIdentifier (indentation + 1) simpleIdentifier
+    | QualifiedIdentifier qualifiedIdentifier -> onQualifiedIdentifier (indentation + 1) qualifiedIdentifier
     
 and private onBuiltinTypeSyntax (indentation: int) (builtinTypeSyntax: BuiltinTypeSyntax) =
     printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(BuiltinTypeSyntax)) (builtinTypeSyntax.ToString() |> normalizeString)

@@ -54,7 +54,6 @@ with
 /// </summary>
 type MonkeySyntaxNode =
     | CompilationUnitSyntax
-    // | NamespaceDeclarationSyntax
     | UsingDeclarationSyntax
     | ArgumentListSyntax of ArgumentListSyntax
     | ParameterListSyntax of ParameterListSyntax
@@ -89,7 +88,6 @@ with
 /// The parent type for all expression syntax types.
 /// </summary>
 type ExpressionSyntax =
-    // | ArrayInitializationExpression
     | ParenthesizedExpressionSyntax of ParenthesizedExpressionSyntax
     | FunctionExpressionSyntax of FunctionExpressionSyntax
     | BinaryExpressionSyntax of BinaryExpressionSyntax
@@ -98,7 +96,7 @@ type ExpressionSyntax =
     | LiteralExpressionSyntax of LiteralExpressionSyntax
     | PostfixExpressionSyntax of PostfixExpressionSyntax
     | PrefixExpressionSyntax of PrefixExpressionSyntax
-    | IdentifierNameSyntax of IdentifierNameSyntax
+    | IdentifierSyntax of IdentifierSyntax
     | TypeSyntax of TypeSyntax
     | IfExpressionSyntax of IfExpressionSyntax
     | ArrayExpressionSyntax of ArrayExpressionSyntax
@@ -113,10 +111,25 @@ with
         | LiteralExpressionSyntax literalExpressionSyntax -> literalExpressionSyntax.ToString()
         | PostfixExpressionSyntax postfixExpressionSyntax -> postfixExpressionSyntax.ToString()
         | PrefixExpressionSyntax prefixExpressionSyntax -> prefixExpressionSyntax.ToString()
-        | IdentifierNameSyntax identifierNameSyntax -> identifierNameSyntax.ToString()
+        | IdentifierSyntax identifierSyntax -> identifierSyntax.ToString()
         | TypeSyntax typeSyntax -> typeSyntax.ToString()
         | IfExpressionSyntax ifExpressionSyntax -> ifExpressionSyntax.ToString()
         | ArrayExpressionSyntax arrayExpressionSyntax -> arrayExpressionSyntax.ToString()
+        
+    member this.TextSpan() =
+        match this with
+        | ParenthesizedExpressionSyntax parenthesizedExpressionSyntax -> parenthesizedExpressionSyntax.TextSpan()
+        | FunctionExpressionSyntax functionExpressionSyntax -> functionExpressionSyntax.TextSpan()
+        | BinaryExpressionSyntax binaryExpressionSyntax -> binaryExpressionSyntax.TextSpan()
+        | InterpolatedStringExpressionSyntax interpolatedStringExpressionSyntax -> interpolatedStringExpressionSyntax.TextSpan()
+        | InvocationExpressionSyntax invocationExpressionSyntax -> invocationExpressionSyntax.TextSpan()
+        | LiteralExpressionSyntax literalExpressionSyntax -> literalExpressionSyntax.TextSpan()
+        | PostfixExpressionSyntax postfixExpressionSyntax -> postfixExpressionSyntax.TextSpan()
+        | PrefixExpressionSyntax prefixExpressionSyntax -> prefixExpressionSyntax.TextSpan()
+        | IdentifierSyntax identifierNameSyntax -> identifierNameSyntax.TextSpan()
+        | TypeSyntax typeSyntax -> typeSyntax.TextSpan()
+        | IfExpressionSyntax ifExpressionSyntax -> ifExpressionSyntax.TextSpan()
+        | ArrayExpressionSyntax arrayExpressionSyntax -> arrayExpressionSyntax.TextSpan()
         
     static member AreEquivalent(es1: ExpressionSyntax, es2: ExpressionSyntax) =
         match es1, es2 with
@@ -136,8 +149,8 @@ with
             PostfixExpressionSyntax.AreEquivalent(pes1, pes2)
         | PrefixExpressionSyntax pes1, PrefixExpressionSyntax pes2 ->
             PrefixExpressionSyntax.AreEquivalent(pes1, pes2)
-        | IdentifierNameSyntax ins1, IdentifierNameSyntax ins2 ->
-            IdentifierNameSyntax.AreEquivalent(ins1, ins2)
+        | IdentifierSyntax ins1, IdentifierSyntax ins2 ->
+            IdentifierSyntax.AreEquivalent(ins1, ins2)
         | TypeSyntax ts1, TypeSyntax ts2 ->
             TypeSyntax.AreEquivalent(ts1, ts2)
         | IfExpressionSyntax ifs1, IfExpressionSyntax ifs2 ->
@@ -161,6 +174,12 @@ with
         | BlockSyntax blockSyntax -> blockSyntax.ToString()
         | ExpressionStatementSyntax expressionStatementSyntax -> expressionStatementSyntax.ToString()
         | VariableDeclarationStatementSyntax variableDeclarationStatementSyntax -> variableDeclarationStatementSyntax.ToString()
+        
+    member this.TextSpan () : TextSpan =
+        match this with
+        | BlockSyntax blockSyntax -> blockSyntax.TextSpan()
+        | ExpressionStatementSyntax expressionStatementSyntax -> expressionStatementSyntax.TextSpan()
+        | VariableDeclarationStatementSyntax variableDeclarationStatementSyntax -> variableDeclarationStatementSyntax.TextSpan()
         
     static member AreEquivalent(ss1: StatementSyntax, ss2: StatementSyntax) =
         match ss1, ss2 with
@@ -191,6 +210,14 @@ with
         | ArrayTypeSyntax arrayTypeSyntax -> arrayTypeSyntax.ToString()
         | GenericTypeSyntax genericTypeSyntax -> genericTypeSyntax.ToString()
         
+    member this.TextSpan () : TextSpan =
+        match this with
+        | NameSyntax nameSyntax -> nameSyntax.TextSpan()
+        | BuiltinTypeSyntax builtinTypeSyntax -> builtinTypeSyntax.TextSpan()
+        | FunctionTypeSyntax functionTypeSyntax -> functionTypeSyntax.TextSpan()
+        | ArrayTypeSyntax arrayTypeSyntax -> arrayTypeSyntax.TextSpan()
+        | GenericTypeSyntax genericTypeSyntax -> genericTypeSyntax.TextSpan()
+        
     static member AreEquivalent(ts1: TypeSyntax, ts2: TypeSyntax) =
         match ts1, ts2 with
         | NameSyntax ns1, NameSyntax ns2 -> NameSyntax.AreEquivalent(ns1, ns2)
@@ -204,13 +231,16 @@ with
 /// Example: <code>TypeSyntax</code>
 /// </remarks>
 and NameSyntax =
-    { Identifier: IdentifierNameSyntax }
+    { Identifier: IdentifierSyntax }
 with
     override this.ToString() =
         this.Identifier.ToString()
         
+    member this.TextSpan () : TextSpan =
+        this.Identifier.TextSpan()
+        
     static member AreEquivalent(ns1: NameSyntax, ns2: NameSyntax) =
-        IdentifierNameSyntax.AreEquivalent(ns1.Identifier, ns2.Identifier)
+        IdentifierSyntax.AreEquivalent(ns1.Identifier, ns2.Identifier)
         
 /// <remarks>
 /// Example: <code>int</code>
@@ -220,6 +250,9 @@ and BuiltinTypeSyntax =
 with
     override this.ToString() =
         this.Token.ToString()
+        
+    member this.TextSpan () : TextSpan =
+        this.Token.TextSpan
         
     static member AreEquivalent(bts1: BuiltinTypeSyntax, bts2: BuiltinTypeSyntax) =
         SyntaxToken.AreEquivalent(bts1.Token, bts2.Token)
@@ -239,6 +272,9 @@ with
         let funcSigCoreStr = (interleave parameterTypesStrings arrowTokensStrings) |> String.concat ""
         $"{this.OpenBracketToken.ToString()}{funcSigCoreStr}{this.CloseBracketToken.ToString()}"
         
+    member this.TextSpan () : TextSpan =
+        TextSpan(this.OpenBracketToken.TextSpan.Start, this.CloseBracketToken.TextSpan.End - this.OpenBracketToken.TextSpan.Start)
+        
     static member AreEquivalent(fts1: FunctionTypeSyntax, fts2: FunctionTypeSyntax) =
         Array.zip fts1.ParameterTypes fts2.ParameterTypes
         |> Array.map TypeSyntax.AreEquivalent
@@ -254,6 +290,10 @@ and ArrayTypeSyntax =
 with
     override this.ToString() =
         $"{this.Type.ToString()}{this.OpenBracketToken.ToString()}{this.CloseBracketToken.ToString()}"
+        
+    member this.TextSpan () : TextSpan =
+        let typeTextSpan = this.Type.TextSpan()
+        TextSpan(typeTextSpan.Start, this.CloseBracketToken.TextSpan.End - typeTextSpan.Start)
         
     static member AreEquivalent(ats1: ArrayTypeSyntax, ats2: ArrayTypeSyntax) =
         TypeSyntax.AreEquivalent(ats1.Type, ats2.Type)
@@ -273,6 +313,10 @@ with
         let commasString = this.Commas |> Array.map _.ToString()
         let genericTypeCoreStr = (interleave genericTypesString commasString) |> String.concat ""
         $"{this.Type.ToString()}{this.LessThanToken.ToString()}{genericTypeCoreStr}{this.GreaterThanToken.ToString()}"
+        
+    member this.TextSpan () : TextSpan =
+        let typeTextSpan = this.Type.TextSpan()
+        TextSpan(typeTextSpan.Start, this.GreaterThanToken.TextSpan.End - typeTextSpan.Start)
         
     static member AreEquivalent(gts1: GenericTypeSyntax, gts2: GenericTypeSyntax) =
         Array.zip gts1.GenericTypes gts2.GenericTypes
@@ -295,6 +339,9 @@ with
         let paramListCoreStr = (interleave parameterSyntaxStrings commaTokensStrings) |> String.concat ""
         $"{this.OpenParenToken.ToString()}{paramListCoreStr}{this.CloseParenToken.ToString()}"
         
+    member this.TextSpan () : TextSpan =
+        TextSpan(this.OpenParenToken.TextSpan.Start, this.CloseParenToken.TextSpan.End - this.OpenParenToken.TextSpan.Start)
+        
     static member AreEquivalent(ns1: ParameterListSyntax, ns2: ParameterListSyntax) =
         Array.zip ns1.Parameters ns2.Parameters
         |> Array.map ParameterSyntax.AreEquivalent
@@ -305,13 +352,17 @@ with
 /// </remarks>
 and ParameterSyntax =
     { Type: TypeSyntax
-      Identifier: IdentifierNameSyntax }
+      Identifier: IdentifierSyntax }
 with
     override this.ToString() =
         $"{this.Type.ToString()}{this.Identifier.ToString()}"
         
+    member this.TextSpan () : TextSpan =
+        let typeTextSpan = this.Type.TextSpan()
+        TextSpan(typeTextSpan.Start, this.Identifier.TextSpan().End - typeTextSpan.Start)
+        
     static member AreEquivalent(ps1: ParameterSyntax, ps2: ParameterSyntax) =
-        TypeSyntax.AreEquivalent(ps1.Type, ps2.Type) && IdentifierNameSyntax.AreEquivalent(ps1.Identifier, ps2.Identifier)
+        TypeSyntax.AreEquivalent(ps1.Type, ps2.Type) && IdentifierSyntax.AreEquivalent(ps1.Identifier, ps2.Identifier)
     
 
 type ArgumentListSyntax =
@@ -325,6 +376,9 @@ with
         let commaTokensStrings = this.Commas |> Array.map _.ToString()
         let argListCoreStr = (interleave argumentSyntaxStrings commaTokensStrings) |> String.concat ""
         $"{this.OpenParenToken.ToString()}{argListCoreStr}{this.CloseParenToken.ToString()}"
+        
+    member this.TextSpan () : TextSpan =
+        TextSpan(this.OpenParenToken.TextSpan.Start, this.CloseParenToken.TextSpan.End - this.OpenParenToken.TextSpan.Start)
         
     static member AreEquivalent(ns1: ArgumentListSyntax, ns2: ArgumentListSyntax) =
         Array.zip ns1.Arguments ns2.Arguments
@@ -344,11 +398,17 @@ with
         | ListInitialization listInitialization -> listInitialization.ToString()
         | SizeBasedInitialization sizeBasedInitialization -> sizeBasedInitialization.ToString()
         
+    member this.TextSpan () : TextSpan =
+        match this with
+        | ListInitialization listInitialization -> listInitialization.TextSpan()
+        | SizeBasedInitialization sizeBasedInitialization -> sizeBasedInitialization.TextSpan()
+        
     static member AreEquivalent(aes1: ArrayExpressionSyntax, aes2: ArrayExpressionSyntax) =
         match aes1, aes2 with
         | ListInitialization li1, ListInitialization li2 -> ListInitialization.AreEquivalent(li1, li2)
         | SizeBasedInitialization sbi1, SizeBasedInitialization sbi2 -> SizeBasedInitialization.AreEquivalent(sbi1, sbi2)
         | _ -> false
+        
 /// <remarks>
 /// Example:
 /// <code>[EXPRESSION_1, EXPRESSION_2, ..., EXPRESSION_N]</code>
@@ -364,6 +424,9 @@ with
         let commasStr = this.Commas |> Array.map _.ToString()
         let contentsStr = (interleave valuesStr commasStr) |> Array.fold (fun acc str -> acc + str) ""
         $"{this.OpenBracketToken.ToString()}{contentsStr}{this.CloseBracketToken.ToString()}"
+        
+    member this.TextSpan () : TextSpan =
+        TextSpan(this.OpenBracketToken.TextSpan.Start, this.CloseBracketToken.TextSpan.End - this.OpenBracketToken.TextSpan.Start)
         
     static member AreEquivalent(li1: ListInitialization, li2: ListInitialization) =
         (Array.zip li1.Values li2.Values) |> Array.map ExpressionSyntax.AreEquivalent |> Array.forall id
@@ -381,6 +444,9 @@ with
     override this.ToString() =
         $"{this.NewToken.ToString()}{this.TypeToken.ToString()}{this.OpenBracketToken.ToString()}{this.CloseBracketToken.ToString()}"
         
+    member this.TextSpan () : TextSpan =
+        TextSpan(this.NewToken.TextSpan.Start, this.CloseBracketToken.TextSpan.End - this.NewToken.TextSpan.Start)
+        
     static member AreEquivalent(sbi1: SizeBasedInitialization, sbi2: SizeBasedInitialization) =
         SyntaxToken.AreEquivalent(sbi1.TypeToken, sbi2.TypeToken)
         && ExpressionSyntax.AreEquivalent(sbi1.Size, sbi2.Size)
@@ -395,6 +461,9 @@ type FunctionExpressionSyntax =
 with
     override this.ToString() =
         $"{this.FunctionKeywordToken.ToString()}{this.ParameterList.ToString()}{this.ColonToken.ToString()}{this.ReturnType.ToString()}{this.Body.ToString()}"
+        
+    member this.TextSpan () : TextSpan =
+        TextSpan(this.FunctionKeywordToken.TextSpan.Start, this.Body.CloseBraceToken.TextSpan.End - this.FunctionKeywordToken.TextSpan.Start)
         
     static member AreEquivalent(fe1: FunctionExpressionSyntax, fe2: FunctionExpressionSyntax) =
         ParameterListSyntax.AreEquivalent(fe1.ParameterList, fe2.ParameterList)
@@ -411,6 +480,11 @@ with
     override this.ToString() =
         $"{this.Left.ToString()}{this.OperatorToken.ToString()}{this.Right.ToString()}"
         
+    member this.TextSpan () : TextSpan =
+        let leftTextSpan = this.Left.TextSpan()
+        let rightTextSpan = this.Right.TextSpan()
+        TextSpan(leftTextSpan.Start, rightTextSpan.End - leftTextSpan.Start)
+        
     static member AreEquivalent(bs1: BinaryExpressionSyntax, bs2: BinaryExpressionSyntax) =
         ExpressionSyntax.AreEquivalent(bs1.Left, bs2.Left)
             && SyntaxToken.AreEquivalent(bs1.OperatorToken, bs2.OperatorToken)
@@ -426,6 +500,13 @@ with
     override this.ToString() =
         $"{this.InterpolatedStringStartToken.ToString()}{this.Contents.ToString()}"
         
+    member this.TextSpan () : TextSpan =
+        let contentsEnd =
+            match this.Contents with
+            | [|  |] -> this.InterpolatedStringStartToken.TextSpan.End
+            | arr -> arr[arr.Length - 1].TextSpan().End
+        TextSpan(this.InterpolatedStringStartToken.TextSpan.Start, contentsEnd - this.InterpolatedStringStartToken.TextSpan.Start)
+        
     static member AreEquivalent(bs1: InterpolatedStringExpressionSyntax, bs2: InterpolatedStringExpressionSyntax) =
         Array.zip bs1.Contents bs2.Contents
         |> Array.map InterpolatedStringContent.AreEquivalent
@@ -440,6 +521,11 @@ with
         | InterpolatedStringText interpolatedStringText -> interpolatedStringText.ToString()
         | Interpolation interpolation -> interpolation.ToString()
         
+    member this.TextSpan () : TextSpan =
+        match this with
+        | InterpolatedStringText interpolatedStringText -> interpolatedStringText.TextSpan()
+        | Interpolation interpolation -> interpolation.TextSpan()
+        
     static member AreEquivalent(bs1: InterpolatedStringContent, bs2: InterpolatedStringContent) =
         match bs1, bs2 with
         | InterpolatedStringText ist1, InterpolatedStringText ist2 -> InterpolatedStringText.AreEquivalent(ist1, ist2)
@@ -452,6 +538,9 @@ with
     override this.ToString() =
         this.TextToken.ToString()
         
+    member this.TextSpan () : TextSpan =
+        this.TextToken.TextSpan
+        
     static member AreEquivalent(ist1: InterpolatedStringText, ist2: InterpolatedStringText) =
         SyntaxToken.AreEquivalent(ist1.TextToken, ist2.TextToken)
         
@@ -462,6 +551,9 @@ and Interpolation =
 with
     override this.ToString() =
         $"{this.OpenBraceToken.ToString()}{this.Expression.ToString()}{this.CloseBraceToken.ToString()}"
+        
+    member this.TextSpan () : TextSpan =
+        TextSpan(this.OpenBraceToken.TextSpan.Start, this.CloseBraceToken.TextSpan.End - this.OpenBraceToken.TextSpan.Start)
         
     static member AreEquivalent(i1: Interpolation, i2: Interpolation) =
         ExpressionSyntax.AreEquivalent(i1.Expression, i2.Expression)
@@ -475,24 +567,34 @@ with
     override this.ToString() =
         $"{this.Expression.ToString()}{this.Arguments.ToString()}"
         
+    member this.TextSpan () : TextSpan =
+        let startTextSpan = this.Expression.TextSpan()
+        TextSpan(startTextSpan.Start, this.Arguments.TextSpan().End - startTextSpan.Start)
+        
     static member AreEquivalent(ies1: InvocationExpressionSyntax, ies2: InvocationExpressionSyntax) =
         InvocationExpressionLeftExpression.AreEquivalent(ies1.Expression, ies2.Expression) && ArgumentListSyntax.AreEquivalent(ies1.Arguments, ies2.Arguments)
         
 and InvocationExpressionLeftExpression =
     | ParenthesizedFunctionExpressionSyntax of InvocationParenthesizedExpressionSyntax
     | FunctionExpressionSyntax of FunctionExpressionSyntax
-    | IdentifierNameSyntax of IdentifierNameSyntax
+    | IdentifierSyntax of IdentifierSyntax
 with 
     override this.ToString() =
         match this with
         | FunctionExpressionSyntax functionExpressionSyntax -> functionExpressionSyntax.ToString()
-        | IdentifierNameSyntax identifierNameSyntax -> identifierNameSyntax.ToString()
+        | IdentifierSyntax identifierNameSyntax -> identifierNameSyntax.ToString()
         | ParenthesizedFunctionExpressionSyntax parenthesizedFunctionExpressionSyntax -> parenthesizedFunctionExpressionSyntax.ToString()
+        
+    member this.TextSpan () : TextSpan =
+        match this with
+        | ParenthesizedFunctionExpressionSyntax invocationParenthesizedExpressionSyntax -> invocationParenthesizedExpressionSyntax.TextSpan()
+        | FunctionExpressionSyntax functionExpressionSyntax -> functionExpressionSyntax.TextSpan()
+        | IdentifierSyntax identifierNameSyntax -> identifierNameSyntax.TextSpan()
         
     static member AreEquivalent(ies1: InvocationExpressionLeftExpression, ies2: InvocationExpressionLeftExpression) =
         match ies1, ies2 with
         | FunctionExpressionSyntax fes1, FunctionExpressionSyntax fes2 -> FunctionExpressionSyntax.AreEquivalent(fes1, fes2)
-        | IdentifierNameSyntax ins1, IdentifierNameSyntax ins2 -> IdentifierNameSyntax.AreEquivalent(ins1, ins2)
+        | IdentifierSyntax ins1, IdentifierSyntax ins2 -> IdentifierSyntax.AreEquivalent(ins1, ins2)
         | ParenthesizedFunctionExpressionSyntax pfes1, ParenthesizedFunctionExpressionSyntax pfes2 -> InvocationParenthesizedExpressionSyntax.AreEquivalent(pfes1, pfes2)
         | _ -> false
         
@@ -503,9 +605,9 @@ with
                Expression = InvocationExpressionLeftExpression.FunctionExpressionSyntax functionExpressionSyntax
                CloseParenToken = parenthesizedExpression.CloseParenToken }: InvocationParenthesizedExpressionSyntax)
             |> Some
-        | ExpressionSyntax.IdentifierNameSyntax identifierNameSyntax ->
+        | ExpressionSyntax.IdentifierSyntax identifierNameSyntax ->
             ({ OpenParenToken = parenthesizedExpression.OpenParenToken
-               Expression = InvocationExpressionLeftExpression.IdentifierNameSyntax identifierNameSyntax
+               Expression = InvocationExpressionLeftExpression.IdentifierSyntax identifierNameSyntax
                CloseParenToken = parenthesizedExpression.CloseParenToken }: InvocationParenthesizedExpressionSyntax)
             |> Some
         | ParenthesizedExpressionSyntax parenthesizedExpressionSyntax ->
@@ -527,6 +629,9 @@ with
     override this.ToString() =
         $"{this.OpenParenToken.ToString()}{this.Expression.ToString()}{this.CloseParenToken.ToString()}"
         
+    member this.TextSpan () : TextSpan =
+        TextSpan(this.OpenParenToken.TextSpan.Start, this.CloseParenToken.TextSpan.End - this.OpenParenToken.TextSpan.Start)
+        
     static member AreEquivalent(pes1: InvocationParenthesizedExpressionSyntax, pes2: InvocationParenthesizedExpressionSyntax) =
         InvocationExpressionLeftExpression.AreEquivalent(pes1.Expression, pes2.Expression)
         
@@ -539,6 +644,9 @@ with
     override this.ToString() =
         this.Token.ToString()
         
+    member this.TextSpan () : TextSpan =
+        this.Token.TextSpan
+        
     static member AreEquivalent(les1: LiteralExpressionSyntax, les2: LiteralExpressionSyntax) =
         les1.Kind = les2.Kind && SyntaxToken.AreEquivalent(les1.Token, les2.Token)
     
@@ -550,6 +658,10 @@ type PrefixExpressionSyntax =
 with
     override this.ToString() =
         $"{this.OperatorToken.ToString()}{this.Operand.ToString()}"
+        
+    member this.TextSpan () : TextSpan =
+        let operandTextSpan = this.Operand.TextSpan()
+        TextSpan(this.OperatorToken.TextSpan.Start, operandTextSpan.End - this.OperatorToken.TextSpan.Start)
         
     static member AreEquivalent(pes1: PrefixExpressionSyntax, pes2: PrefixExpressionSyntax) =
         pes1.Kind = pes2.Kind
@@ -564,19 +676,69 @@ with
     override this.ToString() =
         $"{this.Operand.ToString()}{this.OperatorToken.ToString()}"
         
+    member this.TextSpan () : TextSpan =
+        let operandTextSpan = this.Operand.TextSpan()
+        TextSpan(operandTextSpan.Start, this.OperatorToken.TextSpan.End - operandTextSpan.Start)
+        
     static member AreEquivalent(pes1: PostfixExpressionSyntax, pes2: PostfixExpressionSyntax) =
         pes1.Kind = pes2.Kind
             && SyntaxToken.AreEquivalent(pes1.OperatorToken, pes2.OperatorToken)
             && ExpressionSyntax.AreEquivalent(pes1.Operand, pes2.Operand)
     
-type IdentifierNameSyntax =
+
+and IdentifierSyntax =
+    | SimpleIdentifier of SimpleIdentifier
+    | QualifiedIdentifier of QualifiedIdentifier
+with
+    override this.ToString() =
+        match this with
+        | SimpleIdentifier simpleIdentifier -> simpleIdentifier.ToString()
+        | QualifiedIdentifier qualifiedIdentifier -> qualifiedIdentifier.ToString()
+        
+    member this.TextSpan () : TextSpan =
+        match this with
+        | SimpleIdentifier simpleIdentifier -> simpleIdentifier.TextSpan()
+        | QualifiedIdentifier qualifiedIdentifier -> qualifiedIdentifier.TextSpan()
+        
+    static member AreEquivalent(it1: IdentifierSyntax, it2: IdentifierSyntax) =
+        match it1, it2 with
+        | SimpleIdentifier si1, SimpleIdentifier si2 -> SimpleIdentifier.AreEquivalent(si1, si2)
+        | QualifiedIdentifier qi1, QualifiedIdentifier qi2 -> QualifiedIdentifier.AreEquivalent(qi1, qi2)
+        | _ -> false
+            
+and SimpleIdentifier =
     { Token: SyntaxToken }
 with
     override this.ToString() =
         this.Token.ToString()
         
-    static member AreEquivalent(ins1: IdentifierNameSyntax, ins2: IdentifierNameSyntax) =
-        SyntaxToken.AreEquivalent(ins1.Token, ins2.Token)
+    member this.TextSpan () : TextSpan =
+        this.Token.TextSpan
+        
+    static member AreEquivalent(si1: SimpleIdentifier, si2: SimpleIdentifier) =
+        SyntaxToken.AreEquivalent(si1.Token, si2.Token)
+            
+and QualifiedIdentifier =
+    { Tokens: SyntaxToken array
+      Dots: SyntaxToken array }
+with
+    override this.ToString() =
+        let tokenStrings = this.Tokens |> Array.map _.ToString()
+        let periodStrings = this.Dots |> Array.map _.ToString()
+        let stringsArr = interleave tokenStrings periodStrings
+        System.String.Join("", stringsArr)
+        
+    member this.TextSpan () : TextSpan =
+        match this.Tokens with
+        | [| |] -> TextSpan(0, 0)
+        | arr -> TextSpan(arr[0].TextSpan.Start, arr[arr.Length].TextSpan.End - arr[0].TextSpan.Start)
+        
+    static member AreEquivalent(qi1: QualifiedIdentifier, qi2: QualifiedIdentifier) =
+        Array.zip qi1.Tokens qi2.Tokens
+        |> Array.map SyntaxToken.AreEquivalent
+        |> Array.forall id
+    
+
     
 type ParenthesizedExpressionSyntax =
     { OpenParenToken: SyntaxToken
@@ -585,6 +747,9 @@ type ParenthesizedExpressionSyntax =
 with
     override this.ToString() =
         $"{this.OpenParenToken.ToString()}{this.Expression.ToString()}{this.CloseParenToken.ToString()}"
+        
+    member this.TextSpan () : TextSpan =
+        TextSpan(this.OpenParenToken.TextSpan.Start, this.CloseParenToken.TextSpan.End - this.OpenParenToken.TextSpan.Start)
         
     static member AreEquivalent(pes1: ParenthesizedExpressionSyntax, pes2: ParenthesizedExpressionSyntax) =
         ExpressionSyntax.AreEquivalent(pes1.Expression, pes2.Expression)
@@ -602,6 +767,16 @@ with
         let elseIfClausesStr = this.ElseIfClauses |> Array.map _.ToString() |> Array.fold (fun acc str -> acc + str) ""
         let elseClauseStr = defaultArg (this.ElseClause |> Option.map _.ToString()) ""
         $"{this.IfKeyword.ToString()}{this.OpenParenToken.ToString()}{this.Condition.ToString()}{this.CloseParenToken.ToString()}{this.Clause.ToString()}{elseIfClausesStr}{elseClauseStr}"
+        
+    member this.TextSpan () : TextSpan =
+        let spanEnd =
+            match this.ElseClause with
+            | Some elseClause -> elseClause.TextSpan().End
+            | None ->
+                match this.ElseIfClauses with
+                | [|  |] -> this.Clause.CloseBraceToken.TextSpan.End
+                | arr -> arr[arr.Length - 1].TextSpan().End
+        TextSpan(this.IfKeyword.TextSpan.Start, spanEnd - this.IfKeyword.TextSpan.Start)
         
     static member AreEquivalent(iss1: IfExpressionSyntax, iss2: IfExpressionSyntax) =
         let areElseIfClausesEquivalent =
@@ -629,6 +804,9 @@ with
     override this.ToString() =
         $"{this.ElseKeyword.ToString()}{this.IfKeyword.ToString()}{this.Condition.ToString()}{this.Clause.ToString()}"
         
+    member this.TextSpan () : TextSpan =
+        TextSpan(this.ElseKeyword.TextSpan.Start, this.Clause.CloseBraceToken.TextSpan.End - this.ElseKeyword.TextSpan.Start)
+        
     static member AreEquivalent(eiss1: ElseIfClauseSyntax, eiss2: ElseIfClauseSyntax) =
         ExpressionSyntax.AreEquivalent(eiss1.Condition, eiss2.Condition)
             && BlockSyntax.AreEquivalent(eiss1.Clause, eiss2.Clause)
@@ -639,6 +817,9 @@ and ElseClauseSyntax =
 with
     override this.ToString() =
         $"{this.ElseKeyword.ToString()}{this.ElseClause.ToString()}"
+        
+    member this.TextSpan () : TextSpan =
+        TextSpan(this.ElseKeyword.TextSpan.Start, this.ElseClause.CloseBraceToken.TextSpan.End - this.ElseKeyword.TextSpan.Start)
         
     static member AreEquivalent(ecs1: ElseClauseSyntax, ecs2: ElseClauseSyntax) =
         BlockSyntax.AreEquivalent(ecs1.ElseClause, ecs2.ElseClause)
@@ -658,6 +839,9 @@ with
         let statementsStr = this.Statements |> Array.map _.ToString() |> Array.fold (fun acc str -> acc + str) ""
         $"{this.OpenBraceToken.ToString()}{statementsStr}{this.CloseBraceToken.ToString()}"
         
+    member this.TextSpan () : TextSpan =
+        TextSpan(this.OpenBraceToken.TextSpan.Start, this.CloseBraceToken.TextSpan.End - this.OpenBraceToken.TextSpan.Start)
+        
     static member AreEquivalent(bs1: BlockSyntax, bs2: BlockSyntax) =
         Array.zip bs1.Statements bs2.Statements
         |> Array.map StatementSyntax.AreEquivalent
@@ -669,6 +853,10 @@ type ExpressionStatementSyntax =
 with
     override this.ToString() =
         $"{this.Expression.ToString()}{this.SemicolonToken.ToString()}"
+        
+    member this.TextSpan () : TextSpan =
+        let expressionTextSpan = this.Expression.TextSpan()
+        TextSpan(expressionTextSpan.Start, this.SemicolonToken.TextSpan.End - expressionTextSpan.Start)
         
     static member AreEquivalent(ess1: ExpressionStatementSyntax, ess2: ExpressionStatementSyntax) =
         ExpressionSyntax.AreEquivalent(ess1.Expression, ess2.Expression)
@@ -685,6 +873,9 @@ with
         let typeAnnotationStr = defaultArg (this.TypeAnnotation |> Option.map _.ToString()) ""
         $"{this.LetKeyword.ToString()}{this.Name.ToString()}{typeAnnotationStr}{this.EqualsToken.ToString()}{this.Expression.ToString()}{this.SemicolonToken.ToString()}"
         
+    member this.TextSpan () : TextSpan =
+        TextSpan(this.LetKeyword.TextSpan.Start, this.SemicolonToken.TextSpan.End - this.LetKeyword.TextSpan.Start)
+        
     static member AreEquivalent(vdss1: VariableDeclarationStatementSyntax, vdss2: VariableDeclarationStatementSyntax) =
         let isTypeAnnotationEquivalent =
             match vdss1.TypeAnnotation, vdss2.TypeAnnotation with
@@ -700,6 +891,10 @@ and VariableTypeAnnotation =
 with
     override this.ToString() =
         $"{this.ColonToken.ToString()}{this.Type.ToString()}"
+        
+    member this.TextSpan () : TextSpan =
+        let typeSyntaxTextSpan = this.Type.TextSpan()
+        TextSpan(this.ColonToken.TextSpan.Start, typeSyntaxTextSpan.End - this.ColonToken.TextSpan.Start)
         
     static member AreEquivalent(vta1: VariableTypeAnnotation, vta2: VariableTypeAnnotation) =
         TypeSyntax.AreEquivalent(vta1.Type, vta2.Type)

@@ -1,103 +1,10 @@
 ﻿[<AutoOpen>]
-[<System.Obsolete>]
-module Monkey.Frontend.CLR.Parsers.ParserHelpers
+module rec Monkey.Frontend.CLR.Parsers.ParserHelpers
 
-open System
-
-open Microsoft.CodeAnalysis.CSharp.Syntax
 open Microsoft.CodeAnalysis.CSharp
-open type Microsoft.CodeAnalysis.CSharp.SyntaxFactory
-
-open FsToolkit.ErrorHandling
-
-open Monkey.Frontend.CLR.Token
-open Monkey.Frontend.CLR.Parsers.CSharpAstErrors
-
-
-/// <summary>
-/// Mutable type containing the main parser state.
-/// </summary>
-type internal CSharpAstParserState(tokens: Token array) =
-    let mutable currentIdx: int = 0
-    let mutable parseErrors: CSharpParseError list = []
-    let mutable statements: StatementSyntax list = []
-    let mutable lambdaTypeMap: Map<string, LambdaFunctionSignature> = Map.empty
-    
-    member this.Tokens = tokens
-    
-    member this.CurrentIdx
-        with get() = currentIdx
-        and set(value) = currentIdx <- value
-
-    member this.ParseErrors
-        with get() = parseErrors
-        and set(value) = parseErrors <- value
-        
-    member this.Statements
-        with get() = statements
-        and set(value) = statements <- value
-        
-    /// Map containing function signatures of lambda expressions (since their syntax does not contain any type info as
-    /// compared to normal member methods.
-    member this.LambdaTypeMap
-        with get() = lambdaTypeMap
-        and set(value) = lambdaTypeMap <- value
-    
-with
-    member this.TokensLength() =
-        Array.length this.Tokens
-        
-    member this.IsEof() =
-        let isEof =
-            match this.Tokens[this.CurrentIdx].Type with
-            | EOF -> true
-            | _ -> false
-        
-        (this.CurrentIdx >= Array.length this.Tokens) || isEof
-        
-    member this.PeekToken() =
-        this.Tokens[this.CurrentIdx]
-        
-    member this.PopToken() =
-        let token = this.Tokens[this.CurrentIdx]
-        this.CurrentIdx <- this.CurrentIdx + 1
-        token
-        
-    member this.GetTokenAt(index: int) =
-        this.Tokens[index]
-        
-and LambdaFunctionSignature =
-    { ParameterTypes: TypeSyntax array
-      ReturnType: TypeSyntax }
-with
-    member this.ToFuncTypeSyntax() =
-        let types = Array.append this.ParameterTypes [| this.ReturnType |]
-        let commas = Array.create ((Array.length types) - 1) (Token(SyntaxKind.CommaToken))
-        GenericName(Identifier("Func"))
-            .WithTypeArgumentList(
-                TypeArgumentList(
-                    SeparatedList<TypeSyntax>(types, commas)))
-
-
-[<AutoOpen>]
-module ParserStateHelpers =
-    let isSemicolon (tokenType: TokenType) = tokenType = TokenType.SEMICOLON
-
-    let isRParen (tokenType: TokenType) = tokenType = TokenType.RPAREN
-            
-    let rec internal consumeUntilTokenType (tokenTypePredicate: TokenType -> bool) (parserState: CSharpAstParserState) =
-        match parserState.IsEof() with
-        | true ->
-            parserState
-        | false ->
-            let token = parserState.PeekToken()
-            match token.Type with
-            | tokenType when (tokenTypePredicate tokenType) || tokenType = EOF ->
-                parserState
-            | _ ->
-                parserState.CurrentIdx <- parserState.CurrentIdx + 1
-                consumeUntilTokenType tokenTypePredicate parserState
-
+open Monkey.Frontend.CLR.Parsers.ParsingErrors
+open Monkey.Frontend.CLR.Syntax.Ast
+                
 
 /// <summary>
 /// Operator precedence when determining how to order nested infix expressions.
@@ -111,43 +18,107 @@ type internal Precedence =
     | PREFIX = 6
     | CALL = 7
     | INDEX = 8
-    
+
 let internal tokenTypeToPrecedenceMap = Map.ofList [
-    (EQ, Precedence.EQUALS)
-    (NOT_EQ, Precedence.EQUALS)
-    (LT, Precedence.LESSGREATER)
-    (GT, Precedence.LESSGREATER)
-    (PLUS, Precedence.SUM)
-    (MINUS, Precedence.SUM)
-    (SLASH, Precedence.PRODUCT)
-    (ASTERISK, Precedence.PRODUCT)
-    (LPAREN, Precedence.CALL)
-    (LBRACKET, Precedence.INDEX)
+    (SyntaxKind.EqualsEqualsToken, Precedence.EQUALS)
+    (SyntaxKind.ExclamationEqualsToken, Precedence.EQUALS)
+    (SyntaxKind.LessThanToken, Precedence.LESSGREATER)
+    (SyntaxKind.GreaterThanToken, Precedence.LESSGREATER)
+    (SyntaxKind.LessThanEqualsToken, Precedence.LESSGREATER)
+    (SyntaxKind.GreaterThanEqualsToken, Precedence.LESSGREATER)
+    (SyntaxKind.GreaterThanToken, Precedence.LESSGREATER)
+    (SyntaxKind.PlusToken, Precedence.SUM)
+    (SyntaxKind.MinusToken, Precedence.SUM)
+    (SyntaxKind.SlashToken, Precedence.PRODUCT)
+    (SyntaxKind.AsteriskToken, Precedence.PRODUCT)
+    (SyntaxKind.OpenParenToken, Precedence.CALL)
+    (SyntaxKind.OpenBracketToken, Precedence.INDEX)
 ]
-
-
-let internal defaultHashLen = 16
-
-let internal generateRandomStringHash n =
-    let chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-    let random = Random()
-    Array.init n (fun _ -> chars.[random.Next(chars.Length)]) |> String
     
     
-let internal onUnexpectedToken (expectedTokenType: TokenType) (actualToken: Token) =
-    let errorMsg = $"Expected a/an \"{expectedTokenType}\", but received \"{actualToken.Literal}\" of type \"{actualToken.Type}\""
-    Error (CSharpParseError(message=errorMsg))
+    
+/// <summary>
+/// Mutable type containing the main parser state.
+/// </summary>
+type internal MonkeyAstParserState(tokens: SyntaxToken array) =
+    let mutable currentIdx: int = 0
+    let mutable errors: ResizeArray<ParseError> = ResizeArray<ParseError>()
+    let mutable statements: ResizeArray<StatementSyntax> = ResizeArray<StatementSyntax>()
+    
+    member this.Tokens = tokens
+    
+    member this.CurrentIdx
+        with get() = currentIdx
+        and set(value) = currentIdx <- value
 
-let internal assertAndPop (expectedTokenType: TokenType) (parserState: CSharpAstParserState) =
-    let currentToken = parserState.PopToken()
-    match currentToken.Type with
-    | tokenType when tokenType = expectedTokenType -> Ok ()
-    | _ -> consumeUntilTokenType isSemicolon parserState |> ignore
-           onUnexpectedToken expectedTokenType currentToken
+    member this.Errors
+        with get() = errors
+        
+    member this.Statements
+        with get() = statements
+        
+with
+    member this.TokensLength() =
+        Array.length this.Tokens
+        
+    member this.IsEof() =
+        let isEof =
+            match this.Tokens[this.CurrentIdx].Kind with
+            | SyntaxKind.EndOfFileToken -> true
+            | _ -> false
+        
+        (this.CurrentIdx >= Array.length this.Tokens) || isEof
+        
+    member this.PeekToken() : SyntaxToken =
+        this.Tokens[this.CurrentIdx]
+        
+    member this.PeekToken(offset: int) : SyntaxToken =
+        this.Tokens[this.CurrentIdx + offset]
+        
+    member this.CanPeek(offset: int) : bool =
+        match offset + this.CurrentIdx with
+        | i when i >= 0 && i <= this.Tokens.Length - 1 -> true
+        | _ -> false
+        
+    member this.PopToken() : SyntaxToken =
+        let token = this.Tokens[this.CurrentIdx]
+        this.CurrentIdx <- this.CurrentIdx + 1
+        token
+        
+    member this.GetTokenAt(index: int) : SyntaxToken =
+        this.Tokens[index]
+       
+        
+    member this.RecoverFromParseError() : unit =
+        consumeUntilTokenType (fun kind -> kind = SyntaxKind.SemicolonToken || kind = SyntaxKind.EndOfFileToken) this
+        |> ignore
 
-let internal assertNoParseErrors (parseErrors: CSharpParseError list) =
+
+
+let isSemicolon (tokenType: SyntaxKind) = tokenType = SyntaxKind.SemicolonToken
+
+let isCloseParen (tokenType: SyntaxKind) = tokenType = SyntaxKind.CloseParenToken
+
+let isCloseBracket (tokenType: SyntaxKind) = tokenType = SyntaxKind.CloseBracketToken
+        
+        
+let rec internal consumeUntilTokenType (tokenTypePredicate: SyntaxKind -> bool) (parserState: MonkeyAstParserState) =
+    match parserState.IsEof() with
+    | true ->
+        parserState
+    | false ->
+        let token = parserState.PeekToken()
+        match token.Kind with
+        | tokenType when (tokenTypePredicate tokenType) || tokenType = SyntaxKind.EndOfFileToken ->
+            parserState
+        | _ ->
+            parserState.CurrentIdx <- parserState.CurrentIdx + 1
+            consumeUntilTokenType tokenTypePredicate parserState
+            
+    
+let internal assertNoParseErrors (parseErrors: ParseError array) =
     match parseErrors with
-    | [ ] ->
+    | [|  |] ->
         Ok ()
-    | head :: _ ->
-        Error head
+    | _ ->
+        Error parseErrors[0]  // we're guaranteed at least one element
