@@ -40,13 +40,21 @@ type SyntaxNode with
             else
                 printfn "%sToken: %s - %s" (String.replicate (indent + 2) " ") (child.Kind().ToString()) (child.ToString())
                 
+    
+let filterGlobalStatementsAsStatementSyntaxes (arr: MemberDeclarationSyntax array) : StatementSyntax array =
+    let statements = ResizeArray<StatementSyntax>()
+    for memberDeclaration in arr do
+        match memberDeclaration with
+        | :? GlobalStatementSyntax as globalStatement ->
+            statements.Add(globalStatement.Statement)
+        | _ ->
+            ()
+            
+    statements.ToArray()
+                
 
 let compareSyntaxNodes (monkeyInput: string) (expectedSyntaxNodes: SyntaxNode array) (actualSyntaxNodes: SyntaxNode array) : bool =
-    let mutable pass = true
-    for expected, actual in Array.zip expectedSyntaxNodes actualSyntaxNodes do
-        if (not (expected.IsEquivalentTo(actual)) || not (actual.IsEquivalentTo(expected))) then
-            pass <- false
-        
+    
     printfn "Input/Output"
     printfn "---------------------------------------------------------"
     
@@ -81,4 +89,9 @@ let compareSyntaxNodes (monkeyInput: string) (expectedSyntaxNodes: SyntaxNode ar
     printfn "```"
     printfn ""
     
+    let mutable pass = true
+    for expected, actual in Array.zip expectedSyntaxNodes actualSyntaxNodes do
+        if (not (expected.IsEquivalentTo(actual)) || not (actual.IsEquivalentTo(expected))) then
+            pass <- false
+        
     pass 

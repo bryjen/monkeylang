@@ -422,8 +422,8 @@ type FunctionParsingTests() =
                 FunctionExpression(
                     ParameterList(
                         [|
-                            Parameter(BuiltinType(IntKeyword()), IdentifierNameNoBox(Identifier("x")))
-                            Parameter(BuiltinType(IntKeyword()), IdentifierNameNoBox(Identifier("y")))
+                            Parameter(BuiltinType(IntKeyword()), SimpleIdentifier(Identifier("x")))
+                            Parameter(BuiltinType(IntKeyword()), SimpleIdentifier(Identifier("y")))
                         |]),
                     BuiltinType(IntKeyword()),
                     BlockStatementNoBox(
@@ -492,10 +492,10 @@ type FunctionParsingTests() =
                                         BuiltinType(IntKeyword())
                                         BuiltinType(IntKeyword())
                                     |]),
-                                IdentifierNameNoBox(Identifier("transform")))
+                                SimpleIdentifier(Identifier("transform")))
                             Parameter(
                                 BuiltinType(IntKeyword()),
-                                IdentifierNameNoBox(Identifier("init_value")))
+                                SimpleIdentifier(Identifier("init_value")))
                         |]),
                     BuiltinType(IntKeyword()),
                     BlockStatementNoBox(
@@ -521,10 +521,10 @@ type FunctionParsingTests() =
                                         BuiltinType(IntKeyword())
                                         BuiltinType(IntKeyword())
                                     |]),
-                                IdentifierNameNoBox(Identifier("full_transform")))
+                                SimpleIdentifier(Identifier("full_transform")))
                             Parameter(
                                 BuiltinType(IntKeyword()),
-                                IdentifierNameNoBox(Identifier("init_value")))
+                                SimpleIdentifier(Identifier("init_value")))
                         |]),
                     FunctionType(
                         [|
@@ -683,7 +683,7 @@ type InvocationExpressionParsingTests() =
                                     [|
                                         Parameter(
                                             BuiltinType(StringKeyword()),
-                                            IdentifierNameNoBox(Identifier("str"))
+                                            SimpleIdentifier(Identifier("str"))
                                             )
                                     |]),
                                 NameType(IdentifierNameNoBox(Identifier("unit"))),
@@ -717,7 +717,7 @@ type InvocationExpressionParsingTests() =
                                     [|
                                         Parameter(
                                             BuiltinType(StringKeyword()),
-                                            IdentifierNameNoBox(Identifier("str"))
+                                            SimpleIdentifier(Identifier("str"))
                                             )
                                     |]),
                                 NameType(IdentifierNameNoBox(Identifier("unit"))),
@@ -776,8 +776,8 @@ type InvocationExpressionParsingTests() =
                     InvocationExpressionFunctionExpression(
                         ParameterList(
                             [|
-                                Parameter(BuiltinType(IntKeyword()), IdentifierNameNoBox(Identifier("x")))
-                                Parameter(BuiltinType(IntKeyword()), IdentifierNameNoBox(Identifier("y")))
+                                Parameter(BuiltinType(IntKeyword()), SimpleIdentifier(Identifier("x")))
+                                Parameter(BuiltinType(IntKeyword()), SimpleIdentifier(Identifier("y")))
                             |]),
                         BuiltinType(IntKeyword()),
                         BlockStatementNoBox(
@@ -806,8 +806,8 @@ type InvocationExpressionParsingTests() =
                         InvocationExpressionFunctionExpression(
                             ParameterList(
                                 [|
-                                    Parameter(BuiltinType(IntKeyword()), IdentifierNameNoBox(Identifier("x")))
-                                    Parameter(BuiltinType(IntKeyword()), IdentifierNameNoBox(Identifier("y")))
+                                    Parameter(BuiltinType(IntKeyword()), SimpleIdentifier(Identifier("x")))
+                                    Parameter(BuiltinType(IntKeyword()), SimpleIdentifier(Identifier("y")))
                                 |]),
                             BuiltinType(IntKeyword()),
                             BlockStatementNoBox(
@@ -838,8 +838,8 @@ type InvocationExpressionParsingTests() =
                             InvocationExpressionFunctionExpression(
                                 ParameterList(
                                     [|
-                                        Parameter(BuiltinType(IntKeyword()), IdentifierNameNoBox(Identifier("x")))
-                                        Parameter(BuiltinType(IntKeyword()), IdentifierNameNoBox(Identifier("y")))
+                                        Parameter(BuiltinType(IntKeyword()), SimpleIdentifier(Identifier("x")))
+                                        Parameter(BuiltinType(IntKeyword()), SimpleIdentifier(Identifier("y")))
                                     |]),
                                 BuiltinType(IntKeyword()),
                                 BlockStatementNoBox(
@@ -873,8 +873,8 @@ type InvocationExpressionParsingTests() =
                                     InvocationExpressionFunctionExpression(
                                         ParameterList(
                                             [|
-                                                Parameter(BuiltinType(IntKeyword()), IdentifierNameNoBox(Identifier("x")))
-                                                Parameter(BuiltinType(IntKeyword()), IdentifierNameNoBox(Identifier("y")))
+                                                Parameter(BuiltinType(IntKeyword()), SimpleIdentifier(Identifier("x")))
+                                                Parameter(BuiltinType(IntKeyword()), SimpleIdentifier(Identifier("y")))
                                             |]),
                                         BuiltinType(IntKeyword()),
                                         BlockStatementNoBox(
@@ -913,15 +913,15 @@ type InvocationExpressionParsingTests() =
                                                 BuiltinType(StringKeyword())
                                                 NameType(IdentifierNameNoBox(Identifier("unit")))
                                             |]),
-                                        IdentifierNameNoBox(Identifier("logger"))
+                                        SimpleIdentifier(Identifier("logger"))
                                         )
                                     Parameter(
                                         BuiltinType(IntKeyword()),
-                                        IdentifierNameNoBox(Identifier("offset"))
+                                        SimpleIdentifier(Identifier("offset"))
                                         )
                                     Parameter(
                                         BuiltinType(BoolKeyword()),
-                                        IdentifierNameNoBox(Identifier("verbose"))
+                                        SimpleIdentifier(Identifier("verbose"))
                                         )
                                 |]),
                             NameType(IdentifierNameNoBox(Identifier("unit"))),
@@ -937,7 +937,7 @@ type InvocationExpressionParsingTests() =
                                     [|
                                         Parameter(
                                             BuiltinType(StringKeyword()),
-                                            IdentifierNameNoBox(Identifier("str"))
+                                            SimpleIdentifier(Identifier("str"))
                                             )
                                     |]),
                                 NameType(IdentifierNameNoBox(Identifier("unit"))),
@@ -1207,8 +1207,8 @@ type LetStatementParsing() =
                         InvocationExpressionFunctionExpression(
                             ParameterList(
                                 [|
-                                    Parameter(BuiltinType(IntKeyword()), IdentifierNameNoBox(Identifier("x")))
-                                    Parameter(BuiltinType(IntKeyword()), IdentifierNameNoBox(Identifier("y")))
+                                    Parameter(BuiltinType(IntKeyword()), SimpleIdentifier(Identifier("x")))
+                                    Parameter(BuiltinType(IntKeyword()), SimpleIdentifier(Identifier("y")))
                                 |]),
                             BuiltinType(IntKeyword()),
                             BlockStatementNoBox(
@@ -1239,8 +1239,8 @@ type LetStatementParsing() =
                         InvocationExpressionFunctionExpression(
                             ParameterList(
                                 [|
-                                    Parameter(BuiltinType(IntKeyword()), IdentifierNameNoBox(Identifier("x")))
-                                    Parameter(BuiltinType(IntKeyword()), IdentifierNameNoBox(Identifier("y")))
+                                    Parameter(BuiltinType(IntKeyword()), SimpleIdentifier(Identifier("x")))
+                                    Parameter(BuiltinType(IntKeyword()), SimpleIdentifier(Identifier("y")))
                                 |]),
                             BuiltinType(IntKeyword()),
                             BlockStatementNoBox(

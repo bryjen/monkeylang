@@ -581,7 +581,8 @@ module internal PrefixExpressions =
             let currentToken = parserState.PopToken()
             let! parameterNameToken = 
                 match currentToken.Kind with
-                | SyntaxKind.IdentifierToken -> IdentifierNameNoBox(currentToken) |> Ok
+                | SyntaxKind.IdentifierToken ->
+                    SimpleIdentifier(currentToken) |> Ok
                 | _ ->
                     parserState.RecoverFromParseError()
                     InvalidParameterNameError(currentToken) :> ParseError |> Error

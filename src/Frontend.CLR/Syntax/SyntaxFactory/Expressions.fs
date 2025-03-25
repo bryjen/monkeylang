@@ -32,6 +32,9 @@ type MonkeyExpressionSyntaxFactory() =
         { Token = token }
         |> IdentifierSyntax.SimpleIdentifier
         
+    static member SimpleIdentifier(token: SyntaxToken) : SimpleIdentifier =
+        { Token = token }
+        
     static member internal QualifiedName(tokens: SyntaxToken array) =
         let periods = Array.create (tokens.Length - 1) (DotToken())
         { Tokens = tokens; Dots = periods }
@@ -377,7 +380,7 @@ type MonkeyExpressionSyntaxFactory() =
         { ColonToken = ColonToken(); Type = typeSyntax }
         
         
-    static member Parameter(paramType: TypeSyntax, identifierName: IdentifierSyntax) =
+    static member Parameter(paramType: TypeSyntax, identifierName: SimpleIdentifier) =
         { Type = paramType; Identifier = identifierName }
         
 

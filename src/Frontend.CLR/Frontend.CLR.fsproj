@@ -25,9 +25,13 @@
         <Compile Include="Parsers\ParserHelpers.fs" />
         <Compile Include="Parsers\DirectCSharpAstParser.fs" />
         <Compile Include="Parsers\MonkeyAstParser.fs" />
-        <Compile Include="Parsers\MonkeyToCSharpAstConverter.fs" />
+        
         <Compile Include="Binding\Binder.fs" />
         <Compile Include="Binding\Optimizer.fs" />
+
+        <Compile Include="Converter\ConverterErrors\ConverterError.fs" />
+        <Compile Include="Converter\AstConverter.fs" />
+        
         <Compile Include="HostStubGenerator.fs" />
         <Compile Include="ApiErrors.fs" />
         <Compile Include="Api.fs" />

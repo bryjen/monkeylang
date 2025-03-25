@@ -2,11 +2,13 @@
 
 open System
 
+open Frontend.CLR.Syntax.Tokenizer
 open Microsoft.CodeAnalysis
 open Microsoft.CodeAnalysis.CSharp
 open Microsoft.CodeAnalysis.CSharp.Syntax
 open type Microsoft.CodeAnalysis.CSharp.SyntaxFactory
 
+open Monkey.Frontend.CLR.Converter
 open NUnit.Framework
 
 open Monkey.Frontend.CLR.Lexer
@@ -71,6 +73,7 @@ type NumericExpressionParsingTests() =
     [<TestCase(2)>]
     [<TestCase(3)>]
     member this.``A: Test Basic Numeric Expression Parsing``(testCaseIndex: int) =
+#if LEGACY_PARSER
         let input, expectedSyntaxTree = List.item testCaseIndex this.TestCases
         let tokens = Lexer.parseIntoTokens input |> List.toArray
         
@@ -88,6 +91,37 @@ type NumericExpressionParsingTests() =
                 printfn $"{count}. {parseError}"
                 count <- count + 1
             Assert.Fail()
+#endif
+        let input, expectedSyntaxTree = List.item testCaseIndex this.TestCases
+        let tokens = tokenize input
+        let statements, parseErrors = MonkeyAstParser.parseTokens tokens
+        
+        if parseErrors.Length > 0 then
+            printfn "Parsing Errors:"
+            let mutable count = 1
+            for parseError in parseErrors do
+                printfn $"{count}. {parseError}"
+                count <- count + 1
+            Assert.Fail()
+        
+        let conversionResult = AstConverter.toCSharpCompilationUnit statements
+        match conversionResult with
+        | Ok compilationUnitSyntax ->
+            let statements = filterGlobalStatementsAsStatementSyntaxes (Seq.toArray compilationUnitSyntax.Members)
+            let actualSyntaxNodes = statements |> Array.map (fun s -> s :> SyntaxNode)
+            let expectedSyntaxNodes = [| expectedSyntaxTree |]
+            match compareSyntaxNodes input expectedSyntaxNodes actualSyntaxNodes with
+            | true -> Assert.Pass()
+            | false -> Assert.Fail()
+        | Error conversionErrors -> 
+            printfn "Conversion Errors:"
+            let mutable count = 1
+            for error in conversionErrors do
+                printfn $"{count}. {error}"
+                count <- count + 1
+            Assert.Fail()
+        
+        
         
         
 [<TestFixture>]

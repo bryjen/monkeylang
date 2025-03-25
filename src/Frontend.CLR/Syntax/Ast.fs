@@ -352,7 +352,7 @@ with
 /// </remarks>
 and ParameterSyntax =
     { Type: TypeSyntax
-      Identifier: IdentifierSyntax }
+      Identifier: SimpleIdentifier }
 with
     override this.ToString() =
         $"{this.Type.ToString()}{this.Identifier.ToString()}"
@@ -362,7 +362,7 @@ with
         TextSpan(typeTextSpan.Start, this.Identifier.TextSpan().End - typeTextSpan.Start)
         
     static member AreEquivalent(ps1: ParameterSyntax, ps2: ParameterSyntax) =
-        TypeSyntax.AreEquivalent(ps1.Type, ps2.Type) && IdentifierSyntax.AreEquivalent(ps1.Identifier, ps2.Identifier)
+        TypeSyntax.AreEquivalent(ps1.Type, ps2.Type) && SimpleIdentifier.AreEquivalent(ps1.Identifier, ps2.Identifier)
     
 
 type ArgumentListSyntax =
