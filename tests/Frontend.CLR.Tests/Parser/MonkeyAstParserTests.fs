@@ -17,6 +17,7 @@ open Monkey.Frontend.CLR.Tests.Parser.Helpers
 open type Monkey.Frontend.CLR.Syntax.SyntaxFactory.MonkeySyntaxTokenFactory
 open type Monkey.Frontend.CLR.Syntax.SyntaxFactory.MonkeyExpressionSyntaxFactory
 open type Monkey.Frontend.CLR.Syntax.SyntaxFactory.MonkeyStatementSyntaxFactory
+open type Monkey.Frontend.CLR.Syntax.SyntaxFactory.MonkeyOtherSyntaxFactory
 
 [<AutoOpen>]
 module private MonkeyAstParserTestsHelpers =
@@ -144,8 +145,8 @@ type LiteralExpressionStatementParsing() =
         let input, expectedSyntaxTree = castedTestCases[testCaseIndex]
         let tokens = Tokenizer.tokenize input
         
-        let statements, parseErrors = Monkey.Frontend.CLR.Parsers.MonkeyAstParser.parseTokens tokens
-        let asMonkeySyntaxNodes = statements |> Array.map MonkeySyntaxNode.StatementSyntax
+        let monkeyCompilationUnit, parseErrors = MonkeyAstParser.parseTokens tokens
+        let asMonkeySyntaxNodes = monkeyCompilationUnit.Statements |> Array.map MonkeySyntaxNode.StatementSyntax
         match Array.length parseErrors with
         | 0 ->
             let actualSyntaxNodes = asMonkeySyntaxNodes
@@ -329,8 +330,9 @@ type BinaryExpressionStatementParsing() =
         let input, expectedSyntaxTree = castedTestCases[testCaseIndex]
         let tokens = Tokenizer.tokenize input
         
-        let statements, parseErrors = Monkey.Frontend.CLR.Parsers.MonkeyAstParser.parseTokens tokens
-        let asMonkeySyntaxNodes = statements |> Array.map MonkeySyntaxNode.StatementSyntax
+        
+        let monkeyCompilationUnit, parseErrors = MonkeyAstParser.parseTokens tokens
+        let asMonkeySyntaxNodes = monkeyCompilationUnit.Statements |> Array.map MonkeySyntaxNode.StatementSyntax
         match Array.length parseErrors with
         | 0 ->
             let actualSyntaxNodes = asMonkeySyntaxNodes
@@ -392,8 +394,8 @@ type IfExpressionParsingTests() =
         let input, expectedSyntaxTree = castedTestCases[testCaseIndex]
         let tokens = Tokenizer.tokenize input
         
-        let statements, parseErrors = Monkey.Frontend.CLR.Parsers.MonkeyAstParser.parseTokens tokens
-        let asMonkeySyntaxNodes = statements |> Array.map MonkeySyntaxNode.StatementSyntax
+        let monkeyCompilationUnit, parseErrors = MonkeyAstParser.parseTokens tokens
+        let asMonkeySyntaxNodes = monkeyCompilationUnit.Statements |> Array.map MonkeySyntaxNode.StatementSyntax
         match Array.length parseErrors with
         | 0 ->
             let actualSyntaxNodes = asMonkeySyntaxNodes
@@ -422,8 +424,8 @@ type FunctionParsingTests() =
                 FunctionExpression(
                     ParameterList(
                         [|
-                            Parameter(BuiltinType(IntKeyword()), SimpleIdentifier(Identifier("x")))
-                            Parameter(BuiltinType(IntKeyword()), SimpleIdentifier(Identifier("y")))
+                            Parameter(BuiltinType(IntKeyword()), SimpleIdentifierNoBox(Identifier("x")))
+                            Parameter(BuiltinType(IntKeyword()), SimpleIdentifierNoBox(Identifier("y")))
                         |]),
                     BuiltinType(IntKeyword()),
                     BlockStatementNoBox(
@@ -492,10 +494,10 @@ type FunctionParsingTests() =
                                         BuiltinType(IntKeyword())
                                         BuiltinType(IntKeyword())
                                     |]),
-                                SimpleIdentifier(Identifier("transform")))
+                                SimpleIdentifierNoBox(Identifier("transform")))
                             Parameter(
                                 BuiltinType(IntKeyword()),
-                                SimpleIdentifier(Identifier("init_value")))
+                                SimpleIdentifierNoBox(Identifier("init_value")))
                         |]),
                     BuiltinType(IntKeyword()),
                     BlockStatementNoBox(
@@ -521,10 +523,10 @@ type FunctionParsingTests() =
                                         BuiltinType(IntKeyword())
                                         BuiltinType(IntKeyword())
                                     |]),
-                                SimpleIdentifier(Identifier("full_transform")))
+                                SimpleIdentifierNoBox(Identifier("full_transform")))
                             Parameter(
                                 BuiltinType(IntKeyword()),
-                                SimpleIdentifier(Identifier("init_value")))
+                                SimpleIdentifierNoBox(Identifier("init_value")))
                         |]),
                     FunctionType(
                         [|
@@ -551,8 +553,8 @@ type FunctionParsingTests() =
         let input, expectedSyntaxTree = castedTestCases[testCaseIndex]
         let tokens = Tokenizer.tokenize input
         
-        let statements, parseErrors = Monkey.Frontend.CLR.Parsers.MonkeyAstParser.parseTokens tokens
-        let asMonkeySyntaxNodes = statements |> Array.map MonkeySyntaxNode.StatementSyntax
+        let monkeyCompilationUnit, parseErrors = MonkeyAstParser.parseTokens tokens
+        let asMonkeySyntaxNodes = monkeyCompilationUnit.Statements |> Array.map MonkeySyntaxNode.StatementSyntax
         match Array.length parseErrors with
         | 0 ->
             let actualSyntaxNodes = asMonkeySyntaxNodes
@@ -683,7 +685,7 @@ type InvocationExpressionParsingTests() =
                                     [|
                                         Parameter(
                                             BuiltinType(StringKeyword()),
-                                            SimpleIdentifier(Identifier("str"))
+                                            SimpleIdentifierNoBox(Identifier("str"))
                                             )
                                     |]),
                                 NameType(IdentifierNameNoBox(Identifier("unit"))),
@@ -717,7 +719,7 @@ type InvocationExpressionParsingTests() =
                                     [|
                                         Parameter(
                                             BuiltinType(StringKeyword()),
-                                            SimpleIdentifier(Identifier("str"))
+                                            SimpleIdentifierNoBox(Identifier("str"))
                                             )
                                     |]),
                                 NameType(IdentifierNameNoBox(Identifier("unit"))),
@@ -776,8 +778,8 @@ type InvocationExpressionParsingTests() =
                     InvocationExpressionFunctionExpression(
                         ParameterList(
                             [|
-                                Parameter(BuiltinType(IntKeyword()), SimpleIdentifier(Identifier("x")))
-                                Parameter(BuiltinType(IntKeyword()), SimpleIdentifier(Identifier("y")))
+                                Parameter(BuiltinType(IntKeyword()), SimpleIdentifierNoBox(Identifier("x")))
+                                Parameter(BuiltinType(IntKeyword()), SimpleIdentifierNoBox(Identifier("y")))
                             |]),
                         BuiltinType(IntKeyword()),
                         BlockStatementNoBox(
@@ -806,8 +808,8 @@ type InvocationExpressionParsingTests() =
                         InvocationExpressionFunctionExpression(
                             ParameterList(
                                 [|
-                                    Parameter(BuiltinType(IntKeyword()), SimpleIdentifier(Identifier("x")))
-                                    Parameter(BuiltinType(IntKeyword()), SimpleIdentifier(Identifier("y")))
+                                    Parameter(BuiltinType(IntKeyword()), SimpleIdentifierNoBox(Identifier("x")))
+                                    Parameter(BuiltinType(IntKeyword()), SimpleIdentifierNoBox(Identifier("y")))
                                 |]),
                             BuiltinType(IntKeyword()),
                             BlockStatementNoBox(
@@ -838,8 +840,8 @@ type InvocationExpressionParsingTests() =
                             InvocationExpressionFunctionExpression(
                                 ParameterList(
                                     [|
-                                        Parameter(BuiltinType(IntKeyword()), SimpleIdentifier(Identifier("x")))
-                                        Parameter(BuiltinType(IntKeyword()), SimpleIdentifier(Identifier("y")))
+                                        Parameter(BuiltinType(IntKeyword()), SimpleIdentifierNoBox(Identifier("x")))
+                                        Parameter(BuiltinType(IntKeyword()), SimpleIdentifierNoBox(Identifier("y")))
                                     |]),
                                 BuiltinType(IntKeyword()),
                                 BlockStatementNoBox(
@@ -873,8 +875,8 @@ type InvocationExpressionParsingTests() =
                                     InvocationExpressionFunctionExpression(
                                         ParameterList(
                                             [|
-                                                Parameter(BuiltinType(IntKeyword()), SimpleIdentifier(Identifier("x")))
-                                                Parameter(BuiltinType(IntKeyword()), SimpleIdentifier(Identifier("y")))
+                                                Parameter(BuiltinType(IntKeyword()), SimpleIdentifierNoBox(Identifier("x")))
+                                                Parameter(BuiltinType(IntKeyword()), SimpleIdentifierNoBox(Identifier("y")))
                                             |]),
                                         BuiltinType(IntKeyword()),
                                         BlockStatementNoBox(
@@ -913,15 +915,15 @@ type InvocationExpressionParsingTests() =
                                                 BuiltinType(StringKeyword())
                                                 NameType(IdentifierNameNoBox(Identifier("unit")))
                                             |]),
-                                        SimpleIdentifier(Identifier("logger"))
+                                        SimpleIdentifierNoBox(Identifier("logger"))
                                         )
                                     Parameter(
                                         BuiltinType(IntKeyword()),
-                                        SimpleIdentifier(Identifier("offset"))
+                                        SimpleIdentifierNoBox(Identifier("offset"))
                                         )
                                     Parameter(
                                         BuiltinType(BoolKeyword()),
-                                        SimpleIdentifier(Identifier("verbose"))
+                                        SimpleIdentifierNoBox(Identifier("verbose"))
                                         )
                                 |]),
                             NameType(IdentifierNameNoBox(Identifier("unit"))),
@@ -937,7 +939,7 @@ type InvocationExpressionParsingTests() =
                                     [|
                                         Parameter(
                                             BuiltinType(StringKeyword()),
-                                            SimpleIdentifier(Identifier("str"))
+                                            SimpleIdentifierNoBox(Identifier("str"))
                                             )
                                     |]),
                                 NameType(IdentifierNameNoBox(Identifier("unit"))),
@@ -1032,8 +1034,8 @@ type InvocationExpressionParsingTests() =
         let sourceText = SourceText.From(input)
         let tokens = Tokenizer.tokenize input
         
-        let statements, parseErrors = Monkey.Frontend.CLR.Parsers.MonkeyAstParser.parseTokens tokens
-        let asMonkeySyntaxNodes = statements |> Array.map MonkeySyntaxNode.StatementSyntax
+        let monkeyCompilationUnit, parseErrors = MonkeyAstParser.parseTokens tokens
+        let asMonkeySyntaxNodes = monkeyCompilationUnit.Statements |> Array.map MonkeySyntaxNode.StatementSyntax
         match Array.length parseErrors with
         | 0 ->
             let actualSyntaxNodes = asMonkeySyntaxNodes
@@ -1207,8 +1209,8 @@ type LetStatementParsing() =
                         InvocationExpressionFunctionExpression(
                             ParameterList(
                                 [|
-                                    Parameter(BuiltinType(IntKeyword()), SimpleIdentifier(Identifier("x")))
-                                    Parameter(BuiltinType(IntKeyword()), SimpleIdentifier(Identifier("y")))
+                                    Parameter(BuiltinType(IntKeyword()), SimpleIdentifierNoBox(Identifier("x")))
+                                    Parameter(BuiltinType(IntKeyword()), SimpleIdentifierNoBox(Identifier("y")))
                                 |]),
                             BuiltinType(IntKeyword()),
                             BlockStatementNoBox(
@@ -1239,8 +1241,8 @@ type LetStatementParsing() =
                         InvocationExpressionFunctionExpression(
                             ParameterList(
                                 [|
-                                    Parameter(BuiltinType(IntKeyword()), SimpleIdentifier(Identifier("x")))
-                                    Parameter(BuiltinType(IntKeyword()), SimpleIdentifier(Identifier("y")))
+                                    Parameter(BuiltinType(IntKeyword()), SimpleIdentifierNoBox(Identifier("x")))
+                                    Parameter(BuiltinType(IntKeyword()), SimpleIdentifierNoBox(Identifier("y")))
                                 |]),
                             BuiltinType(IntKeyword()),
                             BlockStatementNoBox(
@@ -1309,8 +1311,8 @@ type LetStatementParsing() =
         let input, expectedSyntaxTree = castedTestCases[testCaseIndex]
         let tokens = Tokenizer.tokenize input
         
-        let statements, parseErrors = Monkey.Frontend.CLR.Parsers.MonkeyAstParser.parseTokens tokens
-        let asMonkeySyntaxNodes = statements |> Array.map MonkeySyntaxNode.StatementSyntax
+        let monkeyCompilationUnit, parseErrors = MonkeyAstParser.parseTokens tokens
+        let asMonkeySyntaxNodes = monkeyCompilationUnit.Statements |> Array.map MonkeySyntaxNode.StatementSyntax
         match Array.length parseErrors with
         | 0 ->
             let actualSyntaxNodes = asMonkeySyntaxNodes
@@ -1415,7 +1417,7 @@ type TypeSyntaxParsing() =
                     BuiltinType(StringKeyword())
                     
                     GenericType(
-                        NameType(QualifiedNameNoBox(
+                        NameType(QualifiedName(
                             [|
                                 Identifier("System")
                                 Identifier("Collections")
@@ -1515,8 +1517,8 @@ type ArrayExpressionParsing() =
         let input, expectedSyntaxTree = castedTestCases[testCaseIndex]
         let tokens = Tokenizer.tokenize input
         
-        let statements, parseErrors = Monkey.Frontend.CLR.Parsers.MonkeyAstParser.parseTokens tokens
-        let asMonkeySyntaxNodes = statements |> Array.map MonkeySyntaxNode.StatementSyntax
+        let monkeyCompilationUnit, parseErrors = MonkeyAstParser.parseTokens tokens
+        let asMonkeySyntaxNodes = monkeyCompilationUnit.Statements |> Array.map MonkeySyntaxNode.StatementSyntax
         match Array.length parseErrors with
         | 0 ->
             let actualSyntaxNodes = asMonkeySyntaxNodes
@@ -1528,5 +1530,100 @@ type ArrayExpressionParsing() =
             let mutable count = 1
             for parseError in parseErrors do
                 printfn $"{count}. {parseError}"
+                count <- count + 1
+            Assert.Fail()
+            
+            
+[<TestFixture>]
+type UsingDirectiveParsing() =
+    member this.TestCases : (string * UsingDirectiveSyntax) array = [|
+        (
+            "using System;",
+            UsingDirective(SimpleIdentifier(Identifier("System")))
+        )
+        (
+            "using System.Console;",
+            UsingDirective(
+                QualifiedName(
+                    [|
+                        Identifier("System")
+                        Identifier("Console")
+                    |]
+                    )
+                )
+        )
+    |]
+    
+    [<TestCase(0)>]
+    [<TestCase(1)>]
+    member this.``I: Using directive parsing test``(testCaseIndex: int) =
+        // we keep the test case in 'ExpressionStatementSyntax' to avoid having to cast each during declaration
+        let castedTestCases = this.TestCases
+        let input, expectedSyntaxTree = castedTestCases[testCaseIndex]
+        let tokens = Tokenizer.tokenize input
+        
+        let monkeyCompilationUnit, parseErrors = MonkeyAstParser.parseTokens tokens
+        let asMonkeySyntaxNodes = monkeyCompilationUnit.UsingDirectives |> Array.map MonkeySyntaxNode.UsingDirectiveSyntax
+        match Array.length parseErrors with
+        | 0 ->
+            let actualSyntaxNodes = asMonkeySyntaxNodes
+            let expectedSyntaxNodes = [| expectedSyntaxTree |> MonkeySyntaxNode.UsingDirectiveSyntax |]
+            match compareMonkeyStatements input expectedSyntaxNodes actualSyntaxNodes with
+            | true -> Assert.Pass()
+            | false -> Assert.Fail()
+        | _ ->
+            let sourceText = SourceText.From(input)
+            let mutable count = 1
+            for parseError in parseErrors do
+                let filePath = @"C:\Users\Public\Program.mk"
+                printfn $"{parseError.GetFormattedMessage(sourceText, Some filePath)}"
+                count <- count + 1
+            Assert.Fail()
+            
+[<TestFixture>]
+type NamespaceDeclarationParsing() =
+    member this.TestCases : (string * NamespaceDeclarationSyntax) array = [|
+        (
+            "namespace Program;",
+            NamespaceDeclaration(SimpleIdentifier(Identifier("Program")))
+        )
+        (
+            "namespace Monkey.Frontend.CLR.CLI;",
+            NamespaceDeclaration(
+                QualifiedName(
+                    [|
+                        Identifier("Monkey")
+                        Identifier("Frontend")
+                        Identifier("CLR")
+                        Identifier("CLI")
+                    |]
+                    )
+                )
+        )
+    |]
+    
+    [<TestCase(0)>]
+    [<TestCase(1)>]
+    member this.``J: Namespace declaration parsing test``(testCaseIndex: int) =
+        // we keep the test case in 'ExpressionStatementSyntax' to avoid having to cast each during declaration
+        let castedTestCases = this.TestCases
+        let input, expectedSyntaxTree = castedTestCases[testCaseIndex]
+        let tokens = Tokenizer.tokenize input
+        
+        let monkeyCompilationUnit, parseErrors = MonkeyAstParser.parseTokens tokens
+        let asMonkeySyntaxNodes = monkeyCompilationUnit.NamespaceDeclarations |> Array.map MonkeySyntaxNode.NamespaceDeclarationSyntax
+        match Array.length parseErrors with
+        | 0 ->
+            let actualSyntaxNodes = asMonkeySyntaxNodes
+            let expectedSyntaxNodes = [| expectedSyntaxTree |> MonkeySyntaxNode.NamespaceDeclarationSyntax |]
+            match compareMonkeyStatements input expectedSyntaxNodes actualSyntaxNodes with
+            | true -> Assert.Pass()
+            | false -> Assert.Fail()
+        | _ ->
+            let sourceText = SourceText.From(input)
+            let mutable count = 1
+            for parseError in parseErrors do
+                let filePath = @"C:\Users\Public\Program.mk"
+                printfn $"{parseError.GetFormattedMessage(sourceText, Some filePath)}"
                 count <- count + 1
             Assert.Fail()

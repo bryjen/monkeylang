@@ -7,14 +7,20 @@ open Monkey.Frontend.CLR.Syntax.Ast
 let printMonkeySyntaxNodeTree (monkeySyntaxNode: MonkeySyntaxNode) =
     let indentation = 0
     match monkeySyntaxNode with
-    | CompilationUnitSyntax -> failwith "todo"
-    | UsingDeclarationSyntax -> failwith "todo"
+    | UsingDirectiveSyntax usingDirectiveSyntax -> onUsingDirectiveSyntax indentation usingDirectiveSyntax
+    | NamespaceDeclarationSyntax namespaceDeclarationSyntax -> onNamespaceDeclarationSyntax indentation namespaceDeclarationSyntax
     | ArgumentListSyntax argumentListSyntax -> onArgumentListSyntax indentation argumentListSyntax
     | ParameterListSyntax parameterListSyntax -> onParameterListSyntax indentation parameterListSyntax
     | ExpressionSyntax expressionSyntax -> onExpressionSyntax indentation expressionSyntax
     | StatementSyntax statementSyntax -> onStatementSyntax indentation statementSyntax
     
 let private indentationStr = "    "
+
+let private onUsingDirectiveSyntax (indentation: int) (usingDirective: UsingDirectiveSyntax) =
+    printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(UsingDirectiveSyntax)) (usingDirective.ToString() |> normalizeString)
+    
+let private onNamespaceDeclarationSyntax (indentation: int) (namespaceDeclaration: NamespaceDeclarationSyntax) =
+    printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(NamespaceDeclarationSyntax)) (namespaceDeclaration.ToString() |> normalizeString)
         
 let private onSyntaxToken (indentation: int) (syntaxToken: SyntaxToken) =
     printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(SyntaxToken)) (syntaxToken.ToString() |> normalizeString)

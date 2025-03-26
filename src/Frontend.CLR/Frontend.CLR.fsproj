@@ -16,11 +16,13 @@
         <Compile Include="Syntax\SyntaxFactory\SyntaxToken.fs" />
         <Compile Include="Syntax\SyntaxFactory\Expressions.fs" />
         <Compile Include="Syntax\SyntaxFactory\Statements.fs" />
+        <Compile Include="Syntax\SyntaxFactory\Other.fs" />
         <Compile Include="Syntax\Tokenizer.fs" />
         <Compile Include="Parsers\ParsingErrors\ParseError.fs" />
         <Compile Include="Parsers\ParsingErrors\FunctionExpressionErrors.fs" />
         <Compile Include="Parsers\ParsingErrors\VariableAssignmentStatementErrors.fs" />
         <Compile Include="Parsers\ParsingErrors\ParameterListErrors.fs" />
+        <Compile Include="Parsers\ParsingErrors\MisplacedSyntaxNodeErrors.fs" />
         <Compile Include="Parsers\CSharpAstErrors.fs" />
         <Compile Include="Parsers\ParserHelpers.fs" />
         <Compile Include="Parsers\DirectCSharpAstParser.fs" />

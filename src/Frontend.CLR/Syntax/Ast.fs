@@ -13,6 +13,62 @@ let internal interleave (xs: string[]) (ys: string[]) =
     let head = [| for i in 0 .. m - 1 do yield xs.[i]; yield ys.[i] |]
     let tail = if xs.Length > m then xs.[m..] else [||]
     Array.append head tail
+    
+
+
+/// <summary>
+/// Represents the components of a Monkey (.mk) source file.
+/// </summary>
+type MonkeyCompilationUnit =
+    { SyntaxNodes: MonkeySyntaxNode array }
+with
+    member this.WithSyntaxNodes(syntaxNodes: MonkeySyntaxNode array) =
+        { this with SyntaxNodes = syntaxNodes }
+        
+    member this.WithUsings(usings: UsingDirectiveSyntax array) =
+        let usingsAsSyntaxNodes = usings |> Array.map MonkeySyntaxNode.UsingDirectiveSyntax
+        let namespaceDeclarationsAsSyntaxNodes = this.NamespaceDeclarations |> Array.map MonkeySyntaxNode.NamespaceDeclarationSyntax
+        let currentStatementsAsSyntaxNodes = this.Statements |> Array.map MonkeySyntaxNode.StatementSyntax
+        { this with SyntaxNodes = Array.concat [| usingsAsSyntaxNodes; namespaceDeclarationsAsSyntaxNodes; currentStatementsAsSyntaxNodes |] }
+        
+    member this.WithStatements(statements: StatementSyntax array) =
+        let currentUsingsAsSyntaxNodes = this.UsingDirectives |> Array.map MonkeySyntaxNode.UsingDirectiveSyntax
+        let namespaceDeclarationsAsSyntaxNodes = this.NamespaceDeclarations |> Array.map MonkeySyntaxNode.NamespaceDeclarationSyntax
+        let statementsAsSyntaxNodes = statements |> Array.map MonkeySyntaxNode.StatementSyntax
+        { this with SyntaxNodes = Array.concat [| currentUsingsAsSyntaxNodes; namespaceDeclarationsAsSyntaxNodes; statementsAsSyntaxNodes |] }
+        
+    member this.WithNamespaceDeclaration(namespaceDeclaration: NamespaceDeclarationSyntax) =
+        let statementsAsSyntaxNodes = this.Statements |> Array.map MonkeySyntaxNode.StatementSyntax
+        let currentNamespace = [| namespaceDeclaration |> MonkeySyntaxNode.NamespaceDeclarationSyntax |]
+        let currentUsingsAsSyntaxNodes = this.UsingDirectives |> Array.map MonkeySyntaxNode.UsingDirectiveSyntax
+        { this with SyntaxNodes = Array.concat [| currentUsingsAsSyntaxNodes; currentNamespace; statementsAsSyntaxNodes |] }
+        
+        
+    member this.NamespaceDeclarations =
+        let isNamespaceDeclaration monkeySyntaxNode =
+            match monkeySyntaxNode with
+            | NamespaceDeclarationSyntax namespaceDeclaration -> Some namespaceDeclaration
+            | _ -> None
+        
+        this.SyntaxNodes |> Array.map isNamespaceDeclaration |> Array.choose id
+        
+    member this.UsingDirectives =
+        let isUsingDirective monkeySyntaxNode =
+            match monkeySyntaxNode with
+            | UsingDirectiveSyntax usingDirective -> Some usingDirective
+            | _ -> None
+        
+        this.SyntaxNodes |> Array.map isUsingDirective |> Array.choose id
+        
+    member this.Statements =
+        let isStatement monkeySyntaxNode =
+            match monkeySyntaxNode with
+            | StatementSyntax statement -> Some statement
+            | _ -> None
+        
+        this.SyntaxNodes |> Array.map isStatement |> Array.choose id
+
+
 
 /// <summary>
 /// 
@@ -43,12 +99,13 @@ with
         (st1.Kind = st2.Kind) && (st1.Value = st2.Value) 
 
 
+
 /// <summary>
 /// Represents a non-terminal node in the syntax tree.
 /// </summary>
 type MonkeySyntaxNode =
-    | CompilationUnitSyntax
-    | UsingDeclarationSyntax
+    | UsingDirectiveSyntax of UsingDirectiveSyntax
+    | NamespaceDeclarationSyntax of NamespaceDeclarationSyntax
     | ArgumentListSyntax of ArgumentListSyntax
     | ParameterListSyntax of ParameterListSyntax
     | ExpressionSyntax of ExpressionSyntax
@@ -56,8 +113,8 @@ type MonkeySyntaxNode =
 with
     override this.ToString() =
         match this with
-        | CompilationUnitSyntax -> failwith "todo"
-        | UsingDeclarationSyntax -> failwith "todo"
+        | UsingDirectiveSyntax uds -> uds.ToString()
+        | NamespaceDeclarationSyntax nss -> nss.ToString()
         | ArgumentListSyntax als -> als.ToString()
         | ParameterListSyntax pls -> pls.ToString()
         | ExpressionSyntax es -> es.ToString()
@@ -65,8 +122,10 @@ with
         
     static member AreEquivalent(msn1: MonkeySyntaxNode, msn2: MonkeySyntaxNode) =
         match msn1, msn2 with
-        | CompilationUnitSyntax, CompilationUnitSyntax -> failwith "todo"
-        | UsingDeclarationSyntax, UsingDeclarationSyntax -> failwith "todo"
+        | UsingDirectiveSyntax uds1, UsingDirectiveSyntax uds2 ->
+            UsingDirectiveSyntax.AreEquivalent(uds1, uds2)
+        | NamespaceDeclarationSyntax nds1, NamespaceDeclarationSyntax nds2 ->
+            NamespaceDeclarationSyntax.AreEquivalent(nds1, nds2)
         | ArgumentListSyntax als1, ArgumentListSyntax als2 ->
             ArgumentListSyntax.AreEquivalent(als1, als2)
         | ParameterListSyntax pls1, ParameterListSyntax pls2 ->
@@ -76,6 +135,40 @@ with
         | StatementSyntax ss1, StatementSyntax ss2 ->
             StatementSyntax.AreEquivalent(ss1, ss2)
         | _ -> false
+        
+        
+        
+type UsingDirectiveSyntax =
+    { UsingToken: SyntaxToken
+      Name: IdentifierSyntax
+      SemicolonToken: SyntaxToken }
+with
+    override this.ToString() =
+        $"{this.UsingToken.ToString()}{this.Name.ToString()}{this.SemicolonToken.ToString()}"
+        
+    member this.TextSpan () : TextSpan =
+        let semicolonTextSpan = this.SemicolonToken.TextSpan
+        TextSpan(this.UsingToken.TextSpan.Start, semicolonTextSpan.End - this.UsingToken.TextSpan.Start)
+        
+    static member AreEquivalent(uds1: UsingDirectiveSyntax, uds2: UsingDirectiveSyntax) =
+        IdentifierSyntax.AreEquivalent(uds1.Name, uds2.Name)
+    
+    
+type NamespaceDeclarationSyntax =
+    { NamespaceToken: SyntaxToken
+      Name: IdentifierSyntax
+      SemicolonToken: SyntaxToken }
+with
+    override this.ToString() =
+        $"{this.NamespaceToken.ToString()}{this.Name.ToString()}{this.SemicolonToken.ToString()}"
+        
+    member this.TextSpan () : TextSpan =
+        let semicolonTextSpan = this.SemicolonToken.TextSpan
+        TextSpan(this.NamespaceToken.TextSpan.Start, semicolonTextSpan.End - this.NamespaceToken.TextSpan.Start)
+        
+    static member AreEquivalent(nds1: NamespaceDeclarationSyntax, nds2: NamespaceDeclarationSyntax) =
+        IdentifierSyntax.AreEquivalent(nds1.Name, nds2.Name)
+
 
 
 /// <summary>

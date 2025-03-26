@@ -62,6 +62,11 @@ type MonkeySyntaxTokenFactory () =
     static member NumericLiteral(value: obj) =
         MonkeySyntaxTokenFactory.Token(SyntaxKind.NumericLiteralToken, text=(string value), value=value)
         
+    static member UsingKeyword() =
+        MonkeySyntaxTokenFactory.Token(SyntaxKind.UsingKeyword, text="using", value="using")
+        
+    static member NamespaceKeyword() =
+        MonkeySyntaxTokenFactory.Token(SyntaxKind.NamespaceKeyword, text="keyword", value="keyword")
         
     static member LetKeyword() =
         MonkeySyntaxTokenFactory.Token(SyntaxKind.LetKeyword, text="let", value="let")

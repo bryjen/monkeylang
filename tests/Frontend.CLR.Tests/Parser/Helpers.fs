@@ -8,6 +8,7 @@ open Microsoft.CodeAnalysis.CSharp.Syntax
 open Microsoft.CodeAnalysis.Text
 open Monkey.Frontend.CLR.Converter
 open Monkey.Frontend.CLR.Parsers
+open Monkey.Frontend.CLR.Syntax.Ast
 open NUnit.Framework
 
 type ParserComponentType =
@@ -45,8 +46,8 @@ type SyntaxNode with
                 printfn "%sToken: %s - %s" (String.replicate (indent + 2) " ") (child.Kind().ToString()) (child.ToString())
                 
     
-let filterGlobalStatementsAsStatementSyntaxes (arr: MemberDeclarationSyntax array) : StatementSyntax array =
-    let statements = ResizeArray<StatementSyntax>()
+let filterGlobalStatementsAsStatementSyntaxes (arr: MemberDeclarationSyntax array) : Microsoft.CodeAnalysis.CSharp.Syntax.StatementSyntax array =
+    let statements = ResizeArray<Microsoft.CodeAnalysis.CSharp.Syntax.StatementSyntax>()
     for memberDeclaration in arr do
         match memberDeclaration with
         | :? GlobalStatementSyntax as globalStatement ->
@@ -107,7 +108,7 @@ let compareSyntaxNodes (monkeyInput: string) (expectedSyntaxNodes: SyntaxNode ar
 let private comparisonCore (expectedSyntaxNodes: SyntaxNode array) (input: string) =
     let sourceText = SourceText.From(input)
     let tokens = tokenize input
-    let statements, parseErrors = MonkeyAstParser.parseTokens tokens
+    let monkeyCompilationUnit, parseErrors = MonkeyAstParser.parseTokens tokens
     
     if parseErrors.Length > 0 then
         printfn "Parsing Errors:"
@@ -118,7 +119,7 @@ let private comparisonCore (expectedSyntaxNodes: SyntaxNode array) (input: strin
             count <- count + 1
         Assert.Fail()
     
-    let conversionResult = AstConverter.toCSharpCompilationUnit statements
+    let conversionResult = AstConverter.toCSharpCompilationUnit monkeyCompilationUnit.Statements  // TODO: Support MonkeyCompilationUnit
     match conversionResult with
     | Ok compilationUnitSyntax ->
         let statements = filterGlobalStatementsAsStatementSyntaxes (Seq.toArray compilationUnitSyntax.Members)

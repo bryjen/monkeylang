@@ -20,6 +20,9 @@ module ParseErrorHelpers =
         c = 'a' ||  c = 'e' ||  c = 'i' ||  c = 'o' ||  c = 'u' 
         
 
+/// <summary>
+/// 
+/// </summary>
 [<AbstractClass>]
 type ParseError () =
     inherit Exception()
@@ -67,6 +70,9 @@ type ParseError () =
         
 
 
+/// <summary>
+/// 
+/// </summary>
 type AbsentSemicolonError(textSpan: TextSpan, from: AbsentSemicolonAt) =
     inherit ParseError()
 with
@@ -88,6 +94,10 @@ and AbsentSemicolonAt =
     | ExpressionStatement
     
 
+
+/// <summary>
+/// 
+/// </summary>
 type AbsentOrInvalidTokenError(textSpan: TextSpan, expectedKinds: SyntaxKind array, from: AbsentTokenAt) =
     inherit ParseError()
 with
@@ -107,6 +117,9 @@ with
 
     override this.ErrorType() =
         match from with
+        | UsingDirective -> "Invalid using directive."
+        | NamespaceDeclaration -> "Invalid namespace declaration."
+        
         | IfExpression -> "Invalid 'If' expression."
         | GenericTypeSyntax -> "Invalid generic type."
         | ParameterList -> "Invalid parameter list."
@@ -123,6 +136,9 @@ with
     override this.DetailedHelpMessage() = None
     
 and AbsentTokenAt =
+    | UsingDirective
+    | NamespaceDeclaration
+    
     | IfExpression
     | GenericTypeSyntax
     | ParameterList
@@ -131,6 +147,24 @@ and AbsentTokenAt =
     | ListArrayInitialization
     | QualifiedIdentifier 
     
+    
+    
+/// <summary>
+/// 
+/// </summary>
+type CompositeParseError(parseErrors: ParseError array) =
+    inherit ParseError()
+with
+    override this.GetFormattedMessage(sourceText: SourceText, filePath: string option) =
+        let formattedMessages = parseErrors |> Array.map _.GetFormattedMessage(sourceText, filePath)
+        System.String.Join("\n\n", formattedMessages)
+
+    override this.ErrorType() = ""
+    
+    override this.ErrorMessage() = ""
+    
+    override this.DetailedHelpMessage() = None
+        
         
         
 type PlaceholderError () =

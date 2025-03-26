@@ -152,7 +152,7 @@ module CsharpProjectConverter =
                 | _ -> parseErrors |> Array.map (fun error -> error :> Exception) |> Error
                 
             let conversionResults =
-                AstConverter.toCSharpCompilationUnit statements
+                AstConverter.toCSharpCompilationUnit statements.Statements  // TODO: FIX    
                 |> Result.mapError (Array.map (fun err -> err :> Exception))
                 
             let! compilationUnit = conversionResults
