@@ -9,6 +9,7 @@ open Microsoft.CodeAnalysis.CSharp.Syntax
 open type Microsoft.CodeAnalysis.CSharp.SyntaxFactory
 
 open Monkey.Frontend.CLR.Converter
+open Monkey.Frontend.CLR.Converter.AstConverter
 open NUnit.Framework
 
 open Monkey.Frontend.CLR.Lexer
@@ -92,35 +93,7 @@ type NumericExpressionParsingTests() =
                 count <- count + 1
             Assert.Fail()
 #endif
-        let input, expectedSyntaxTree = List.item testCaseIndex this.TestCases
-        let tokens = tokenize input
-        let statements, parseErrors = MonkeyAstParser.parseTokens tokens
-        
-        if parseErrors.Length > 0 then
-            printfn "Parsing Errors:"
-            let mutable count = 1
-            for parseError in parseErrors do
-                printfn $"{count}. {parseError}"
-                count <- count + 1
-            Assert.Fail()
-        
-        let conversionResult = AstConverter.toCSharpCompilationUnit statements
-        match conversionResult with
-        | Ok compilationUnitSyntax ->
-            let statements = filterGlobalStatementsAsStatementSyntaxes (Seq.toArray compilationUnitSyntax.Members)
-            let actualSyntaxNodes = statements |> Array.map (fun s -> s :> SyntaxNode)
-            let expectedSyntaxNodes = [| expectedSyntaxTree |]
-            match compareSyntaxNodes input expectedSyntaxNodes actualSyntaxNodes with
-            | true -> Assert.Pass()
-            | false -> Assert.Fail()
-        | Error conversionErrors -> 
-            printfn "Conversion Errors:"
-            let mutable count = 1
-            for error in conversionErrors do
-                printfn $"{count}. {error}"
-                count <- count + 1
-            Assert.Fail()
-        
+        defaultComparison (List.item testCaseIndex this.TestCases)
         
         
         
@@ -159,6 +132,7 @@ type BooleanExpressionParsingTests() =
     [<TestCase(2)>]
     [<TestCase(3)>]
     member this.``B. Test Basic Boolean Expression Parsing``(testCaseIndex: int) =
+#if LEGACY_PARSER
         let input, expectedSyntaxTree = List.item testCaseIndex this.TestCases
         let tokens = Lexer.parseIntoTokens input |> List.toArray
         
@@ -176,6 +150,8 @@ type BooleanExpressionParsingTests() =
                 printfn $"{count}. {parseError}"
                 count <- count + 1
             Assert.Fail()
+#endif
+        defaultComparison (List.item testCaseIndex this.TestCases)
         
         
 [<TestFixture>]
@@ -297,6 +273,7 @@ type BasicInfixExpressionParsingTests() =
     [<TestCase(7)>]
     [<TestCase(8)>]  // more complicated starts from here
     member this.``C: Test Basic Infix Expression Parsing``(testCaseIndex: int) =
+#if LEGACY_PARSER
         let input, expectedSyntaxTree = List.item testCaseIndex this.TestCases
         let tokens = Lexer.parseIntoTokens input |> List.toArray
         
@@ -314,6 +291,8 @@ type BasicInfixExpressionParsingTests() =
                 printfn $"{count}. {parseError}"
                 count <- count + 1
             Assert.Fail()
+#endif
+        defaultComparison (List.item testCaseIndex this.TestCases)
         
         
 [<TestFixture>]
@@ -477,6 +456,7 @@ type BasicVariableAssignmentParsingTests() =
     [<TestCase(4)>]
     [<TestCase(5)>]
     member this.``D: Test Basic Let Statement Parsing``(testCaseIndex: int) =
+#if LEGACY_PARSER
         let input, expectedSyntaxTree = List.item testCaseIndex this.TestCases
         let tokens = Lexer.parseIntoTokens input |> List.toArray
         
@@ -494,12 +474,14 @@ type BasicVariableAssignmentParsingTests() =
                 printfn $"{count}. {parseError}"
                 count <- count + 1
             Assert.Fail()
+#endif
+        defaultComparison (List.item testCaseIndex this.TestCases)
 
 
 [<TestFixture>]
 [<ParserComponent(ParserComponentType.Expressions)>]
 type IfStatementParsingTests() =
-    member this.TestCases : (string * SyntaxNode list) list = [
+    member this.OldTestCases : (string * SyntaxNode list) list = [
         (
             "if (5 > 2) { let foobar = 5; };",
             [
@@ -623,18 +605,137 @@ type IfStatementParsingTests() =
         )
     ]
     
+    member this.TestCases : (string * SyntaxNode list) list = [
+        (
+            "if (5 > 2) { 5; } else { 10; };",
+            [
+                LocalDeclarationStatement(
+                    VariableDeclaration(
+                        PredefinedType(Token(SyntaxKind.ObjectKeyword)),
+                        SeparatedList(
+                            [|
+                            VariableDeclarator(Identifier("LQNDkDVw"))
+                            |]
+                            )
+                        )
+                    )
+                
+                IfStatement(
+                    Token(SyntaxKind.IfKeyword),
+                    Token(SyntaxKind.OpenParenToken),
+                    BinaryExpression(
+                        SyntaxKind.GreaterThanExpression,
+                        LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(5)),
+                        LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(2))),
+                    Token(SyntaxKind.CloseParenToken),
+                    Block(
+                        [|
+                            ExpressionStatement(
+                                AssignmentExpression(
+                                    SyntaxKind.SimpleAssignmentExpression,
+                                    IdentifierName("LQNDkDVw"),
+                                    LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(5))
+                                    )
+                                )
+                            :> StatementSyntax
+                        |]),
+                    ElseClause(
+                        Token(SyntaxKind.ElseKeyword),
+                        Block(
+                            [|
+                                ExpressionStatement(
+                                    AssignmentExpression(
+                                        SyntaxKind.SimpleAssignmentExpression,
+                                        IdentifierName("LQNDkDVw"),
+                                        LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(10))
+                                        )
+                                    )
+                                :> StatementSyntax
+                            |]))
+                    )
+                
+                ExpressionStatement(IdentifierName("LQNDkDVw"))
+            ]
+        )
+        (
+            "let foobar = if (5 > 2) { 5; } else { 10; };",
+            [
+                LocalDeclarationStatement(
+                    VariableDeclaration(
+                        PredefinedType(Token(SyntaxKind.ObjectKeyword)),
+                        SeparatedList(
+                            [|
+                            VariableDeclarator(Identifier("LQNDkDVw"))
+                            |]
+                            )
+                        )
+                    )
+                
+                IfStatement(
+                    Token(SyntaxKind.IfKeyword),
+                    Token(SyntaxKind.OpenParenToken),
+                    BinaryExpression(
+                        SyntaxKind.GreaterThanExpression,
+                        LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(5)),
+                        LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(2))),
+                    Token(SyntaxKind.CloseParenToken),
+                    Block(
+                        [|
+                            ExpressionStatement(
+                                AssignmentExpression(
+                                    SyntaxKind.SimpleAssignmentExpression,
+                                    IdentifierName("LQNDkDVw"),
+                                    LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(5))
+                                    )
+                                )
+                            :> StatementSyntax
+                        |]),
+                    ElseClause(
+                        Token(SyntaxKind.ElseKeyword),
+                        Block(
+                            [|
+                                ExpressionStatement(
+                                    AssignmentExpression(
+                                        SyntaxKind.SimpleAssignmentExpression,
+                                        IdentifierName("LQNDkDVw"),
+                                        LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(10))
+                                        )
+                                    )
+                                :> StatementSyntax
+                            |]))
+                    )
+                
+                LocalDeclarationStatement(
+                    VariableDeclaration(
+                        IdentifierName("var"),
+                        SeparatedList(
+                            [|
+                            VariableDeclarator(Identifier("foobar"))
+                                .WithInitializer(
+                                    EqualsValueClause(
+                                        IdentifierName("LQNDkDVw")
+                                        ))
+                            |]
+                            )
+                        )
+                    )
+            ]
+        )
+    ]
+    
     [<TestCase(0)>]
     [<TestCase(1)>]
-    [<TestCase(2)>]  // inline if statement assignment
     member this.``E: Test If Statement Parsing``(testCaseIndex: int) =
-        let input, expectedSyntaxNodes = List.item testCaseIndex this.TestCases
+#if LEGACY_PARSER
+        let input, expectedSyntaxTree = List.item testCaseIndex this.TestCases
         let tokens = Lexer.parseIntoTokens input |> List.toArray
         
         let syntaxNodes, parseErrors = DirectCSharpAstParser.parseTokens tokens
         match List.length parseErrors with
         | 0 ->
             let actualSyntaxNodes = List.toArray syntaxNodes |> Array.map (fun x -> x :> SyntaxNode)
-            match compareSyntaxNodes input (List.toArray expectedSyntaxNodes) actualSyntaxNodes with
+            let expectedSyntaxNodes = [| expectedSyntaxTree |]
+            match compareSyntaxNodes input expectedSyntaxNodes actualSyntaxNodes with
             | true -> Assert.Pass()
             | false -> Assert.Fail()
         | _ ->
@@ -643,6 +744,9 @@ type IfStatementParsingTests() =
                 printfn $"{count}. {parseError}"
                 count <- count + 1
             Assert.Fail()
+#endif
+        ConverterConfigSingleton.Instance.Seed <- Some 0
+        multiStatementComparison (List.item testCaseIndex this.TestCases)
             
             
 [<TestFixture>]
@@ -674,7 +778,7 @@ type FunctionParsingTests() =
             """fn(int x, int y) : int {
     let z = 10;
     x + y + z;
-}
+};
 """,
             ExpressionStatement(
                 ParenthesizedLambdaExpression(
@@ -718,14 +822,14 @@ type FunctionParsingTests() =
                                 ) :> StatementSyntax
                         |]
                         )
-                    )
+                    ).WithReturnType(PredefinedType(Token(SyntaxKind.IntKeyword)))
                 )
         )
         (
             """fn() : int {
     let x = 10;
     x + 12;
-}
+};
 """,
             ExpressionStatement(
                 ParenthesizedLambdaExpression(
@@ -758,12 +862,12 @@ type FunctionParsingTests() =
                                 ) :> StatementSyntax
                         |]
                         )
-                    )
+                    ).WithReturnType(PredefinedType(Token(SyntaxKind.IntKeyword)))
                 )
         )
         (
             """fn() : unit {
-}
+};
 """,
             ExpressionStatement(
                 ParenthesizedLambdaExpression(
@@ -773,7 +877,7 @@ type FunctionParsingTests() =
                             unitReturnStatement :> StatementSyntax
                         |]
                         )
-                    )
+                    ).WithReturnType(IdentifierName("unit"))
                 )
         )
         
@@ -781,7 +885,7 @@ type FunctionParsingTests() =
             """let add = fn(int x, int y) : int {
     let z = 10;
     x + y + z;
-}
+};
 """,
             LocalDeclarationStatement(
                 VariableDeclaration(
@@ -846,7 +950,7 @@ type FunctionParsingTests() =
                                                         ) :> StatementSyntax
                                                 |]
                                                 )
-                                            )
+                                            ).WithReturnType(PredefinedType(Token(SyntaxKind.IntKeyword)))
                                         ))
                         |]
                         )
@@ -856,7 +960,7 @@ type FunctionParsingTests() =
         (
             """fn([int -> int] transform, int init_value) : int {
     init_value;
-}
+};
 """,
             ExpressionStatement(
                 ParenthesizedLambdaExpression(
@@ -880,13 +984,13 @@ type FunctionParsingTests() =
                                 ) :> StatementSyntax
                         |]
                         )
-                    )
+                    ).WithReturnType(PredefinedType(Token(SyntaxKind.IntKeyword)))
                 )
         )
         (
             """fn([int -> int -> int] full_transform, int init_value) : [int -> int] {
     init_value;
-}
+};
 """,
             ExpressionStatement(
                 ParenthesizedLambdaExpression(
@@ -911,13 +1015,18 @@ type FunctionParsingTests() =
                                 ) :> StatementSyntax
                         |]
                         )
+                    ).WithReturnType(
+                        createFuncSignatureType [|
+                            PredefinedType(Token(SyntaxKind.IntKeyword))
+                            PredefinedType(Token(SyntaxKind.IntKeyword))
+                        |]
                     )
                 )
         )
         (
             """let partial_application_example = fn([int -> int -> int] full_transform, int init_value) : [int -> int] {
     init_value;
-}
+};
 """,
             LocalDeclarationStatement(
                 VariableDeclaration(
@@ -974,8 +1083,14 @@ type FunctionParsingTests() =
                                                         ) :> StatementSyntax
                                                 |]
                                                 )
+                                            ).WithReturnType(
+                                                createFuncSignatureType [|
+                                                    PredefinedType(Token(SyntaxKind.IntKeyword))
+                                                    PredefinedType(Token(SyntaxKind.IntKeyword))
+                                                |]
                                             )
-                                        ))
+                                        )
+                                    )
                         |]
                         )
                     )
@@ -993,14 +1108,16 @@ type FunctionParsingTests() =
     // TODO: Find a way to implement unit typing when we implement 'class' implementations
     // TODO: For non assignment statements, the expression does not keep track of function return type, so we need to add annotation tests
     member this.``F: Test Function Expression Parsing``(testCaseIndex: int) =
-        let input, expectedSyntaxNodes = List.item testCaseIndex this.TestCases
+#if LEGACY_PARSER
+        let input, expectedSyntaxTree = List.item testCaseIndex this.TestCases
         let tokens = Lexer.parseIntoTokens input |> List.toArray
         
         let syntaxNodes, parseErrors = DirectCSharpAstParser.parseTokens tokens
         match List.length parseErrors with
         | 0 ->
             let actualSyntaxNodes = List.toArray syntaxNodes |> Array.map (fun x -> x :> SyntaxNode)
-            match compareSyntaxNodes input [| expectedSyntaxNodes |] actualSyntaxNodes with
+            let expectedSyntaxNodes = [| expectedSyntaxTree |]
+            match compareSyntaxNodes input expectedSyntaxNodes actualSyntaxNodes with
             | true -> Assert.Pass()
             | false -> Assert.Fail()
         | _ ->
@@ -1009,6 +1126,8 @@ type FunctionParsingTests() =
                 printfn $"{count}. {parseError}"
                 count <- count + 1
             Assert.Fail()
+#endif
+        defaultComparison (List.item testCaseIndex this.TestCases)
 
 
 
@@ -1136,14 +1255,16 @@ type ArrayParsingTests() =
     ]
     
     member this.``G: Test Function Expression Parsing``(testCaseIndex: int) =
-        let input, expectedSyntaxNodes = List.item testCaseIndex this.TestCases
+#if LEGACY_PARSER
+        let input, expectedSyntaxTree = List.item testCaseIndex this.TestCases
         let tokens = Lexer.parseIntoTokens input |> List.toArray
         
         let syntaxNodes, parseErrors = DirectCSharpAstParser.parseTokens tokens
         match List.length parseErrors with
         | 0 ->
             let actualSyntaxNodes = List.toArray syntaxNodes |> Array.map (fun x -> x :> SyntaxNode)
-            match compareSyntaxNodes input [| expectedSyntaxNodes |] actualSyntaxNodes with
+            let expectedSyntaxNodes = [| expectedSyntaxTree |]
+            match compareSyntaxNodes input expectedSyntaxNodes actualSyntaxNodes with
             | true -> Assert.Pass()
             | false -> Assert.Fail()
         | _ ->
@@ -1152,6 +1273,8 @@ type ArrayParsingTests() =
                 printfn $"{count}. {parseError}"
                 count <- count + 1
             Assert.Fail()
+#endif
+        defaultComparison (List.item testCaseIndex this.TestCases)
 
 
 [<TestFixture>]
@@ -1161,7 +1284,7 @@ type FunctionCallParsingTests () =
     
     member this.TestCases : (string * SyntaxNode) list = [
         (
-            """foobar(1, 2)""",
+            """foobar(1, 2);""",
             ExpressionStatement(
                 InvocationExpression(
                         IdentifierName("foobar"),
@@ -1180,7 +1303,7 @@ type FunctionCallParsingTests () =
         )
         
         (
-            """Console.WriteLine("Hello World")""",
+            """Console.WriteLine("Hello World");""",
             ExpressionStatement(
                 InvocationExpression(
                         MemberAccessExpression(
@@ -1206,14 +1329,16 @@ type FunctionCallParsingTests () =
     [<TestCase(0)>]
     [<TestCase(1)>]
     member this.``H: Test Function Call Parsing``(testCaseIndex: int) =
-        let input, expectedSyntaxNodes = List.item testCaseIndex this.TestCases
+#if LEGACY_PARSER
+        let input, expectedSyntaxTree = List.item testCaseIndex this.TestCases
         let tokens = Lexer.parseIntoTokens input |> List.toArray
         
         let syntaxNodes, parseErrors = DirectCSharpAstParser.parseTokens tokens
         match List.length parseErrors with
         | 0 ->
             let actualSyntaxNodes = List.toArray syntaxNodes |> Array.map (fun x -> x :> SyntaxNode)
-            match compareSyntaxNodes input [| expectedSyntaxNodes |] actualSyntaxNodes with
+            let expectedSyntaxNodes = [| expectedSyntaxTree |]
+            match compareSyntaxNodes input expectedSyntaxNodes actualSyntaxNodes with
             | true -> Assert.Pass()
             | false -> Assert.Fail()
         | _ ->
@@ -1222,3 +1347,5 @@ type FunctionCallParsingTests () =
                 printfn $"{count}. {parseError}"
                 count <- count + 1
             Assert.Fail()
+#endif
+        defaultComparison (List.item testCaseIndex this.TestCases)

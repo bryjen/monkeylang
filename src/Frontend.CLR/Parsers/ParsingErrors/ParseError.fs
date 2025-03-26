@@ -1,5 +1,6 @@
 ﻿namespace Monkey.Frontend.CLR.Parsers.ParsingErrors
 
+open System
 open Microsoft.CodeAnalysis.CSharp
 open Microsoft.CodeAnalysis.Text
 
@@ -21,6 +22,7 @@ module ParseErrorHelpers =
 
 [<AbstractClass>]
 type ParseError () =
+    inherit Exception()
     abstract member GetFormattedMessage : SourceText * string option -> string  // source text -> source text file path -> formatted message
     
     abstract member ErrorType : unit -> string

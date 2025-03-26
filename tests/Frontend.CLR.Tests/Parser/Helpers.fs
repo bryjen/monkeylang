@@ -1,10 +1,14 @@
 ﻿module Monkey.Frontend.CLR.Tests.Parser.Helpers
 
 open System
-open System.ComponentModel
+open Frontend.CLR.Syntax.Tokenizer
 open Microsoft.CodeAnalysis
 open Microsoft.CodeAnalysis.CSharp
 open Microsoft.CodeAnalysis.CSharp.Syntax
+open Microsoft.CodeAnalysis.Text
+open Monkey.Frontend.CLR.Converter
+open Monkey.Frontend.CLR.Parsers
+open NUnit.Framework
 
 type ParserComponentType =
     | Expressions = 1
@@ -65,13 +69,13 @@ let compareSyntaxNodes (monkeyInput: string) (expectedSyntaxNodes: SyntaxNode ar
     
     printfn "```csharp (expected)"
     for expected in expectedSyntaxNodes do
-        printfn $"{expected}"
+        printfn $"{expected.NormalizeWhitespace()}"
     printfn "```"
     printfn ""
     
     printfn "```csharp (actual)"
     for actual in actualSyntaxNodes do
-        printfn $"{actual}"
+        printfn $"{actual.NormalizeWhitespace()}"
     printfn "```"
     printfn "---------------------------------------------------------"
     
@@ -91,7 +95,51 @@ let compareSyntaxNodes (monkeyInput: string) (expectedSyntaxNodes: SyntaxNode ar
     
     let mutable pass = true
     for expected, actual in Array.zip expectedSyntaxNodes actualSyntaxNodes do
+        let expected = expected.NormalizeWhitespace()
+        let actual = actual.NormalizeWhitespace()
         if (not (expected.IsEquivalentTo(actual)) || not (actual.IsEquivalentTo(expected))) then
             pass <- false
         
-    pass 
+    pass
+    
+    
+    
+let private comparisonCore (expectedSyntaxNodes: SyntaxNode array) (input: string) =
+    let sourceText = SourceText.From(input)
+    let tokens = tokenize input
+    let statements, parseErrors = MonkeyAstParser.parseTokens tokens
+    
+    if parseErrors.Length > 0 then
+        printfn "Parsing Errors:"
+        let mutable count = 1
+        for parseError in parseErrors do
+            let demoFilePath = @"C:\Users\Public\Documents\repos\MonkeyProject\Program.mk"
+            printfn $"{count}. {parseError.GetFormattedMessage(sourceText, Some demoFilePath)}"
+            count <- count + 1
+        Assert.Fail()
+    
+    let conversionResult = AstConverter.toCSharpCompilationUnit statements
+    match conversionResult with
+    | Ok compilationUnitSyntax ->
+        let statements = filterGlobalStatementsAsStatementSyntaxes (Seq.toArray compilationUnitSyntax.Members)
+        let actualSyntaxNodes = statements |> Array.map (fun s -> s :> SyntaxNode)
+        match compareSyntaxNodes input expectedSyntaxNodes actualSyntaxNodes with
+        | true -> Assert.Pass()
+        | false -> Assert.Fail()
+    | Error conversionErrors -> 
+        printfn "Conversion Errors:"
+        let mutable count = 1
+        for error in conversionErrors do
+            printfn $"{count}. {error}\n{error.Message}"
+            count <- count + 1
+        Assert.Fail()
+    
+let defaultComparison (testCase: string * SyntaxNode) =
+    let input, expectedSyntaxNode = testCase
+    comparisonCore (List.toArray [ expectedSyntaxNode ]) input
+
+let multiStatementComparison (testCase: string * SyntaxNode list) =
+    let input, expectedSyntaxNodesList = testCase
+    comparisonCore (List.toArray expectedSyntaxNodesList) input
+    
+        

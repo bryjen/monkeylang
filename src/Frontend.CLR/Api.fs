@@ -4,6 +4,8 @@ open System
 open System.Diagnostics
 open System.IO
 open System.Threading.Tasks
+open Frontend.CLR.Syntax
+open Frontend.CLR.Syntax.Tokenizer
 open Microsoft.Build.Locator
 open Microsoft.CodeAnalysis
 open Microsoft.CodeAnalysis.CSharp
@@ -14,6 +16,7 @@ open FsToolkit.ErrorHandling
 
 open Microsoft.CodeAnalysis.MSBuild
 open Monkey.Frontend.CLR.Api.Errors
+open Monkey.Frontend.CLR.Converter
 open Monkey.Frontend.CLR.HostStubGenerator
 open Monkey.Frontend.CLR.Lexer
 open Monkey.Frontend.CLR.Parsers
@@ -92,7 +95,9 @@ module CsharpProjectConverter =
             
             // generate .cs files
             let sourceAndOutputFileInfoPairs = getSourceAndOutputFilePathPairs outputDir scanResults
-            let parseResultsAndOutputFileInfoPairs = sourceAndOutputFileInfoPairs |> Array.map (fun (sourceFileInfo, outputFileInfo) -> (compileFile sourceFileInfo, outputFileInfo))
+            let parseResultsAndOutputFileInfoPairs =
+                sourceAndOutputFileInfoPairs 
+                |> Array.map (fun (sourceFileInfo, outputFileInfo) -> (compileFile sourceFileInfo, outputFileInfo))
             
             let sourceFileInfoAndParseResultsPairs =
                 sourceAndOutputFileInfoPairs
@@ -109,8 +114,7 @@ module CsharpProjectConverter =
             do! match justErrors with
                 | [| |] -> Ok ()
                 | _ -> 
-                    let errorMsg = "Some errors occurred during project compilation."
-                    MonkeyProjectFilesCompilationError(message=errorMsg, compilationErrors=justErrors) :> Exception |> Error
+                    MonkeyProjectFilesCompilationError(compilationErrors=justErrors) :> Exception |> Error
             
             let compilationResultsAndOutputFileInfoPairs =
                 parseResultsAndOutputFileInfoPairs
@@ -137,17 +141,22 @@ module CsharpProjectConverter =
             
         Array.zip scanResults.SourceFileInfos correspondingOutputCsPath
         
-    and private compileFile (fileInfo: FileInfo) : Result<CompilationUnitSyntax, Exception list> =
+    and private compileFile (fileInfo: FileInfo) : Result<CompilationUnitSyntax, Exception array> =
         result {
             let monkeySourceCode = File.ReadAllText(fileInfo.FullName)
-            let tokens = Lexer.parseIntoTokens monkeySourceCode
-            let statements, errors = DirectCSharpAstParser.parseTokens (List.toArray tokens)
+            let tokens = tokenize monkeySourceCode
+            let statements, parseErrors = MonkeyAstParser.parseTokens tokens
             
-            do! match errors with
-                | [] -> Ok ()
-                | _ -> errors |> List.map (fun error -> error :> Exception) |> Error
+            do! match parseErrors with
+                | [||] -> Ok ()
+                | _ -> parseErrors |> Array.map (fun error -> error :> Exception) |> Error
                 
-            return toCompilationUnit statements
+            let conversionResults =
+                AstConverter.toCSharpCompilationUnit statements
+                |> Result.mapError (Array.map (fun err -> err :> Exception))
+                
+            let! compilationUnit = conversionResults
+            return compilationUnit
         }
         
     and private toCompilationUnit (statements: StatementSyntax list) =

@@ -1,5 +1,6 @@
 ﻿namespace Monkey.Frontend.CLR.Syntax.SyntaxFactory
 
+open System
 open System.Runtime.CompilerServices
 open Microsoft.CodeAnalysis
 open Microsoft.CodeAnalysis.CSharp
@@ -9,10 +10,7 @@ open Monkey.Frontend.CLR.Syntax.Ast
 type private CSharpToken = Microsoft.CodeAnalysis.SyntaxToken
 type private MonkeyToken = Monkey.Frontend.CLR.Syntax.Ast.SyntaxToken
 
-[<AutoOpen>]
-module private SyntaxTokenFactoryHelpers =
-    let temp () =
-        ()
+
 
 [<AbstractClass; Sealed>]
 type MonkeySyntaxTokenFactory () =
@@ -27,6 +25,7 @@ type MonkeySyntaxTokenFactory () =
             : SyntaxToken =
                 
         let textValue = Option.defaultValue "" text
+        let value = Option.defaultValue Unchecked.defaultof<obj> value
         let textSpanValue = Option.defaultValue Unchecked.defaultof<TextSpan> textSpan
         let fullTextSpanValue = Option.defaultValue Unchecked.defaultof<TextSpan> fullTextSpan
         let leadingTriviaValue = Option.defaultValue (SyntaxTriviaList()) leadingTrivia

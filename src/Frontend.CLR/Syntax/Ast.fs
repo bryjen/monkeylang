@@ -28,7 +28,7 @@ let internal interleave (xs: string[]) (ys: string[]) =
 type SyntaxToken =
     { Kind: SyntaxKind
       Text: string
-      Value: obj option
+      Value: obj
       
       TextSpan: TextSpan  // excludes trivia
       FullTextSpan: TextSpan  // includes trivia
@@ -40,13 +40,7 @@ with
         $"{this.LeadingTrivia.ToFullString()}{this.Text}{this.TrailingTrivia.ToFullString()}"
    
     static member AreEquivalent(st1: SyntaxToken, st2: SyntaxToken) =
-        let valueComparison =
-            match st1.Value, st2.Value with
-            | Some val1, Some val2 -> val1 = val2
-            | None, None -> true
-            | _ -> false
-            
-        (st1.Kind = st2.Kind) && valueComparison
+        (st1.Kind = st2.Kind) && (st1.Value = st2.Value) 
 
 
 /// <summary>
@@ -731,7 +725,15 @@ with
     member this.TextSpan () : TextSpan =
         match this.Tokens with
         | [| |] -> TextSpan(0, 0)
-        | arr -> TextSpan(arr[0].TextSpan.Start, arr[arr.Length].TextSpan.End - arr[0].TextSpan.Start)
+        | arr ->
+            TextSpan(arr[0].TextSpan.Start, arr[arr.Length - 1].TextSpan.End - arr[0].TextSpan.Start)
+            
+            (*
+            if arr[arr.Length - 1].TextSpan.End - arr[0].TextSpan.Start < 0 then
+                TextSpan(arr[0].TextSpan.Start, 0)
+            else
+                TextSpan(arr[0].TextSpan.Start, arr[arr.Length - 1].TextSpan.End - arr[0].TextSpan.Start)
+            *)
         
     static member AreEquivalent(qi1: QualifiedIdentifier, qi2: QualifiedIdentifier) =
         Array.zip qi1.Tokens qi2.Tokens

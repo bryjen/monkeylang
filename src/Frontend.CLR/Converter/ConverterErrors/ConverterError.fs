@@ -1,5 +1,7 @@
 ﻿module Monkey.Frontend.CLR.Converter.ConverterErrors.ConverterError
 
+open System
+
 type ConverterError(message: string) =
-    class end
+    inherit Exception(message)
 

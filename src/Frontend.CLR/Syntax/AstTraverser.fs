@@ -20,11 +20,10 @@ let private onSyntaxToken (indentation: int) (syntaxToken: SyntaxToken) =
     printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(SyntaxToken)) (syntaxToken.ToString() |> normalizeString)
     onSyntaxKind (indentation + 1) syntaxToken.Kind
     
-    if syntaxToken.Value.IsSome then
-        let value = syntaxToken.Value.Value
-        let indentation = indentation + 1
-        printfn "%svalue type : %s" (String.replicate indentation indentationStr) (value.GetType().ToString())
-        printfn "%svalue : %s" (String.replicate indentation indentationStr) (value.ToString())
+    let value = syntaxToken.Value
+    let indentation = indentation + 1
+    printfn "%svalue type : %s" (String.replicate indentation indentationStr) (value.GetType().ToString())
+    printfn "%svalue : %s" (String.replicate indentation indentationStr) (value.ToString())
         
     
 let private onSyntaxKind (indentation: int) (syntaxKind: SyntaxKind) =

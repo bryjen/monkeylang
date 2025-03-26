@@ -26,12 +26,43 @@ type CSharpExpression = Microsoft.CodeAnalysis.CSharp.Syntax.ExpressionSyntax
 type CSharpSyntaxToken = Microsoft.CodeAnalysis.SyntaxToken
 
 
+/// Singleton type mainly to control certain options during <b>testing</b>. Is not public-facing.
+type internal ConverterConfigSingleton() =
+    let mutable randomSeed: int option = None
+    
+    static let instance = lazy (ConverterConfigSingleton())
+    static member Instance = instance.Value
+    
+    member this.Seed
+        with get() = randomSeed
+        and set(value) = randomSeed <- value
+
+
+/// Utilities for converting monkey tokens into csharp syntax tokens. Even though the monkey token type technically
+/// contains all the required information to build csharp tokens, we have to generate them through <b>SnytaxFactory</b>.
+[<AutoOpen>]
+module private TokenConverter =
+    let monkeyToCSharpSyntaxToken (monkeySyntaxToken: MonkeySyntaxToken) : Result<CSharpSyntaxToken, ConverterError> =
+        match monkeySyntaxToken.Kind with
+        | kind when kind = SyntaxKind.NumericLiteralToken ->
+            match monkeySyntaxToken.Value with
+            | :? int as int -> Literal(int) |> Ok
+            | :? float as float -> Literal(float) |> Ok
+            | :? byte as byte -> Literal(byte) |> Ok
+            | _ -> ConverterError("Tried to convert a non-numeric type to a numeric token") |> Error
+        | kind when kind = SyntaxKind.StringLiteralToken ->
+            match monkeySyntaxToken.Value with
+            | :? string as string -> Literal(string) |> Ok
+            | _ -> ConverterError("Tried to convert a non-string type to a string token") |> Error
+        | SyntaxKind.IdentifierToken ->
+            Identifier(monkeySyntaxToken.Text.Trim()) |> Ok
+        | _ ->
+            Token(monkeySyntaxToken.Kind) |> Ok
+        
+    
 
 [<AutoOpen>]
 module private ConverterHelpers =
-    let monkeyToCSharpSyntaxToken (monkeySyntaxToken: MonkeySyntaxToken) : CSharpSyntaxToken =
-        Token(SyntaxTriviaList.Empty, monkeySyntaxToken.Kind, monkeySyntaxToken.Text, monkeySyntaxToken.Value.ToString(), SyntaxTriviaList.Empty)
-        
     let separateResultArray (results: Result<'a, 'b> array) =
         let rec separateResultArrayCore (oks: ResizeArray<'a>) (errors: ResizeArray<'b>) (currentIdx: int) =
             match currentIdx with
@@ -45,11 +76,7 @@ module private ConverterHelpers =
                 
         separateResultArrayCore (ResizeArray<'a>()) (ResizeArray<'b>()) 0
         
-    /// <summary>
-    /// Changes the last statement of a block to a variable assignment statement. Requires that the last statement be an
-    /// <b>expression statement</b>.
-    /// </summary>
-    let rec changeLastStatementToAssignment
+    let rec appendAssignmentStatementToBlock
             (varName: string)
             (blockSyntax: Microsoft.CodeAnalysis.CSharp.Syntax.BlockSyntax)
             : Result<Microsoft.CodeAnalysis.CSharp.Syntax.BlockSyntax, ConverterError> =
@@ -72,16 +99,59 @@ module private ConverterHelpers =
                 ConverterError("Expected the last statement of the block to be an expression statement.") |> Error
         | None ->
             ConverterError("The block has no statements.") |> Error
+            
+            
+    let rec transformLastStatementToAssignmentStatement
+            (varName: string)
+            (blockSyntax: Microsoft.CodeAnalysis.CSharp.Syntax.BlockSyntax)
+            : Result<Microsoft.CodeAnalysis.CSharp.Syntax.BlockSyntax, ConverterError> =
+        match blockSyntax.Statements.LastOrDefault() |> Option.ofObj with
+        | Some lastStatement ->
+            match lastStatement with
+            | :? Microsoft.CodeAnalysis.CSharp.Syntax.ExpressionStatementSyntax as expressionStatement ->
+                let newLastStatement =
+                    ExpressionStatement(
+                        AssignmentExpression(
+                            SyntaxKind.SimpleAssignmentExpression,
+                            IdentifierName(varName),
+                            Token(SyntaxKind.EqualsToken),
+                            expressionStatement.Expression)
+                        ) :> Microsoft.CodeAnalysis.CSharp.Syntax.StatementSyntax
+                let everythingButLastStatement = Array.take (blockSyntax.Statements.Count - 1) (Seq.toArray blockSyntax.Statements)
+                let newStatements = Array.append everythingButLastStatement [| newLastStatement |] |> SyntaxList
+                blockSyntax.WithStatements(newStatements) |> Ok
+            | _ ->
+                ConverterError("Expected the last statement of the block to be an expression statement.") |> Error
+        | None ->
+            ConverterError("The block has no statements.") |> Error
+            
+            
+    let rec transformLastStatementToReturnStatement
+            (blockSyntax: Microsoft.CodeAnalysis.CSharp.Syntax.BlockSyntax)
+            : Result<Microsoft.CodeAnalysis.CSharp.Syntax.BlockSyntax, ConverterError> =
+                
+        let unitReturnStatement =
+            ReturnStatement(
+                ObjectCreationExpression(
+                    Token(SyntaxKind.NewKeyword),
+                    IdentifierName("unit"),
+                    ArgumentList(),
+                    null)
+                )
 
-    let flattenArray (arr: 'a array array) : 'a array =
-        match arr.Length with
-        | i when i = 0 ->
-            [| |]
-        | i when i = 1 ->
-            arr[0]
-        | _ ->
-            Array.concat arr
-
+        match blockSyntax.Statements.LastOrDefault() |> Option.ofObj with
+        | Some lastStatement ->
+            match lastStatement with
+            | :? Microsoft.CodeAnalysis.CSharp.Syntax.ExpressionStatementSyntax as expressionStatement ->
+                let returnStatement = ReturnStatement(expressionStatement.Expression)
+                let everythingButLastStatement = Array.take (blockSyntax.Statements.Count - 1) (Seq.toArray blockSyntax.Statements)
+                let newStatements = Array.append everythingButLastStatement [| returnStatement |] |> SyntaxList
+                blockSyntax.WithStatements(newStatements) |> Ok
+            | _ ->
+                ConverterError("Expected the last statement of the block to be an expression statement.") |> Error
+        | None ->
+            Block().WithStatements(List([| unitReturnStatement |])) |> Ok
+ 
 
 let toCSharpCompilationUnit
         (statements: StatementSyntax array)
@@ -89,11 +159,9 @@ let toCSharpCompilationUnit
     let conversionResults = statements |> Array.map tryConvertStatement
     let statements, errors = separateResultArray conversionResults
     
-    match flattenArray errors with
+    match Array.concat errors with
     | [| |] ->
         let tempUsingDirective = UsingDirective(IdentifierName("System"))  // TODO: This thing
-        
-        let temp = statements |> flattenArray
         
         let statements =
             statements
@@ -115,7 +183,7 @@ let rec internal tryConvertType (typeSyntax: TypeSyntax) : Microsoft.CodeAnalysi
     | NameSyntax nameSyntax ->
         tryConvertNameSyntax nameSyntax
     | BuiltinTypeSyntax builtinTypeSyntax ->
-        PredefinedType(monkeyToCSharpSyntaxToken builtinTypeSyntax.Token)
+        PredefinedType(Token(builtinTypeSyntax.Token.Kind))
     | FunctionTypeSyntax functionTypeSyntax ->
         tryConvertFunctionType functionTypeSyntax
     | ArrayTypeSyntax arrayTypeSyntax -> 
@@ -126,7 +194,7 @@ let rec internal tryConvertType (typeSyntax: TypeSyntax) : Microsoft.CodeAnalysi
 and private tryConvertNameSyntax (nameSyntax: NameSyntax) : Microsoft.CodeAnalysis.CSharp.Syntax.NameSyntax =
     match nameSyntax.Identifier with
     | SimpleIdentifier simpleIdentifier ->
-        IdentifierName(monkeyToCSharpSyntaxToken simpleIdentifier.Token)
+        IdentifierName(Identifier(simpleIdentifier.Token.Text.Trim()))
     | QualifiedIdentifier qualifiedIdentifier ->
         tryConvertQualifiedIdentifier qualifiedIdentifier
     
@@ -135,9 +203,9 @@ and private tryConvertQualifiedIdentifier (qualifiedIdentifier: QualifiedIdentif
     let rec tryConvertQualifiedIdentifierCore (currentIdx: int) =
         match currentIdx with
         | i when i > 0 ->
-            QualifiedName(tryConvertQualifiedIdentifierCore (currentIdx - 1), IdentifierName(monkeyToCSharpSyntaxToken tokens[i])) :> Microsoft.CodeAnalysis.CSharp.Syntax.NameSyntax
+            QualifiedName(tryConvertQualifiedIdentifierCore (currentIdx - 1), IdentifierName(tokens[i].Text.Trim())) :> Microsoft.CodeAnalysis.CSharp.Syntax.NameSyntax
         | i ->
-            IdentifierName(monkeyToCSharpSyntaxToken tokens[i]) :> Microsoft.CodeAnalysis.CSharp.Syntax.NameSyntax
+            IdentifierName(tokens[i].Text.Trim()) :> Microsoft.CodeAnalysis.CSharp.Syntax.NameSyntax
             
     tryConvertQualifiedIdentifierCore (tokens.Length - 1)
     
@@ -156,15 +224,34 @@ and private tryConvertGenericType (genericType: GenericTypeSyntax) =
 
 (* Parameter Conversion *)
 let private tryConvertParameter (parameter: ParameterSyntax) : Microsoft.CodeAnalysis.CSharp.Syntax.ParameterSyntax =
-    let csToken = monkeyToCSharpSyntaxToken parameter.Identifier.Token
-    Parameter(csToken).WithType(tryConvertType parameter.Type)
+    let identifierToken = Identifier(parameter.Identifier.Token.ToString().Trim())
+    Parameter(identifierToken).WithType(tryConvertType parameter.Type)
     
 let private tryConvertParameterList (parameterList: ParameterListSyntax) : Microsoft.CodeAnalysis.CSharp.Syntax.ParameterListSyntax =
     let csParameters = parameterList.Parameters |> Array.map tryConvertParameter
     
     ParameterList(SeparatedList(csParameters))
-        .WithOpenParenToken(monkeyToCSharpSyntaxToken parameterList.OpenParenToken)
-        .WithOpenParenToken(monkeyToCSharpSyntaxToken parameterList.CloseParenToken)
+        .WithOpenParenToken(Token(SyntaxKind.OpenParenToken))
+        .WithCloseParenToken(Token(SyntaxKind.CloseParenToken))
+        
+        
+        
+(* Argument Conversion *)
+let private tryConvertArgumentsList
+        (addStatements: CSharpStatement array -> unit)
+        (argumentList: ArgumentListSyntax)
+        : Result<Microsoft.CodeAnalysis.CSharp.Syntax.ArgumentListSyntax, ConverterError array> =
+    result {
+        let argumentParseResults = argumentList.Arguments |> Array.map (tryConvertExpression addStatements)
+        let expressions, errors = separateResultArray argumentParseResults
+        
+        do! match Array.concat errors with
+            | [| |] -> Ok ()
+            | errors -> Error errors
+        
+        let arguments = expressions |> Array.map Argument
+        return ArgumentList(SeparatedList(arguments))
+    }
         
         
     
@@ -192,8 +279,8 @@ and internal tryConvertBlock
         let blockStatement =
             Block()
                 .WithStatements(SyntaxList(csharpStatements))
-                .WithOpenBraceToken(monkeyToCSharpSyntaxToken block.OpenBraceToken)
-                .WithCloseBraceToken(monkeyToCSharpSyntaxToken block.CloseBraceToken)
+                .WithOpenBraceToken(Token(SyntaxKind.OpenBraceToken))
+                .WithCloseBraceToken(Token(SyntaxKind.CloseBraceToken))
         Ok blockStatement
     | _ ->
         errors |> Array.concat |> Error
@@ -212,7 +299,7 @@ and internal tryConvertExpressionStatement
         let csExpressionStatement =
             [|
                 ExpressionStatement(csExpression)
-                    .WithSemicolonToken(monkeyToCSharpSyntaxToken expressionStatement.SemicolonToken)
+                    .WithSemicolonToken(Token(SyntaxKind.SemicolonToken))
                     :> CSharpStatement
             |]
         Array.append (csStatements.ToArray()) csExpressionStatement |> Ok
@@ -225,12 +312,21 @@ and internal tryConvertVariableDeclarationStatement
     let addStatements newStatements = csStatements.AddRange(newStatements)
             
     result {
-        let variableType =
-            match variableDeclarationStatement.TypeAnnotation with
-            | Some variableTypeAnnotation -> tryConvertType variableTypeAnnotation.Type
-            | None -> IdentifierName("var") :> Microsoft.CodeAnalysis.CSharp.Syntax.TypeSyntax
-            
         let! csExpression = tryConvertExpression addStatements variableDeclarationStatement.Expression
+        
+        let variableTypeOption =
+            match variableDeclarationStatement.TypeAnnotation with
+            | Some variableTypeAnnotation ->
+                tryConvertType variableTypeAnnotation.Type |> Some
+            | None ->
+                match csExpression with
+                | :? ParenthesizedLambdaExpressionSyntax as ples ->
+                    ples |> getParameterizedLambdaExpressionType |> Some
+                | _ ->
+                    None
+                    
+        let defaultType = IdentifierName("var") :> Microsoft.CodeAnalysis.CSharp.Syntax.TypeSyntax
+        let variableType = defaultArg variableTypeOption defaultType
         
         let csStatement =
             [|
@@ -238,7 +334,7 @@ and internal tryConvertVariableDeclarationStatement
                     VariableDeclaration(variableType)
                         .WithVariables(
                             SingletonSeparatedList(
-                                VariableDeclarator(monkeyToCSharpSyntaxToken variableDeclarationStatement.Name)
+                                VariableDeclarator(Identifier(variableDeclarationStatement.Name.Text.ToString()))
                                     .WithInitializer(
                                         EqualsValueClause(
                                             csExpression
@@ -252,7 +348,12 @@ and internal tryConvertVariableDeclarationStatement
         return Array.append (csStatements.ToArray()) csStatement
     }
 
-
+and private getParameterizedLambdaExpressionType (parenthesizedLambdaExpressionSyntax: ParenthesizedLambdaExpressionSyntax) =
+    let parameterTypes = parenthesizedLambdaExpressionSyntax.ParameterList.Parameters |> Seq.toArray |> Array.map _.Type
+    let returnType = parenthesizedLambdaExpressionSyntax.ReturnType
+    let fullTypeArr = Array.append parameterTypes [| returnType |]
+    
+    GenericName(Identifier("Func")).WithTypeArgumentList(TypeArgumentList(SeparatedList(fullTypeArr))) :> Microsoft.CodeAnalysis.CSharp.Syntax.TypeSyntax
 
 
 
@@ -270,35 +371,32 @@ let rec internal tryConvertExpression
     | TypeSyntax typeSyntax ->
         tryConvertType typeSyntax :> CSharpExpression |> Ok
     | LiteralExpressionSyntax literalExpressionSyntax ->
-        tryConvertLiteralExpression literalExpressionSyntax :> CSharpExpression |> Ok
+        tryConvertLiteralExpression literalExpressionSyntax
+        |> Result.map (fun les -> les :> CSharpExpression)
+        |> Result.mapError (fun err -> [| err |])
     | PrefixExpressionSyntax prefixExpressionSyntax ->
         tryConvertPrefixExpression addStatements prefixExpressionSyntax
     | MonkeyExpression.IdentifierSyntax identifierSyntax ->
         tryConvertIdentifier identifierSyntax |> Ok
     | IfExpressionSyntax ifExpressionSyntax ->
         tryConvertIfExpression addStatements ifExpressionSyntax
+    | InvocationExpressionSyntax invocationExpressionSyntax ->
+        tryConvertInvocationExpression addStatements invocationExpressionSyntax
     
     | ArrayExpressionSyntax arrayExpressionSyntax ->
         failwith "todo"
     | InterpolatedStringExpressionSyntax interpolatedStringExpressionSyntax ->
-        failwith "todo"
-    | InvocationExpressionSyntax invocationExpressionSyntax ->
         failwith "todo"
     | PostfixExpressionSyntax postfixExpressionSyntax ->
         failwith "todo"
     
 and internal tryConvertLiteralExpression
         (literalExpression: LiteralExpressionSyntax)
-        : Microsoft.CodeAnalysis.CSharp.Syntax.LiteralExpressionSyntax =
-    let value =
-        match literalExpression.Token.Value with
-        | None -> failwith "no value for token?"
-        | Some value ->
-            match value with
-            | :? int as intValue -> Literal(intValue)
-            | :? string as stringValue -> Literal(stringValue)
-            | _ -> failwith "unrecognized value type"
-    LiteralExpression(literalExpression.Kind, value)
+        : Result<Microsoft.CodeAnalysis.CSharp.Syntax.LiteralExpressionSyntax, ConverterError> =
+    result {
+        let! token = monkeyToCSharpSyntaxToken literalExpression.Token
+        return LiteralExpression(literalExpression.Kind, token)
+    }
     
 and internal tryConvertParenthesizedExpression
         (addStatements: CSharpStatement array -> unit)
@@ -306,9 +404,7 @@ and internal tryConvertParenthesizedExpression
         : Result<CSharpExpression, ConverterError array> =
     result {
         let! csExpression = tryConvertExpression addStatements parenthesizedExpression.Expression
-        let csOpenParenToken = monkeyToCSharpSyntaxToken parenthesizedExpression.OpenParenToken
-        let csCloseParenToken = monkeyToCSharpSyntaxToken parenthesizedExpression.CloseParenToken
-        return ParenthesizedExpression(csOpenParenToken, csExpression, csCloseParenToken)
+        return ParenthesizedExpression(Token(SyntaxKind.OpenParenToken), csExpression, Token(SyntaxKind.CloseParenToken))
     }
     
     
@@ -319,9 +415,58 @@ and internal tryConvertBinaryExpression
     result {
         let! csLeftExpression = tryConvertExpression addStatements binaryExpression.Left
         let! csRightExpression = tryConvertExpression addStatements binaryExpression.Right
-        let csOperatorToken = monkeyToCSharpSyntaxToken binaryExpression.OperatorToken
-        return BinaryExpression(binaryExpression.Kind, csLeftExpression, csOperatorToken, csRightExpression)
+        return BinaryExpression(binaryExpression.Kind, csLeftExpression, Token(binaryExpression.OperatorToken.Kind), csRightExpression)
     }
+    
+    
+and internal tryConvertInvocationExpression
+        (addStatements: CSharpStatement array -> unit)
+        (invocationExpression: InvocationExpressionSyntax)
+        : Result<CSharpExpression, ConverterError array> =
+    result {
+        let! leftExpression = tryConvertInvocationExpressionLeftExpression invocationExpression.Expression
+        let! argumentsList = tryConvertArgumentsList addStatements invocationExpression.Arguments
+        return InvocationExpression(leftExpression, argumentsList)
+    }
+    
+and private tryConvertInvocationExpressionLeftExpression
+        (invocationExpressionLeftExpression: InvocationExpressionLeftExpression)
+        : Result<CSharpExpression, ConverterError array> =
+    match invocationExpressionLeftExpression with
+    | ParenthesizedFunctionExpressionSyntax invocationParenthesizedExpressionSyntax ->
+        tryConvertInvocationExpressionLeftExpression invocationParenthesizedExpressionSyntax.Expression
+        |> Result.map (fun expr -> ParenthesizedExpression(expr))
+    | FunctionExpressionSyntax functionExpressionSyntax ->
+        tryConvertFunctionExpression functionExpressionSyntax
+    | IdentifierSyntax identifierSyntax ->
+        match identifierSyntax with
+        | SimpleIdentifier simpleIdentifier ->
+            IdentifierName(Identifier(simpleIdentifier.Token.Text.Trim())) :> CSharpExpression |> Ok
+        | QualifiedIdentifier qualifiedIdentifier ->
+            tryConvertQualifiedIdentifierToMemberAccessExpression qualifiedIdentifier :> CSharpExpression |> Ok
+        
+and private tryConvertQualifiedIdentifierToMemberAccessExpression (qualifiedIdentifier: QualifiedIdentifier) =
+    let tokens = qualifiedIdentifier.Tokens
+    let rec core (currentIdx: int) =
+        match currentIdx with
+        | i when i = tokens.Length - 2 ->
+            MemberAccessExpression(
+                SyntaxKind.SimpleMemberAccessExpression,
+                IdentifierName(tokens[tokens.Length - 2].Text.Trim()),
+                Token(SyntaxKind.DotToken),
+                IdentifierName(tokens[tokens.Length - 1].Text.Trim())
+                )
+        | i ->
+            MemberAccessExpression(
+                SyntaxKind.SimpleMemberAccessExpression,
+                core (currentIdx + 1),
+                Token(SyntaxKind.DotToken),
+                IdentifierName(tokens[i].Text.Trim())
+                )
+            
+    core (0)
+    
+    
     
 and internal tryConvertInterpolatedStringExpression
         (addStatements: CSharpStatement array -> unit)
@@ -341,8 +486,7 @@ and internal tryConvertPrefixExpression
         : Result<CSharpExpression, ConverterError array> =
     result {
         let! csOperand = tryConvertExpression addStatements prefixExpression.Operand
-        let operatorToken = monkeyToCSharpSyntaxToken prefixExpression.OperatorToken
-        return PrefixUnaryExpression(prefixExpression.Kind, operatorToken, csOperand)
+        return PrefixUnaryExpression(prefixExpression.Kind, Token(prefixExpression.OperatorToken.Kind), csOperand)
     }
     
 and internal tryConvertIdentifier
@@ -350,11 +494,9 @@ and internal tryConvertIdentifier
         : CSharpExpression =
     match identifier with
     | SimpleIdentifier simpleIdentifier ->
-        IdentifierName(monkeyToCSharpSyntaxToken simpleIdentifier.Token)
+        IdentifierName(Identifier(simpleIdentifier.Token.Text.Trim()))
     | QualifiedIdentifier qualifiedIdentifier ->
         tryConvertQualifiedIdentifier qualifiedIdentifier
-    
-    
     
 and internal tryConvertFunctionExpression
         (functionExpression: FunctionExpressionSyntax)
@@ -362,8 +504,9 @@ and internal tryConvertFunctionExpression
     result {
         let parameterList = tryConvertParameterList functionExpression.ParameterList
         let! functionBlock = tryConvertBlock functionExpression.Body
+        let! updatedFunctionBlock = transformLastStatementToReturnStatement functionBlock |> Result.mapError (fun err -> [| err |])
         let returnType = tryConvertType functionExpression.ReturnType
-        return ParenthesizedLambdaExpression(parameterList, functionBlock).WithReturnType(returnType)
+        return ParenthesizedLambdaExpression(parameterList, updatedFunctionBlock).WithReturnType(returnType)
     }
     
     
@@ -397,7 +540,7 @@ and internal tryConvertIfExpression
         
         let! condition = tryConvertExpression addStatements ifExpression.Condition
         let! block = tryConvertBlock ifExpression.Clause
-        let! block = changeLastStatementToAssignment varName block |> Result.mapError (fun err -> [| err |])
+        let! block = transformLastStatementToAssignmentStatement varName block |> Result.mapError (fun err -> [| err |])
         
         let! elseClauseOption =
             match ifExpression.ElseClause with
@@ -420,13 +563,17 @@ and private tryConvertElseClause
         : Result<Microsoft.CodeAnalysis.CSharp.Syntax.ElseClauseSyntax, ConverterError array> =
     result {
         let! block = tryConvertBlock elseClause.ElseClause
-        let! block = changeLastStatementToAssignment varName block |> Result.mapError (fun err -> [| err |])
+        let! block = transformLastStatementToAssignmentStatement varName block |> Result.mapError (fun err -> [| err |])
         return ElseClause(Token(SyntaxKind.ElseKeyword), block)
     }
     
 and private generatePlaceholderVariable () =
+    let random =
+        match ConverterConfigSingleton.Instance.Seed with
+        | None -> Random()
+        | Some seed -> Random(seed)
+    
     let chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    let random = Random()
     let varName = Array.init 8 (fun _ -> chars.[random.Next(chars.Length)]) |> String
     
     let localDeclarationStatement =

@@ -3,7 +3,6 @@
 module rec Monkey.Frontend.CLR.Parsers.MonkeyAstParser
 
 open Frontend.CLR.Parsers.ParsingErrors.ParameterListErrors
-open Microsoft.CodeAnalysis
 open Microsoft.CodeAnalysis.CSharp
 
 open FsToolkit.ErrorHandling
@@ -208,12 +207,12 @@ module internal PrefixExpressions =
         
     let tryParseTrueLiteralExpression (parserState: MonkeyAstParserState) : Result<ExpressionSyntax, ParseError> =
         let currentToken = parserState.PopToken()
-        let updatedToken = { currentToken with Value = Some true }
+        let updatedToken = { currentToken with Value = true }
         { Kind = SyntaxKind.TrueLiteralExpression; Token = updatedToken } |> ExpressionSyntax.LiteralExpressionSyntax |> Ok
         
     let tryParseFalseLiteralExpression (parserState: MonkeyAstParserState) : Result<ExpressionSyntax, ParseError> =
         let currentToken = parserState.PopToken()
-        let updatedToken = { currentToken with Value = Some false }
+        let updatedToken = { currentToken with Value = false }
         { Kind = SyntaxKind.FalseLiteralExpression; Token = updatedToken } |> ExpressionSyntax.LiteralExpressionSyntax |> Ok
         
     let tryParseLogicalNotPrefixExpression (parserState: MonkeyAstParserState) : Result<ExpressionSyntax, ParseError> =
@@ -776,13 +775,10 @@ module internal PrefixExpressions =
                 // failwith "todo"
                 PlaceholderError() :> ParseError |> Error
                 
-    and private isFnKeyword (value: obj option) : bool =
+    and private isFnKeyword (value: obj) : bool =
         match value with
-        | Some value ->
-            match value with
-            | :? string as str when str = "fn" -> true
-            | _ -> false
-        | None -> false
+        | :? string as str when str = "fn" -> true
+        | _ -> false
         
     and private tryParseInvocationExpressionIfPrecedesCallExpr
             (parserState: MonkeyAstParserState)

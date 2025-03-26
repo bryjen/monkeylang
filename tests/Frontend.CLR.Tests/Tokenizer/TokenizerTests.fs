@@ -36,15 +36,7 @@ module private TokenizerTestHelpers =
             
             do! assertTokenTypeIsExpectedTokenType testCount expectedSyntaxKind actualToken.Kind
             
-            do! match expectedValue, actualToken.Value with
-                | None, None ->
-                    Ok ()
-                | None, Some actual ->
-                    Error $"[test #{testCount}] Expected nothing, but got \"{actual}\""
-                | Some expected, None ->
-                    Error $"[test #{testCount}] Expected \"{expected}\", but got nothing"
-                | Some expected, Some actual ->
-                    assertValueIsExpectedValue testCount expected actual
+            do! assertValueIsExpectedValue testCount expectedValue actualToken.Value
         }
         
     /// If any 'Result' DU is 'ERROR', return 'ERROR + error message', returns OK otherwise

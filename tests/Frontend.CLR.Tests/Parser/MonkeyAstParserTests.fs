@@ -1045,7 +1045,7 @@ type InvocationExpressionParsingTests() =
             let mutable count = 1
             for parseError in parseErrors do
                 let filePath = @"C:\Users\Public\Program.mk"
-                printfn $"{count}\n{parseError.GetFormattedMessage(sourceText, Some filePath)}"
+                printfn $"{count}\n{parseError.GetType().ToString()}\n{parseError.GetFormattedMessage(sourceText, Some filePath)}"
                 count <- count + 1
             Assert.Fail()
             
