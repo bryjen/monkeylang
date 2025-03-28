@@ -11,7 +11,6 @@
 
     <ItemGroup>
         <Compile Include="Tokenizer\AstEquivalenceTests.fs" />
-        <Compile Include="Tokenizer\OldTokenizerTests.fs" />
         <Compile Include="Tokenizer\TokenizerTests.fs" />
         <Compile Include="Tokenizer\RoundtrippableTests.fs" />
         <Compile Include="Parser\Helpers.fs" />
@@ -33,7 +32,13 @@
     </ItemGroup>
     
     <ItemGroup>
-      <ProjectReference Include="..\..\src\Frontend.CLR\Frontend.CLR.fsproj" />
+        <!-- Retained just for legacy sakes.
+        <ProjectReference Include="..\..\src\Frontend.CLR\Frontend.CLR.fsproj" />
+         -->
+        
+        <ProjectReference Include="..\..\src\Monkey.AST\Monkey.AST.fsproj" />
+        <ProjectReference Include="..\..\src\Monkey.Parser\Monkey.Parser.fsproj" />
+        <ProjectReference Include="..\..\src\Monkey.Codegen.Dotnet\Monkey.Codegen.Dotnet.fsproj" />
     </ItemGroup>
 
 </Project>

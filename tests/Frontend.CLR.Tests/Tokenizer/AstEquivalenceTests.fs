@@ -1,11 +1,11 @@
 ﻿namespace Monkey.Frontend.CLR.Tests.Tokenizer
 
-open Monkey.Frontend.CLR.Syntax.Ast
+open Monkey.AST
 open NUnit.Framework
 
-open type Monkey.Frontend.CLR.Syntax.SyntaxFactory.MonkeySyntaxTokenFactory
-open type Monkey.Frontend.CLR.Syntax.SyntaxFactory.MonkeyExpressionSyntaxFactory
-open type Monkey.Frontend.CLR.Syntax.SyntaxFactory.MonkeyStatementSyntaxFactory
+open type Monkey.AST.SyntaxFactory.MonkeySyntaxTokenFactory
+open type Monkey.AST.SyntaxFactory.MonkeyExpressionSyntaxFactory
+open type Monkey.AST.SyntaxFactory.MonkeyStatementSyntaxFactory
 
 
 [<AutoOpen>]

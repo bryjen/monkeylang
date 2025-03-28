@@ -1,15 +1,17 @@
 ﻿namespace Monkey.Frontend.CLR.Tests.Parser.MonkeyAstParseErrorTests
 
-open Frontend.CLR.Syntax
-open Microsoft.CodeAnalysis.CSharp
 open Microsoft.CodeAnalysis.Text
-open Monkey.Frontend.CLR.Parsers
-open Monkey.Frontend.CLR.Parsers.ParsingErrors
+open Microsoft.CodeAnalysis.CSharp
+
 open NUnit.Framework
 
-open type Monkey.Frontend.CLR.Syntax.SyntaxFactory.MonkeySyntaxTokenFactory
-open type Monkey.Frontend.CLR.Syntax.SyntaxFactory.MonkeyExpressionSyntaxFactory
-open type Monkey.Frontend.CLR.Syntax.SyntaxFactory.MonkeyStatementSyntaxFactory
+open Monkey.Parser.Errors
+open Monkey.Parser.Parser
+open Monkey.Parser.Tokenizer
+
+open type Monkey.AST.SyntaxFactory.MonkeySyntaxTokenFactory
+open type Monkey.AST.SyntaxFactory.MonkeyExpressionSyntaxFactory
+open type Monkey.AST.SyntaxFactory.MonkeyStatementSyntaxFactory
 
 
 [<AutoOpen>]
@@ -32,25 +34,25 @@ let foobar = 10;
 let bar = 20
 """,
             [|
-                ParsingErrors.AbsentSemicolonError(TextSpan(0, 0), AbsentSemicolonAt.LetStatement)
+                AbsentSemicolonError(TextSpan(0, 0), AbsentSemicolonAt.LetStatement)
             |]
         )
         (
             """let if = 5;""",
             [|
-                VariableAssignmentStatementErrors.InvalidVariableNameError(IfKeyword())
+                InvalidVariableNameError(IfKeyword())
             |]
         )
         (
             """let 6pek = 5;""",
             [|
-                VariableAssignmentStatementErrors.InvalidVariableNameError(IfKeyword())
+                InvalidVariableNameError(IfKeyword())
             |]
         )
         (
             """let foobar  5;""",
             [|
-                VariableAssignmentStatementErrors.AbsentEqualsError(TextSpan(0, 0))
+                AbsentEqualsError(TextSpan(0, 0))
             |]
         )
         (
@@ -121,12 +123,12 @@ if (5>2) {
     member this.``Runner``(index: int) =
         let input, expectedErrors = this.TestCases[index]
         let sourceText = SourceText.From(input)
-        let tokens = Tokenizer.tokenize input 
+        let tokens = tokenize input 
         
         printfn "Expected Errors:"
         printErrors sourceText expectedErrors
         
-        let _, parseErrors = MonkeyAstParser.parseTokens tokens
+        let _, parseErrors = parseTokens tokens
         
         printfn ""
         printfn "Actual Errors:"

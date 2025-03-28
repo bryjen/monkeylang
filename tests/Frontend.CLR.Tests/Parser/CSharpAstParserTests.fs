@@ -2,18 +2,14 @@
 
 open System
 
-open Frontend.CLR.Syntax.Tokenizer
 open Microsoft.CodeAnalysis
 open Microsoft.CodeAnalysis.CSharp
 open Microsoft.CodeAnalysis.CSharp.Syntax
 open type Microsoft.CodeAnalysis.CSharp.SyntaxFactory
 
-open Monkey.Frontend.CLR.Converter
-open Monkey.Frontend.CLR.Converter.AstConverter
+open Monkey.Codegen.Dotnet.MonkeyToCSharpAstConverter
 open NUnit.Framework
 
-open Monkey.Frontend.CLR.Lexer
-open Monkey.Frontend.CLR.Parsers
 open Monkey.Frontend.CLR.Tests.Parser.Helpers
 
 

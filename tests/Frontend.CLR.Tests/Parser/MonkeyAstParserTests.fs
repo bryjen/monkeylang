@@ -1,23 +1,26 @@
 ﻿namespace Monkey.Frontend.CLR.Tests.Parser.MonkeyAstParserTests
 
 
-open Microsoft.CodeAnalysis.CSharp
 
 open Microsoft.CodeAnalysis.Text
-open Monkey.Frontend.CLR.Parsers
-open Monkey.Frontend.CLR.Parsers.CSharpAstErrors
-open Monkey.Frontend.CLR.Parsers.ParsingErrors
-open Monkey.Frontend.CLR.Syntax.AstTraverser
+open Microsoft.CodeAnalysis.CSharp
+
+open Monkey.AST.AstTraverser
+open Monkey.Parser.Errors
+open Monkey.Parser.Tokenizer
 open NUnit.Framework
 
-open Frontend.CLR.Syntax
-open Monkey.Frontend.CLR.Syntax.Ast
+open Monkey.AST
+open Monkey.Parser.Parser
+
+open type Monkey.AST.SyntaxFactory.MonkeySyntaxTokenFactory
+open type Monkey.AST.SyntaxFactory.MonkeyExpressionSyntaxFactory
+open type Monkey.AST.SyntaxFactory.MonkeyStatementSyntaxFactory
+open type Monkey.AST.SyntaxFactory.MonkeyOtherSyntaxFactory
+
 open Monkey.Frontend.CLR.Tests.Parser.Helpers
 
-open type Monkey.Frontend.CLR.Syntax.SyntaxFactory.MonkeySyntaxTokenFactory
-open type Monkey.Frontend.CLR.Syntax.SyntaxFactory.MonkeyExpressionSyntaxFactory
-open type Monkey.Frontend.CLR.Syntax.SyntaxFactory.MonkeyStatementSyntaxFactory
-open type Monkey.Frontend.CLR.Syntax.SyntaxFactory.MonkeyOtherSyntaxFactory
+
 
 [<AutoOpen>]
 module private MonkeyAstParserTestsHelpers =
@@ -140,12 +143,11 @@ type LiteralExpressionStatementParsing() =
     [<TestCase(9)>]
     [<TestCase(10)>]
     member this.``A: Test Basic Numeric Expression Parsing``(testCaseIndex: int) =
-        // we keep the test case in 'ExpressionStatementSyntax' to avoid having to cast each during declaration
         let castedTestCases = this.TestCases |> Array.map (fun (input, expected) -> (input, expected |> StatementSyntax.ExpressionStatementSyntax |> MonkeySyntaxNode.StatementSyntax))
         let input, expectedSyntaxTree = castedTestCases[testCaseIndex]
-        let tokens = Tokenizer.tokenize input
+        let tokens = tokenize input
         
-        let monkeyCompilationUnit, parseErrors = MonkeyAstParser.parseTokens tokens
+        let monkeyCompilationUnit, parseErrors = parseTokens tokens
         let asMonkeySyntaxNodes = monkeyCompilationUnit.Statements |> Array.map MonkeySyntaxNode.StatementSyntax
         match Array.length parseErrors with
         | 0 ->
@@ -325,13 +327,11 @@ type BinaryExpressionStatementParsing() =
     [<TestCase(15)>]
     [<TestCase(16)>]
     member this.``B: Test basic infix expression parsing``(testCaseIndex: int) =
-        // we keep the test case in 'ExpressionStatementSyntax' to avoid having to cast each during declaration
         let castedTestCases = this.TestCases |> Array.map (fun (input, expected) -> (input, expected |> StatementSyntax.ExpressionStatementSyntax |> MonkeySyntaxNode.StatementSyntax))
         let input, expectedSyntaxTree = castedTestCases[testCaseIndex]
-        let tokens = Tokenizer.tokenize input
+        let tokens = tokenize input
         
-        
-        let monkeyCompilationUnit, parseErrors = MonkeyAstParser.parseTokens tokens
+        let monkeyCompilationUnit, parseErrors = parseTokens tokens
         let asMonkeySyntaxNodes = monkeyCompilationUnit.Statements |> Array.map MonkeySyntaxNode.StatementSyntax
         match Array.length parseErrors with
         | 0 ->
@@ -389,12 +389,11 @@ type IfExpressionParsingTests() =
     [<TestCase(0)>]
     [<TestCase(1)>]
     member this.``C: If expression parsing tests``(testCaseIndex: int) =
-        // we keep the test case in 'ExpressionStatementSyntax' to avoid having to cast each during declaration
         let castedTestCases = this.TestCases |> Array.map (fun (input, expected) -> (input, expected |> StatementSyntax.ExpressionStatementSyntax |> MonkeySyntaxNode.StatementSyntax))
         let input, expectedSyntaxTree = castedTestCases[testCaseIndex]
-        let tokens = Tokenizer.tokenize input
+        let tokens = tokenize input
         
-        let monkeyCompilationUnit, parseErrors = MonkeyAstParser.parseTokens tokens
+        let monkeyCompilationUnit, parseErrors = parseTokens tokens
         let asMonkeySyntaxNodes = monkeyCompilationUnit.Statements |> Array.map MonkeySyntaxNode.StatementSyntax
         match Array.length parseErrors with
         | 0 ->
@@ -548,12 +547,11 @@ type FunctionParsingTests() =
     [<TestCase(3)>]
     [<TestCase(4)>]
     member this.``D: Function expression parsing tests``(testCaseIndex: int) =
-        // we keep the test case in 'ExpressionStatementSyntax' to avoid having to cast each during declaration
         let castedTestCases = this.TestCases |> Array.map (fun (input, expected) -> (input, expected |> StatementSyntax.ExpressionStatementSyntax |> MonkeySyntaxNode.StatementSyntax))
         let input, expectedSyntaxTree = castedTestCases[testCaseIndex]
-        let tokens = Tokenizer.tokenize input
+        let tokens = tokenize input
         
-        let monkeyCompilationUnit, parseErrors = MonkeyAstParser.parseTokens tokens
+        let monkeyCompilationUnit, parseErrors = parseTokens tokens
         let asMonkeySyntaxNodes = monkeyCompilationUnit.Statements |> Array.map MonkeySyntaxNode.StatementSyntax
         match Array.length parseErrors with
         | 0 ->
@@ -1028,13 +1026,11 @@ type InvocationExpressionParsingTests() =
     
     [<TestCase(11)>]
     member this.``E: Invocation expression parsing tests``(testCaseIndex: int) =
-        // we keep the test case in 'ExpressionStatementSyntax' to avoid having to cast each during declaration
         let castedTestCases = this.TestCases |> Array.map (fun (input, expected) -> (input, expected |> StatementSyntax.ExpressionStatementSyntax |> MonkeySyntaxNode.StatementSyntax))
         let input, expectedSyntaxTree = castedTestCases[testCaseIndex]
-        let sourceText = SourceText.From(input)
-        let tokens = Tokenizer.tokenize input
+        let tokens = tokenize input
         
-        let monkeyCompilationUnit, parseErrors = MonkeyAstParser.parseTokens tokens
+        let monkeyCompilationUnit, parseErrors = parseTokens tokens
         let asMonkeySyntaxNodes = monkeyCompilationUnit.Statements |> Array.map MonkeySyntaxNode.StatementSyntax
         match Array.length parseErrors with
         | 0 ->
@@ -1046,8 +1042,7 @@ type InvocationExpressionParsingTests() =
         | _ ->
             let mutable count = 1
             for parseError in parseErrors do
-                let filePath = @"C:\Users\Public\Program.mk"
-                printfn $"{count}\n{parseError.GetType().ToString()}\n{parseError.GetFormattedMessage(sourceText, Some filePath)}"
+                printfn $"{count}. {parseError}"
                 count <- count + 1
             Assert.Fail()
             
@@ -1306,12 +1301,11 @@ type LetStatementParsing() =
     [<TestCase(14)>]
     [<TestCase(15)>]
     member this.``F: Variable assignment (let statement) parsing``(testCaseIndex: int) =
-        // we keep the test case in 'ExpressionStatementSyntax' to avoid having to cast each during declaration
         let castedTestCases = this.TestCases |> Array.map (fun (input, expected) -> (input, expected |> MonkeySyntaxNode.StatementSyntax))
         let input, expectedSyntaxTree = castedTestCases[testCaseIndex]
-        let tokens = Tokenizer.tokenize input
+        let tokens = tokenize input
         
-        let monkeyCompilationUnit, parseErrors = MonkeyAstParser.parseTokens tokens
+        let monkeyCompilationUnit, parseErrors = parseTokens tokens
         let asMonkeySyntaxNodes = monkeyCompilationUnit.Statements |> Array.map MonkeySyntaxNode.StatementSyntax
         match Array.length parseErrors with
         | 0 ->
@@ -1451,10 +1445,10 @@ type TypeSyntaxParsing() =
             |> Array.map (fun (input, expected) -> (input, expected |> ExpressionSyntax.TypeSyntax |> MonkeySyntaxNode.ExpressionSyntax))
         let input, expectedNode = castedTestCases[testCaseIndex]
         let sourceText = SourceText.From(input)
-        let tokens = Tokenizer.tokenize input
+        let tokens = tokenize input
         
         let parserState = MonkeyAstParserState(tokens)
-        let typeSyntaxResult = MonkeyAstParser.PrefixExpressions.tryParseTypeSyntax (PlaceholderError()) parserState
+        let typeSyntaxResult = PrefixExpressions.tryParseTypeSyntax (PlaceholderError()) parserState
         match typeSyntaxResult with
         | Ok typeSyntax ->
             let asMonkeyNode = typeSyntax |> ExpressionSyntax.TypeSyntax |> MonkeySyntaxNode.ExpressionSyntax
@@ -1512,12 +1506,11 @@ type ArrayExpressionParsing() =
     [<TestCase(1)>]
     [<TestCase(2)>]
     member this.``H: Array expression parsing test``(testCaseIndex: int) =
-        // we keep the test case in 'ExpressionStatementSyntax' to avoid having to cast each during declaration
         let castedTestCases = this.TestCases |> Array.map (fun (input, expected) -> (input, expected |> MonkeySyntaxNode.StatementSyntax))
         let input, expectedSyntaxTree = castedTestCases[testCaseIndex]
-        let tokens = Tokenizer.tokenize input
+        let tokens = tokenize input
         
-        let monkeyCompilationUnit, parseErrors = MonkeyAstParser.parseTokens tokens
+        let monkeyCompilationUnit, parseErrors = parseTokens tokens
         let asMonkeySyntaxNodes = monkeyCompilationUnit.Statements |> Array.map MonkeySyntaxNode.StatementSyntax
         match Array.length parseErrors with
         | 0 ->
@@ -1560,9 +1553,9 @@ type UsingDirectiveParsing() =
         // we keep the test case in 'ExpressionStatementSyntax' to avoid having to cast each during declaration
         let castedTestCases = this.TestCases
         let input, expectedSyntaxTree = castedTestCases[testCaseIndex]
-        let tokens = Tokenizer.tokenize input
+        let tokens = tokenize input
         
-        let monkeyCompilationUnit, parseErrors = MonkeyAstParser.parseTokens tokens
+        let monkeyCompilationUnit, parseErrors = parseTokens tokens
         let asMonkeySyntaxNodes = monkeyCompilationUnit.UsingDirectives |> Array.map MonkeySyntaxNode.UsingDirectiveSyntax
         match Array.length parseErrors with
         | 0 ->
@@ -1608,9 +1601,9 @@ type NamespaceDeclarationParsing() =
         // we keep the test case in 'ExpressionStatementSyntax' to avoid having to cast each during declaration
         let castedTestCases = this.TestCases
         let input, expectedSyntaxTree = castedTestCases[testCaseIndex]
-        let tokens = Tokenizer.tokenize input
+        let tokens = tokenize input
         
-        let monkeyCompilationUnit, parseErrors = MonkeyAstParser.parseTokens tokens
+        let monkeyCompilationUnit, parseErrors = parseTokens tokens
         let asMonkeySyntaxNodes = monkeyCompilationUnit.NamespaceDeclarations |> Array.map MonkeySyntaxNode.NamespaceDeclarationSyntax
         match Array.length parseErrors with
         | 0 ->

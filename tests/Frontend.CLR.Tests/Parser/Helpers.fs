@@ -1,14 +1,13 @@
 ﻿module Monkey.Frontend.CLR.Tests.Parser.Helpers
 
 open System
-open Frontend.CLR.Syntax.Tokenizer
 open Microsoft.CodeAnalysis
 open Microsoft.CodeAnalysis.CSharp
 open Microsoft.CodeAnalysis.CSharp.Syntax
 open Microsoft.CodeAnalysis.Text
-open Monkey.Frontend.CLR.Converter
-open Monkey.Frontend.CLR.Parsers
-open Monkey.Frontend.CLR.Syntax.Ast
+open Monkey.Codegen.Dotnet.MonkeyToCSharpAstConverter
+open Monkey.Parser.Parser
+open Monkey.Parser.Tokenizer
 open NUnit.Framework
 
 type ParserComponentType =
@@ -108,7 +107,7 @@ let compareSyntaxNodes (monkeyInput: string) (expectedSyntaxNodes: SyntaxNode ar
 let private comparisonCore (expectedSyntaxNodes: SyntaxNode array) (input: string) =
     let sourceText = SourceText.From(input)
     let tokens = tokenize input
-    let monkeyCompilationUnit, parseErrors = MonkeyAstParser.parseTokens tokens
+    let monkeyCompilationUnit, parseErrors = parseTokens tokens
     
     if parseErrors.Length > 0 then
         printfn "Parsing Errors:"
@@ -119,7 +118,7 @@ let private comparisonCore (expectedSyntaxNodes: SyntaxNode array) (input: strin
             count <- count + 1
         Assert.Fail()
     
-    let conversionResult = AstConverter.toCSharpCompilationUnit monkeyCompilationUnit.Statements  // TODO: Support MonkeyCompilationUnit
+    let conversionResult = toCSharpCompilationUnit monkeyCompilationUnit.Statements  // TODO: Support MonkeyCompilationUnit
     match conversionResult with
     | Ok compilationUnitSyntax ->
         let statements = filterGlobalStatementsAsStatementSyntaxes (Seq.toArray compilationUnitSyntax.Members)

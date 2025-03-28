@@ -24,17 +24,6 @@ open Monkey.Frontend.CLR.Parsers.CSharpAstErrors
 
         
         
-type LogFunctions =
-    { Info: string -> unit
-      Warning: string -> unit
-      Error: string -> unit }
-with
-    static member Default =
-        { Info = (fun _ -> ())
-          Warning = (fun _ -> ())
-          Error = (fun _ -> ()) }
-        
-        
         
 module CsharpProjectConverter =
     

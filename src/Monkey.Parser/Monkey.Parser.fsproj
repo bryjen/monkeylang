@@ -1,0 +1,38 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net9.0</TargetFramework>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    </PropertyGroup>
+    
+    <ItemGroup>
+        <InternalsVisibleTo Include="Monkey.Frontend.CLR.Tests" /> <!-- Retained just for legacy sakes. -->
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\Monkey.AST\Monkey.AST.fsproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Compile Include="Tokenizer.fsi" />
+        <Compile Include="Tokenizer.fs" />
+        
+        <Compile Include="Errors\ParseError.fs" />
+        <Compile Include="Errors\FunctionExpressionErrors.fs" />
+        <Compile Include="Errors\VariableAssignmentStatementErrors.fs" />
+        <Compile Include="Errors\ParameterListErrors.fs" />
+        <Compile Include="Errors\MisplacedSyntaxNodeErrors.fs" />
+        <Compile Include="Errors\InterpolatedStringExpressionParseErrors.fs" />
+
+        <Compile Include="Precedence.fs" />
+        <Compile Include="Parser.fsi" />
+        <Compile Include="Parser.fs" />
+        <Content Include="README.md" />
+        
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="FsToolkit.ErrorHandling" Version="4.15.2" />
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.13.0" />
+    </ItemGroup>
+</Project>

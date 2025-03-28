@@ -1,8 +1,8 @@
 ﻿namespace Monkey.Frontend.CLR.Tests.Tokenizer
 
-open Frontend.CLR.Syntax.Tokenizer
 open Microsoft.CodeAnalysis.Text
-open Monkey.Frontend.CLR.Syntax.Ast
+open Monkey.AST
+open Monkey.Parser.Tokenizer
 open NUnit.Framework
 
 [<AutoOpen>]
