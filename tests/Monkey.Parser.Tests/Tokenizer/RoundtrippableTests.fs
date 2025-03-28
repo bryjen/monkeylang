@@ -1,4 +1,4 @@
-﻿namespace Monkey.Frontend.CLR.Tests.Tokenizer
+﻿namespace Monkey.Parser.Tests.Tokenizer.RoundtrippableTests
 
 open Microsoft.CodeAnalysis.Text
 open Monkey.AST

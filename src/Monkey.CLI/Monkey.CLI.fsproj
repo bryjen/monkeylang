@@ -24,8 +24,4 @@
       <PackageReference Include="FsToolkit.ErrorHandling" Version="4.15.2" />
     </ItemGroup>
 
-    <ItemGroup>
-      <ProjectReference Include="..\Frontend.CLR\Frontend.CLR.fsproj" />
-    </ItemGroup>
-
 </Project>

@@ -93,12 +93,37 @@ and AbsentSemicolonAt =
     | LetStatement
     | ExpressionStatement
     
-
+    
+type At =
+    | UsingDirective
+    | NamespaceDeclaration
+    | InterpolatedStringExpression
+    | IfExpression
+    | GenericTypeSyntax
+    | ParameterList
+    | ArgumentsList 
+    | InvocationExpression
+    | ListArrayInitialization
+    | QualifiedIdentifier
+with
+    static member DefaultErrorType (at: At) =
+        match at with
+        | UsingDirective -> "Invalid using directive."
+        | NamespaceDeclaration -> "Invalid namespace declaration."
+        | IfExpression -> "Invalid 'If' expression."
+        | GenericTypeSyntax -> "Invalid generic type."
+        | ParameterList -> "Invalid parameter list."
+        | ArgumentsList -> "Invalid arguments list."
+        | InvocationExpression -> "Invalid function call expression."
+        | ListArrayInitialization -> "Invalid array expression."
+        | QualifiedIdentifier -> "Invalid qualified identifier."
+        | InterpolatedStringExpression -> "Invalid interpolated string."
+    
 
 /// <summary>
 /// 
 /// </summary>
-type AbsentOrInvalidTokenError(textSpan: TextSpan, expectedKinds: SyntaxKind array, from: AbsentTokenAt) =
+type AbsentOrInvalidTokenError(textSpan: TextSpan, expectedKinds: SyntaxKind array, at: At) =
     inherit ParseError()
 with
     let getExpectedKindString (expectedKind: SyntaxKind) =
@@ -116,18 +141,7 @@ with
         this.Format(sourceText, updatedTextSpan, filePath)
 
     override this.ErrorType() =
-        match from with
-        | UsingDirective -> "Invalid using directive."
-        | NamespaceDeclaration -> "Invalid namespace declaration."
-        
-        | IfExpression -> "Invalid 'If' expression."
-        | GenericTypeSyntax -> "Invalid generic type."
-        | ParameterList -> "Invalid parameter list."
-        | ArgumentsList -> "Invalid arguments list."
-        | InvocationExpression -> "Invalid function call expression."
-        | ListArrayInitialization -> "Invalid array expression."
-        | QualifiedIdentifier -> "Invalid qualified identifier."
-        | InterpolatedStringExpression -> "Invalid interpolated string."
+        At.DefaultErrorType(at)
     
     override this.ErrorMessage() =
         let strings = expectedKinds |> Array.map getExpectedKindString
@@ -135,19 +149,6 @@ with
         $"Expected {asSingleString}'."
     
     override this.DetailedHelpMessage() = None
-    
-and AbsentTokenAt =
-    | UsingDirective
-    | NamespaceDeclaration
-    
-    | InterpolatedStringExpression
-    | IfExpression
-    | GenericTypeSyntax
-    | ParameterList
-    | ArgumentsList 
-    | InvocationExpression
-    | ListArrayInitialization
-    | QualifiedIdentifier 
     
     
     
@@ -157,6 +158,8 @@ and AbsentTokenAt =
 type CompositeParseError(parseErrors: ParseError array) =
     inherit ParseError()
 with
+    member val ParseErrors = parseErrors
+    
     override this.GetFormattedMessage(sourceText: SourceText, filePath: string option) =
         let formattedMessages = parseErrors |> Array.map _.GetFormattedMessage(sourceText, filePath)
         System.String.Join("\n\n", formattedMessages)

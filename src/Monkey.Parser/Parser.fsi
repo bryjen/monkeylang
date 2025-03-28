@@ -11,6 +11,7 @@ open Monkey.Parser.Errors
 val parseTokens : SyntaxToken array -> MonkeyCompilationUnit * ParseError array
 
 
+
 /// <summary>
 /// Type encapsulating the parser's state as it builds the syntax tree using the given syntax tokens.
 /// </summary>
@@ -27,9 +28,6 @@ type internal MonkeyAstParserState =
    
    
    
-/// <summary>
-/// Module 
-/// </summary>
 /// <remarks>
 /// <ul>
 ///     <li>

@@ -1,4 +1,4 @@
-﻿namespace Monkey.Frontend.CLR.Tests.Tokenizer
+﻿namespace Monkey.Parser.Tests.AstEquivalenceTests
 
 open Monkey.AST
 open NUnit.Framework

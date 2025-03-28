@@ -5,9 +5,7 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Monkey.CLI", "src\Monkey.CLI\Monkey.CLI.fsproj", "{3E48D840-2C6A-4616-A269-AABB813CD45E}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Frontend.CLR", "src\Frontend.CLR\Frontend.CLR.fsproj", "{32A38921-628A-4E62-B965-60A552E584F7}"
-EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Frontend.CLR.Tests", "tests\Frontend.CLR.Tests\Frontend.CLR.Tests.fsproj", "{12FB8A0D-31E2-438C-8D36-044A4119BDD3}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Monkey.Parser.Tests", "tests\Monkey.Parser.Tests\Monkey.Parser.Tests.fsproj", "{12FB8A0D-31E2-438C-8D36-044A4119BDD3}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Monkey.AST", "src\Monkey.AST\Monkey.AST.fsproj", "{264CD0F9-99AA-4855-9510-7617583267AE}"
 EndProject
@@ -18,6 +16,8 @@ EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Monkey.Semantics", "src\Monkey.Semantics\Monkey.Semantics.fsproj", "{A31ABA03-DD1B-4206-9B4F-0515125FC314}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Monkey.Codegen.Dotnet", "src\Monkey.Codegen.Dotnet\Monkey.Codegen.Dotnet.fsproj", "{B6858910-4CE4-42FD-AB0F-ACF322941131}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{FA2C58DD-B3C1-4CFB-B830-11739AD60948}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -32,10 +32,6 @@ Global
 		{3E48D840-2C6A-4616-A269-AABB813CD45E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3E48D840-2C6A-4616-A269-AABB813CD45E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3E48D840-2C6A-4616-A269-AABB813CD45E}.Release|Any CPU.Build.0 = Release|Any CPU
-		{32A38921-628A-4E62-B965-60A552E584F7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{32A38921-628A-4E62-B965-60A552E584F7}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{32A38921-628A-4E62-B965-60A552E584F7}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{32A38921-628A-4E62-B965-60A552E584F7}.Release|Any CPU.Build.0 = Release|Any CPU
 		{12FB8A0D-31E2-438C-8D36-044A4119BDD3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{12FB8A0D-31E2-438C-8D36-044A4119BDD3}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{12FB8A0D-31E2-438C-8D36-044A4119BDD3}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -63,5 +59,6 @@ Global
 		{435F8E68-EA00-44DD-AF13-B65AFB8B48CE} = {C817ED4D-9E31-4C28-822D-023BC95F4E2E}
 		{A31ABA03-DD1B-4206-9B4F-0515125FC314} = {C817ED4D-9E31-4C28-822D-023BC95F4E2E}
 		{B6858910-4CE4-42FD-AB0F-ACF322941131} = {C817ED4D-9E31-4C28-822D-023BC95F4E2E}
+		{12FB8A0D-31E2-438C-8D36-044A4119BDD3} = {FA2C58DD-B3C1-4CFB-B830-11739AD60948}
 	EndGlobalSection
 EndGlobal

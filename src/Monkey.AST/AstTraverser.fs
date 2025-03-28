@@ -4,6 +4,26 @@
 open Microsoft.CodeAnalysis.CSharp
 
 
+
+/// Singleton type mainly to control certain options during <b>testing</b>. Is not public-facing.
+type internal PrintTraverserConfigSingleton() =
+    let mutable printSyntaxTokens: bool = false
+    
+    static let instance = lazy (PrintTraverserConfigSingleton())
+    static member Instance = instance.Value
+    
+    /// <summary>
+    /// Option to print <b>all</b> syntax tokens. If 'true', then <b>all</b> syntax tokens will be displayed, otherwise
+    /// only necessary syntax tokens will be printed (ex. those in literal expressions).
+    /// </summary>
+    member this.PrintSyntaxTokens
+        with get() = printSyntaxTokens
+        and set(value) = printSyntaxTokens <- value
+        
+type private Config = PrintTraverserConfigSingleton
+        
+        
+
 let printMonkeySyntaxNodeTree (monkeySyntaxNode: MonkeySyntaxNode) =
     let indentation = 0
     match monkeySyntaxNode with
@@ -75,23 +95,38 @@ and private onArrayExpressionSyntax (indentation: int) (arrayExpressionSyntax: A
     
 and private onArrayListInitialization (indentation: int) (onArrayListInitialization: ListInitialization) =
     printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(ListInitialization)) (onArrayListInitialization.ToString() |> normalizeString)
-    onSyntaxToken (indentation + 1) onArrayListInitialization.OpenBracketToken
-    onSyntaxToken (indentation + 1) onArrayListInitialization.CloseBracketToken
+    
+    if Config.Instance.PrintSyntaxTokens then
+        onSyntaxToken (indentation + 1) onArrayListInitialization.OpenBracketToken
+        
     onArrayListInitialization.Values |> Array.iter (onExpressionSyntax (indentation + 1))
+    
+    if Config.Instance.PrintSyntaxTokens then
+        onSyntaxToken (indentation + 1) onArrayListInitialization.CloseBracketToken
     
 and private onArraySizeBasedInitialization (indentation: int) (sizeBasedInitialization: SizeBasedInitialization) =
     printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(SizeBasedInitialization)) (sizeBasedInitialization.ToString() |> normalizeString)
-    onSyntaxToken (indentation + 1) sizeBasedInitialization.NewToken
-    onSyntaxToken (indentation + 1) sizeBasedInitialization.TypeToken
-    onSyntaxToken (indentation + 1) sizeBasedInitialization.OpenBracketToken
-    onSyntaxToken (indentation + 1) sizeBasedInitialization.CloseBracketToken
+    
+    if Config.Instance.PrintSyntaxTokens then
+        onSyntaxToken (indentation + 1) sizeBasedInitialization.NewToken
+        
+    onSyntaxToken (indentation + 1) sizeBasedInitialization.TypeToken  // mandatory, since key information is stored in the tokens
+    
+    if Config.Instance.PrintSyntaxTokens then
+        onSyntaxToken (indentation + 1) sizeBasedInitialization.OpenBracketToken
+        onSyntaxToken (indentation + 1) sizeBasedInitialization.CloseBracketToken
 
 
 and private onParenthesizedExpressionSyntax (indentation: int) (parenthesizedExpressionSyntax: ParenthesizedExpressionSyntax) =
     printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(ParenthesizedExpressionSyntax)) (parenthesizedExpressionSyntax.ToString() |> normalizeString)
-    onSyntaxToken (indentation + 1) parenthesizedExpressionSyntax.OpenParenToken
+    
+    if Config.Instance.PrintSyntaxTokens then
+        onSyntaxToken (indentation + 1) parenthesizedExpressionSyntax.OpenParenToken
+        
     onExpressionSyntax (indentation + 1) parenthesizedExpressionSyntax.Expression
-    onSyntaxToken (indentation + 1) parenthesizedExpressionSyntax.CloseParenToken
+    
+    if Config.Instance.PrintSyntaxTokens then
+        onSyntaxToken (indentation + 1) parenthesizedExpressionSyntax.CloseParenToken
     
 and private onFunctionExpressionSyntax (indentation: int) (functionExpressionSyntax: FunctionExpressionSyntax) =
     printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(FunctionExpressionSyntax)) (functionExpressionSyntax.ToString() |> normalizeString)
@@ -104,9 +139,31 @@ and private onBinaryExpressionSyntax (indentation: int) (binaryExpressionSyntax:
     onExpressionSyntax (indentation + 1) binaryExpressionSyntax.Left
     onExpressionSyntax (indentation + 1) binaryExpressionSyntax.Right
     
+    
 and private onInterpolatedStringExpressionSyntax (indentation: int) (interpolatedStringExpressionSyntax: InterpolatedStringExpressionSyntax) =
     printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(InterpolatedStringExpressionSyntax)) (interpolatedStringExpressionSyntax.ToString() |> normalizeString)
-    // TODO: interpolatedStringExpressionSyntax.Contents
+    Seq.iter (onInterpolatedStringContents (indentation + 1)) interpolatedStringExpressionSyntax.Contents
+    
+and private onInterpolatedStringContents (indentation: int) (interpolatedStringContent: InterpolatedStringContent) =
+    match interpolatedStringContent with
+    | InterpolatedStringText interpolatedStringText -> onInterpolatedStringText indentation interpolatedStringText
+    | Interpolation interpolation -> onInterpolation indentation interpolation
+    
+and private onInterpolatedStringText (indentation: int) (interpolatedStringText: InterpolatedStringText) =
+    printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(InterpolatedStringText)) (interpolatedStringText.ToString() |> normalizeString)
+    onSyntaxToken (indentation + 1) (interpolatedStringText.TextToken)  // mandatory, since key information is stored in the tokens
+    
+and private onInterpolation (indentation: int) (interpolation: Interpolation) =
+    printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(Interpolation)) (interpolation.ToString() |> normalizeString)
+    
+    if Config.Instance.PrintSyntaxTokens then
+        onSyntaxToken (indentation + 1) (interpolation.OpenBraceToken)
+        
+    onExpressionSyntax (indentation + 1) (interpolation.Expression)
+    
+    if Config.Instance.PrintSyntaxTokens then
+        onSyntaxToken (indentation + 1) (interpolation.OpenBraceToken)
+    
     
 and private onInvocationExpressionSyntax (indentation: int) (invocationExpressionSyntax: InvocationExpressionSyntax) =
     printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(InvocationExpressionSyntax)) (invocationExpressionSyntax.ToString() |> normalizeString)
@@ -123,7 +180,9 @@ and private onInvocationExpressionSyntax (indentation: int) (invocationExpressio
     
 and private onInvocationParenthesizedExpressionSyntax (indentation: int) (invocationParenthesizedExpressionSyntax: InvocationParenthesizedExpressionSyntax) =
     printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(InvocationParenthesizedExpressionSyntax)) (invocationParenthesizedExpressionSyntax.ToString() |> normalizeString)
-    onSyntaxToken (indentation + 1) invocationParenthesizedExpressionSyntax.OpenParenToken
+    
+    if Config.Instance.PrintSyntaxTokens then
+        onSyntaxToken (indentation + 1) invocationParenthesizedExpressionSyntax.OpenParenToken
     
     match invocationParenthesizedExpressionSyntax.Expression with
     | InvocationExpressionLeftExpression.FunctionExpressionSyntax functionExpressionSyntax ->
@@ -133,25 +192,26 @@ and private onInvocationParenthesizedExpressionSyntax (indentation: int) (invoca
     | InvocationExpressionLeftExpression.ParenthesizedFunctionExpressionSyntax parenthesizedExpressionSyntax ->
         onInvocationParenthesizedExpressionSyntax (indentation + 1) parenthesizedExpressionSyntax
         
-    onSyntaxToken (indentation + 1) invocationParenthesizedExpressionSyntax.CloseParenToken
+    if Config.Instance.PrintSyntaxTokens then
+        onSyntaxToken (indentation + 1) invocationParenthesizedExpressionSyntax.CloseParenToken
     
 
     
 and private onLiteralExpressionSyntax (indentation: int) (literalExpressionSyntax: LiteralExpressionSyntax) =
     printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(LiteralExpressionSyntax)) (literalExpressionSyntax.ToString() |> normalizeString)
     onSyntaxKind (indentation + 1) literalExpressionSyntax.Kind
-    onSyntaxToken (indentation + 1) literalExpressionSyntax.Token
+    onSyntaxToken (indentation + 1) literalExpressionSyntax.Token  // mandatory, since key information is stored in the tokens
     
 and private onPostfixExpressionSyntax (indentation: int) (postfixExpressionSyntax: PostfixExpressionSyntax) =
     printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(PostfixExpressionSyntax)) (postfixExpressionSyntax.ToString() |> normalizeString)
     onSyntaxKind (indentation + 1) postfixExpressionSyntax.Kind
     onExpressionSyntax (indentation + 1) postfixExpressionSyntax.Operand
-    onSyntaxToken (indentation + 1) postfixExpressionSyntax.OperatorToken
+    onSyntaxToken (indentation + 1) postfixExpressionSyntax.OperatorToken  // mandatory, since key information is stored in the tokens
     
 and private onPrefixExpressionSyntax (indentation: int) (prefixExpressionSyntax: PrefixExpressionSyntax) =
     printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(PrefixExpressionSyntax)) (prefixExpressionSyntax.ToString() |> normalizeString)
     onSyntaxKind (indentation + 1) prefixExpressionSyntax.Kind
-    onSyntaxToken (indentation + 1) prefixExpressionSyntax.OperatorToken
+    onSyntaxToken (indentation + 1) prefixExpressionSyntax.OperatorToken  // mandatory, since key information is stored in the tokens
     onExpressionSyntax (indentation + 1) prefixExpressionSyntax.Operand
     
     

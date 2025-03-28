@@ -1,4 +1,4 @@
-﻿namespace Monkey.Frontend.CLR.Tests.Parser.MonkeyAstParseErrorTests
+﻿namespace Monkey.Parser.Tests.Parser.MonkeyAstParseErrorTests
 
 open Microsoft.CodeAnalysis.Text
 open Microsoft.CodeAnalysis.CSharp
@@ -65,31 +65,31 @@ let bar = 20
         (
             """if 5 > 2) { 5; } else { 10; };""",
             [|
-                AbsentOrInvalidTokenError(TextSpan(0, 0), [| SyntaxKind.OpenParenToken |], AbsentTokenAt.IfExpression)
+                AbsentOrInvalidTokenError(TextSpan(0, 0), [| SyntaxKind.OpenParenToken |], At.IfExpression)
             |]
         )
         (
             """if (5 > 2 { 5; } else { 10; };""",
             [|
-                AbsentOrInvalidTokenError(TextSpan(0, 0), [| SyntaxKind.OpenParenToken |], AbsentTokenAt.IfExpression)
+                AbsentOrInvalidTokenError(TextSpan(0, 0), [| SyntaxKind.OpenParenToken |], At.IfExpression)
             |]
         )
         (
             """if (5 > 2)  5; } else { 10; };""",
             [|
-                AbsentOrInvalidTokenError(TextSpan(0, 0), [| SyntaxKind.OpenParenToken |], AbsentTokenAt.IfExpression)
+                AbsentOrInvalidTokenError(TextSpan(0, 0), [| SyntaxKind.OpenParenToken |], At.IfExpression)
             |]
         )
         (
             """if (5 > 2) { 5;  else { 10; };""",
             [|
-                AbsentOrInvalidTokenError(TextSpan(0, 0), [| SyntaxKind.OpenParenToken |], AbsentTokenAt.IfExpression)
+                AbsentOrInvalidTokenError(TextSpan(0, 0), [| SyntaxKind.OpenParenToken |], At.IfExpression)
             |]
         )
         (
             """let foobar = fn (Something<int, int} arg1) {};""",
             [|
-                AbsentOrInvalidTokenError(TextSpan(0, 0), [| SyntaxKind.OpenParenToken |], AbsentTokenAt.IfExpression)
+                AbsentOrInvalidTokenError(TextSpan(0, 0), [| SyntaxKind.OpenParenToken |], At.IfExpression)
             |]
         )
         (
@@ -101,7 +101,7 @@ if (5>2) {
 };
 """,
             [|
-                AbsentOrInvalidTokenError(TextSpan(0, 0), [| SyntaxKind.OpenParenToken |], AbsentTokenAt.IfExpression)
+                AbsentOrInvalidTokenError(TextSpan(0, 0), [| SyntaxKind.OpenParenToken |], At.IfExpression)
             |]
         )
     |]

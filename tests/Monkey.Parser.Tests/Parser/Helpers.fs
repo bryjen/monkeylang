@@ -1,4 +1,4 @@
-﻿module Monkey.Frontend.CLR.Tests.Parser.Helpers
+﻿module Monkey.Parser.Tests.Parser.Helpers
 
 open System
 open Microsoft.CodeAnalysis

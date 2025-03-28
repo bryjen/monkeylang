@@ -1,5 +1,4 @@
-﻿namespace Monkey.Frontend.CLR.Tests.Parser.MonkeyAstParserTests
-
+﻿namespace Monkey.Parser.Tests.Parser.MonkeyAstParserTests
 
 
 open Microsoft.CodeAnalysis.Text
@@ -7,6 +6,7 @@ open Microsoft.CodeAnalysis.CSharp
 
 open Monkey.AST.AstTraverser
 open Monkey.Parser.Errors
+open Monkey.Parser.Tests.Parser.Helpers
 open Monkey.Parser.Tokenizer
 open NUnit.Framework
 
@@ -17,8 +17,6 @@ open type Monkey.AST.SyntaxFactory.MonkeySyntaxTokenFactory
 open type Monkey.AST.SyntaxFactory.MonkeyExpressionSyntaxFactory
 open type Monkey.AST.SyntaxFactory.MonkeyStatementSyntaxFactory
 open type Monkey.AST.SyntaxFactory.MonkeyOtherSyntaxFactory
-
-open Monkey.Frontend.CLR.Tests.Parser.Helpers
 
 
 
@@ -1573,6 +1571,8 @@ type UsingDirectiveParsing() =
                 count <- count + 1
             Assert.Fail()
             
+            
+            
 [<TestFixture>]
 type NamespaceDeclarationParsing() =
     member this.TestCases : (string * NamespaceDeclarationSyntax) array = [|
@@ -1618,5 +1618,50 @@ type NamespaceDeclarationParsing() =
             for parseError in parseErrors do
                 let filePath = @"C:\Users\Public\Program.mk"
                 printfn $"{parseError.GetFormattedMessage(sourceText, Some filePath)}"
+                count <- count + 1
+            Assert.Fail()
+
+
+
+[<TestFixture>]
+type StringInterpolationParsingTests() =
+    member this.TestCases : (string * StatementSyntax) array = [|
+        (
+            "$\"Hello, {name}!\";",
+            ExpressionStatement(
+                InterpolatedString(
+                    DollarToken(),
+                    [|
+                        Interpolatedstri
+                    |]
+                    )
+                )
+        )
+    |]
+    
+    [<TestCase(0)>]
+    member this.``K: String interpolation parsing tests``(testCaseIndex: int) =
+        PrintTraverserConfigSingleton.Instance.PrintSyntaxTokens <- false
+        
+        let castedTestCases = this.TestCases |> Array.map (fun (input, expected) -> (input, expected |> MonkeySyntaxNode.StatementSyntax))
+        let input, expectedSyntaxTree = castedTestCases[testCaseIndex]
+        let tokens = tokenize input
+        
+        let monkeyCompilationUnit, parseErrors = parseTokens tokens
+        let asMonkeySyntaxNodes = monkeyCompilationUnit.Statements |> Array.map MonkeySyntaxNode.StatementSyntax
+        match Array.length parseErrors with
+        | 0 ->
+            let actualSyntaxNodes = asMonkeySyntaxNodes
+            let expectedSyntaxNodes = [| expectedSyntaxTree |]
+            match compareMonkeyStatements input expectedSyntaxNodes actualSyntaxNodes with
+            | true -> Assert.Pass()
+            | false -> Assert.Fail()
+        | _ ->
+            let mutable count = 1
+            let filePath = @"C:\Users\Public\Program.mk"
+            let sourceText = SourceText.From(input)
+            
+            for parseError in parseErrors do
+                printfn $"{count}.\n{parseError.GetFormattedMessage(sourceText, Some filePath)}"
                 count <- count + 1
             Assert.Fail()

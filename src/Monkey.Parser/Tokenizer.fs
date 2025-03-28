@@ -74,6 +74,23 @@ module private Helpers =
             
         // System.String(characters, startingIndex, currentIndex - startingIndex)
         startingIndex, tokenizerState.CurrentIdx
+        
+       
+    // takes into account current and previous char, separate methods to prevent changing the whole logic 
+    let readCharacterSequenceWithLookback
+            (characters: char array)
+            (predicate: char -> char -> bool)
+            (tokenizerState: TokenizerState)
+            : int * int =
+        let startingIndex = tokenizerState.CurrentIdx
+        let mutable previousToken = '\u0000'
+        while (isIndexValid characters tokenizerState.CurrentIdx && predicate previousToken characters[tokenizerState.CurrentIdx]) do
+            previousToken <- characters[tokenizerState.CurrentIdx]
+            tokenizerState.Next() |> ignore
+            
+        // System.String(characters, startingIndex, currentIndex - startingIndex)
+        startingIndex, tokenizerState.CurrentIdx
+        
 
         
 let rec tokenize (source: string) =
@@ -125,8 +142,8 @@ and private parseToken (tokenizerState: TokenizerState) (chars: char array) : Mo
     | c when c = '"' ->
         tokenizerState.Next() |> ignore  // consume the starting double quote
         
-        let continueReadingWhen c = (c <> '"')
-        let startIndex, endIndex = readCharacterSequence chars continueReadingWhen tokenizerState
+        let continueReadingWhen prev curr = not (curr = '"' && prev <> '\\')
+        let startIndex, endIndex = readCharacterSequenceWithLookback chars continueReadingWhen tokenizerState
         let textSpan = TextSpan(startIndex - 1, endIndex - startIndex + 2)  // to include the quotation marks
         let fullTextSpan = TextSpan(triviaTextSpan.Start, triviaTextSpan.Length + textSpan.Length)
         let valueSpan = TextSpan(startIndex, endIndex - startIndex)
@@ -165,6 +182,7 @@ and private tryParseAsOperatorOrDelimiter
             | '>' -> SyntaxKind.GreaterThanToken
                 
             // Delimiters
+            | '$' -> SyntaxKind.DollarToken
             | '.' -> SyntaxKind.DotToken 
             | ',' -> SyntaxKind.CommaToken
             | ':' -> SyntaxKind.ColonToken 

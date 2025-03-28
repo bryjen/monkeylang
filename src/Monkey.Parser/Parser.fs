@@ -6,6 +6,7 @@ open Microsoft.CodeAnalysis.CSharp
 
 open FsToolkit.ErrorHandling
 
+open Microsoft.CodeAnalysis.Text
 open Monkey.AST
 open Monkey.Parser.Errors
 open Monkey.Parser.Errors.FunctionExpressionHelpMessages
@@ -15,12 +16,20 @@ open type Monkey.AST.SyntaxFactory.MonkeyStatementSyntaxFactory
 open type Monkey.AST.SyntaxFactory.MonkeyExpressionSyntaxFactory
 
 open Monkey.Parser.Precedence
+open Monkey.Parser.Tokenizer
         
 
 let parseTokens (tokens: SyntaxToken array) : MonkeyCompilationUnit * ParseError array =
     let parserState = MonkeyAstParserState(tokens)
     let stopCondition (state: MonkeyAstParserState) = state.IsEof()
     enterNewScopeAndParseTokens stopCondition parserState
+    
+    
+let interleave (xs: 'a array) (ys: 'a array) =
+    let m = min xs.Length ys.Length
+    let head = [| for i in 0 .. m - 1 do yield xs.[i]; yield ys.[i] |]
+    let tail = if xs.Length > m then xs.[m..] else [||]
+    Array.append head tail
     
 
 /// Record type containing parse results from entering and parsing a scope.
@@ -88,7 +97,7 @@ let private tryParseNamespaceDeclaration (parserState: MonkeyAstParserState) : R
             | SyntaxKind.SemicolonToken -> Ok ()
             | _ ->
                 parserState.RecoverFromParseError()
-                AbsentOrInvalidTokenError(identifierSyntax.TextSpan(), [| SyntaxKind.SemicolonToken |], AbsentTokenAt.NamespaceDeclaration) :> ParseError |> Error
+                AbsentOrInvalidTokenError(identifierSyntax.TextSpan(), [| SyntaxKind.SemicolonToken |], At.NamespaceDeclaration) :> ParseError |> Error
                 
         return { NamespaceToken = namespaceKeywordToken; Name = identifierSyntax; SemicolonToken = semicolonToken }
     }
@@ -103,7 +112,7 @@ let private tryParseUsingDirective (parserState: MonkeyAstParserState) : Result<
             | SyntaxKind.SemicolonToken -> Ok ()
             | _ ->
                 parserState.RecoverFromParseError()
-                AbsentOrInvalidTokenError(identifierSyntax.TextSpan(), [| SyntaxKind.SemicolonToken |], AbsentTokenAt.UsingDirective) :> ParseError |> Error
+                AbsentOrInvalidTokenError(identifierSyntax.TextSpan(), [| SyntaxKind.SemicolonToken |], At.UsingDirective) :> ParseError |> Error
                 
         return { UsingToken = usingKeywordToken; Name = identifierSyntax; SemicolonToken = semicolonToken }
     }
@@ -318,7 +327,7 @@ module internal PrefixExpressions =
                 | SyntaxKind.OpenParenToken -> Ok ()
                 | _ ->
                     parserState.RecoverFromParseError()
-                    AbsentOrInvalidTokenError(ifKeywordToken.TextSpan, [| SyntaxKind.OpenParenToken |], AbsentTokenAt.IfExpression) :> ParseError |> Error
+                    AbsentOrInvalidTokenError(ifKeywordToken.TextSpan, [| SyntaxKind.OpenParenToken |], At.IfExpression) :> ParseError |> Error
 
             let! conditionExpression = tryParseExpression parserState Precedence.LOWEST
                 
@@ -327,7 +336,7 @@ module internal PrefixExpressions =
                 | SyntaxKind.CloseParenToken -> Ok ()
                 | _ ->
                     parserState.RecoverFromParseError()
-                    AbsentOrInvalidTokenError(conditionExpression.TextSpan(), [| SyntaxKind.CloseParenToken |], AbsentTokenAt.IfExpression) :> ParseError |> Error
+                    AbsentOrInvalidTokenError(conditionExpression.TextSpan(), [| SyntaxKind.CloseParenToken |], At.IfExpression) :> ParseError |> Error
                        
             // #2. Parsing the main block
             let openBraceToken = parserState.PopToken()
@@ -335,7 +344,7 @@ module internal PrefixExpressions =
                 | SyntaxKind.OpenBraceToken -> Ok ()
                 | _ ->
                     parserState.RecoverFromParseError()
-                    AbsentOrInvalidTokenError(closeParenToken.TextSpan, [| SyntaxKind.OpenBraceToken |], AbsentTokenAt.IfExpression) :> ParseError |> Error
+                    AbsentOrInvalidTokenError(closeParenToken.TextSpan, [| SyntaxKind.OpenBraceToken |], At.IfExpression) :> ParseError |> Error
                        
             let stopCondition (parserState: MonkeyAstParserState) = parserState.PeekToken().Kind = SyntaxKind.CloseBraceToken || parserState.IsEof()
             let resultingCompilationUnit, scopeParseErrors = enterNewScopeAndParseTokens stopCondition parserState
@@ -351,7 +360,7 @@ module internal PrefixExpressions =
                         match statements with
                         | [| |] -> openBraceToken.TextSpan
                         | arr -> arr[arr.Length - 1].TextSpan()
-                    AbsentOrInvalidTokenError(textSpan, [| SyntaxKind.CloseBraceToken |], AbsentTokenAt.IfExpression) :> ParseError |> Error
+                    AbsentOrInvalidTokenError(textSpan, [| SyntaxKind.CloseBraceToken |], At.IfExpression) :> ParseError |> Error
                        
             let mainBlock = { OpenBraceToken = openBraceToken; Statements = statements; CloseBraceToken = closeBraceToken }
             
@@ -382,7 +391,7 @@ module internal PrefixExpressions =
                 | SyntaxKind.OpenBraceToken -> Ok ()
                 | _ ->
                     parserState.RecoverFromParseError()
-                    AbsentOrInvalidTokenError(elseKeywordToken.TextSpan, [| SyntaxKind.OpenBraceToken |], AbsentTokenAt.IfExpression) :> ParseError |> Error
+                    AbsentOrInvalidTokenError(elseKeywordToken.TextSpan, [| SyntaxKind.OpenBraceToken |], At.IfExpression) :> ParseError |> Error
                        
             let stopCondition (parserState: MonkeyAstParserState) = parserState.PeekToken().Kind = SyntaxKind.CloseBraceToken || parserState.IsEof()
             let resultingCompilationUnit, scopeParseErrors = enterNewScopeAndParseTokens stopCondition parserState
@@ -398,7 +407,7 @@ module internal PrefixExpressions =
                         match statements with
                         | [| |] -> openBraceToken.TextSpan
                         | arr -> arr[arr.Length - 1].TextSpan()
-                    AbsentOrInvalidTokenError(textSpan, [| SyntaxKind.CloseBraceToken |], AbsentTokenAt.IfExpression) :> ParseError |> Error
+                    AbsentOrInvalidTokenError(textSpan, [| SyntaxKind.CloseBraceToken |], At.IfExpression) :> ParseError |> Error
                        
             let elseBlock = { OpenBraceToken = openBraceToken; Statements = statements; CloseBraceToken = closeBraceToken }
             return ElseClause(elseKeywordToken, elseBlock)
@@ -464,7 +473,7 @@ module internal PrefixExpressions =
                             match types with
                             | [| |] -> lessThanToken.TextSpan
                             | arr -> arr[arr.Length - 1].TextSpan()
-                        AbsentOrInvalidTokenError(textSpan, [| SyntaxKind.GreaterThanToken |], AbsentTokenAt.GenericTypeSyntax) :> ParseError |> Error
+                        AbsentOrInvalidTokenError(textSpan, [| SyntaxKind.GreaterThanToken |], At.GenericTypeSyntax) :> ParseError |> Error
                 
                 return GenericType(typeSyntax, types, commas, lessThanToken, greaterThanToken)
             }
@@ -505,7 +514,7 @@ module internal PrefixExpressions =
                    Ok (typesArr, commasArr)
                | _ ->
                     parserState.RecoverFromParseError()
-                    AbsentOrInvalidTokenError(typeSyntax.TextSpan(), [| SyntaxKind.CommaToken; SyntaxKind.GreaterThanToken |], AbsentTokenAt.GenericTypeSyntax) :> ParseError |> Error
+                    AbsentOrInvalidTokenError(typeSyntax.TextSpan(), [| SyntaxKind.CommaToken; SyntaxKind.GreaterThanToken |], At.GenericTypeSyntax) :> ParseError |> Error
            | Error error ->
                Error error
             
@@ -559,7 +568,7 @@ module internal PrefixExpressions =
                     tryParseFunctionTypeSyntax (arrowToken :: arrowTokens) newFuncSigTypes onInvalid parserState
                 | _ ->
                     parserState.RecoverFromParseError()
-                    AbsentOrInvalidTokenError(typeSyntax.TextSpan(), [| SyntaxKind.CloseBracketToken; SyntaxKind.MinusGreaterThanToken |], AbsentTokenAt.IfExpression) :> ParseError |> Error
+                    AbsentOrInvalidTokenError(typeSyntax.TextSpan(), [| SyntaxKind.CloseBracketToken; SyntaxKind.MinusGreaterThanToken |], At.IfExpression) :> ParseError |> Error
             | Error parseError ->
                 Error parseError
 
@@ -672,7 +681,7 @@ module internal PrefixExpressions =
                    Ok (parametersArr, commasArr)
                | _ ->
                     parserState.RecoverFromParseError()
-                    AbsentOrInvalidTokenError(parameterSyntax.TextSpan(), [| SyntaxKind.CommaToken; SyntaxKind.CloseParenToken |], AbsentTokenAt.ParameterList) :> ParseError |> Error
+                    AbsentOrInvalidTokenError(parameterSyntax.TextSpan(), [| SyntaxKind.CommaToken; SyntaxKind.CloseParenToken |], At.ParameterList) :> ParseError |> Error
            | Error error ->
                Error error
                
@@ -685,7 +694,7 @@ module internal PrefixExpressions =
                 | _ ->
                     parserState.RecoverFromParseError()
                     let textSpan = parserState.PeekToken(-2).TextSpan  // we need the previous token to point to the invalid token, kinda illegal what we're doing here
-                    AbsentOrInvalidTokenError(textSpan, [| SyntaxKind.OpenParenToken |], AbsentTokenAt.InvocationExpression) :> ParseError |> Error
+                    AbsentOrInvalidTokenError(textSpan, [| SyntaxKind.OpenParenToken |], At.InvocationExpression) :> ParseError |> Error
             
             let! argumentListParseResults =
                 match parserState.PeekToken().Kind with
@@ -703,7 +712,7 @@ module internal PrefixExpressions =
                         match arguments with
                         | [| |] -> openParenToken.TextSpan
                         | arr -> arr[arr.Length - 1].TextSpan()
-                    AbsentOrInvalidTokenError(textSpan, [| SyntaxKind.CloseParenToken |], AbsentTokenAt.InvocationExpression) :> ParseError |> Error
+                    AbsentOrInvalidTokenError(textSpan, [| SyntaxKind.CloseParenToken |], At.InvocationExpression) :> ParseError |> Error
                     
             let argumentList = ArgumentList(openParenToken, arguments, commas, closeParenToken)
             return InvocationExpression(expression, argumentList)
@@ -741,7 +750,7 @@ module internal PrefixExpressions =
                    Ok (parametersArr, commasArr)
                | _ ->
                     parserState.RecoverFromParseError()
-                    AbsentOrInvalidTokenError(expression.TextSpan(), [| SyntaxKind.CommaToken; SyntaxKind.CloseParenToken |], AbsentTokenAt.ArgumentsList) :> ParseError |> Error
+                    AbsentOrInvalidTokenError(expression.TextSpan(), [| SyntaxKind.CommaToken; SyntaxKind.CloseParenToken |], At.ArgumentsList) :> ParseError |> Error
            | Error error ->
                Error error
                
@@ -754,7 +763,7 @@ module internal PrefixExpressions =
                 | _ ->
                     parserState.RecoverFromParseError()
                     let textSpan = parserState.PeekToken(-2).TextSpan  // we need the previous token to point to the invalid token, kinda illegal what we're doing here
-                    AbsentOrInvalidTokenError(textSpan, [| SyntaxKind.OpenBracketToken |], AbsentTokenAt.ListArrayInitialization) :> ParseError |> Error
+                    AbsentOrInvalidTokenError(textSpan, [| SyntaxKind.OpenBracketToken |], At.ListArrayInitialization) :> ParseError |> Error
                     
             let! listInitializationParseResults =
                 match parserState.PeekToken() with
@@ -774,7 +783,7 @@ module internal PrefixExpressions =
                         match values with
                         | [| |] -> openBracketToken.TextSpan
                         | arr -> arr[arr.Length - 1].TextSpan()
-                    AbsentOrInvalidTokenError(textSpan, [| SyntaxKind.CloseParenToken |], AbsentTokenAt.InvocationExpression) :> ParseError |> Error
+                    AbsentOrInvalidTokenError(textSpan, [| SyntaxKind.CloseParenToken |], At.InvocationExpression) :> ParseError |> Error
                     
             return
                 ArrayListInitialization(openBracketToken, values, commas, closeBracketToken)
@@ -800,7 +809,7 @@ module internal PrefixExpressions =
                Ok (valuesArr, commasArr)
             | _ ->
                 parserState.RecoverFromParseError()
-                AbsentOrInvalidTokenError(expression.TextSpan(), [| SyntaxKind.CommaToken; SyntaxKind.CloseBracketToken |], AbsentTokenAt.InvocationExpression) :> ParseError |> Error
+                AbsentOrInvalidTokenError(expression.TextSpan(), [| SyntaxKind.CommaToken; SyntaxKind.CloseBracketToken |], At.InvocationExpression) :> ParseError |> Error
         | Error error ->
             Error error
             
@@ -814,59 +823,144 @@ module internal PrefixExpressions =
                 | SyntaxKind.StringLiteralToken -> Ok ()
                 | _ ->
                     parserState.RecoverFromParseError()
-                    AbsentOrInvalidTokenError(dollarToken.TextSpan, [| SyntaxKind.StringLiteralToken |], AbsentTokenAt.InterpolatedStringExpression) :> ParseError |> Error
+                    AbsentOrInvalidTokenError(dollarToken.TextSpan, [| SyntaxKind.StringLiteralToken |], At.InterpolatedStringExpression) :> ParseError |> Error
             
-            let! interpolatedStringContents = tryParseStringLiteralAsInterpolatedStringComponents stringToken
-            return ""
+            let! splitResults = splitStringIntoRawInterpolationContents stringToken
+            let rawInterpolatedStringTexts, rawInterpolations = splitResults
+            
+            let interpolatedStringTextsParseResults = rawInterpolatedStringTexts |> Array.map tryParseRawInterpolatedStringText 
+            let interpolationsParseResults = rawInterpolations |> Array.map tryParseRawInterpolation
+            
+            let getErrors result = Array.choose (function Error error -> Some error | _ -> None) result
+            let errors = Array.append (getErrors interpolatedStringTextsParseResults) (getErrors interpolationsParseResults)
+            do! match errors with
+                | [|  |] -> Ok ()
+                | _ -> CompositeParseError(errors) :> ParseError |> Error
+                
+            let getOks result = Array.choose (function Ok ok -> Some ok | _ -> None) result
+            let interpolatedStringTexts =
+                interpolatedStringTextsParseResults
+                |> getOks
+                |> Array.map InterpolatedStringContent.InterpolatedStringText
+            let interpolations =
+                interpolationsParseResults
+                |> getOks
+                |> Array.map InterpolatedStringContent.Interpolation
+            let interpolatedStringContents = interleave interpolatedStringTexts interpolations
+            return { InterpolatedStringStartToken = dollarToken; Contents = interpolatedStringContents }
         }
-        |> ignore
-        failwith "todo"
         
-    and private tryParseStringLiteralAsInterpolatedStringComponents
+    and private splitStringIntoRawInterpolationContents
             (token: SyntaxToken)
-            : Result<InterpolatedStringContent array, ParseError> =
+            : Result<SyntaxToken array * SyntaxToken array, ParseError> =
         result {
-            let interpolatedStringTextRaw = ResizeArray<string>()
-            let interpolationRaw = ResizeArray<string>()
+            let interpolatedStringTextRaw = ResizeArray<SyntaxToken>()
+            let interpolationRaw = ResizeArray<SyntaxToken>()
             
             let! stringContents =
                 match token.Value with
                 | :? string as value -> Ok value
-                | _ -> MissingStringLiteralExpressionError(token) |> Error
+                | _ -> MissingStringLiteralExpressionError(token) :> ParseError |> Error
                 
             let mutable isParsingInterpolation = false;
             let charBuffer = ResizeArray<char>()
+            
+            // for building sub-text spans for each component of the interpolated string
+            let mutable lastSpanStart = token.TextSpan.Start
+            let mutable textSpanLength = 1
+            
             for char in stringContents.ToCharArray() do
                 if isParsingInterpolation then
                     if char = '}' then
                         charBuffer.Add(char)
-                        interpolationRaw.Add(charBuffer.ToArray() |> string)
+                        
+                        let asString = System.String(charBuffer.ToArray())  // "{..."
+                        let textSpan = TextSpan(lastSpanStart, textSpanLength)
+                        let asToken = Token(SyntaxKind.Interpolation, text=asString, value=asString[1..asString.Length-2], textSpan=textSpan)
+                        interpolationRaw.Add(asToken)
+                        
                         charBuffer.Clear()
+                        lastSpanStart <- lastSpanStart + textSpanLength + 1
+                        textSpanLength <- 0
                         isParsingInterpolation <- false
                     else 
                         charBuffer.Add(char)
                 else
                     if char = '{' then
-                        interpolatedStringTextRaw.Add(charBuffer.ToArray() |> string)
+                        let asString = System.String(charBuffer.ToArray())
+                        let textSpan = TextSpan(lastSpanStart, textSpanLength)
+                        let asToken = Token(SyntaxKind.InterpolatedStringTextToken, text=asString, value=asString, textSpan=textSpan)
+                        interpolatedStringTextRaw.Add(asToken)
+                        
                         charBuffer.Clear()
+                        lastSpanStart <- lastSpanStart + textSpanLength + 1
+                        textSpanLength <- 0
                         isParsingInterpolation <- true
                         
                     charBuffer.Add(char)
                     
-            match isParsingInterpolation with
-            | true -> interpolationRaw.Add(charBuffer.ToArray() |> string)
-            | false ->  interpolatedStringTextRaw.Add(charBuffer.ToArray() |> string)
-            
-            return ""
+                textSpanLength <- textSpanLength + 1
+                    
+            // process the 'leftover'
+            if charBuffer.Count > 0 then
+                let asString = System.String(charBuffer.ToArray())
+                let textSpan = TextSpan(lastSpanStart, textSpanLength)
+                match isParsingInterpolation with
+                | true ->
+                    let asToken = Token(SyntaxKind.Interpolation, text=asString, value=asString, textSpan=textSpan)
+                    interpolationRaw.Add(asToken)
+                | false ->
+                    let asToken = Token(SyntaxKind.InterpolatedStringTextToken, text=asString, value=asString, textSpan=textSpan)
+                    interpolatedStringTextRaw.Add(asToken)
+                
+            return interpolatedStringTextRaw.ToArray(), interpolationRaw.ToArray()
         }
-        |> ignore
-        failwith "todo"
         
-    and private tryParseRawInterpolatedStringTexts
-            (rawInterpolatedStringTexts: string array)
-            : Result<InterpolatedStringText array, ParseError array> =
+    and private tryParseRawInterpolatedStringText
+            (rawInterpolatedStringText: SyntaxToken)
+            : Result<InterpolatedStringText, ParseError> =
+        result {
+            let! value =
+                match rawInterpolatedStringText.Value with
+                | :? string as str -> Ok str
+                | _ -> InvalidInterpolationError(rawInterpolatedStringText, "Internal parsing error, could not read the following sequence.") :> ParseError |> Error
+            
+            let mutable outputString = value 
+            if not (value.StartsWith('"')) then
+                outputString <- "\"" + outputString
+                
+            if not (value.EndsWith('"')) then
+                outputString <- outputString + "\""
+                
+            return { TextToken = StringLiteral(outputString) }
+        }
         
-        failwith "todo"
+    and private tryParseRawInterpolation
+            (rawInterpolation: SyntaxToken)
+            : Result<Interpolation, ParseError> =
+        result {
+            // represents the raw string value of the expression
+            let! value =
+                match rawInterpolation.Value with
+                | :? string as str -> Ok str
+                | _ -> InvalidInterpolationError(rawInterpolation, "Internal parsing error, could not read the following sequence.") :> ParseError |> Error
+                
+            let expressionTokens = tokenize value
+            let tempParserState = MonkeyAstParserState(expressionTokens)
+            let! expression = tryParseExpression tempParserState Precedence.LOWEST
+            
+            do! match tempParserState.IsEof() with
+                | true -> Ok ()
+                | false -> InvalidInterpolationError(rawInterpolation, "Expected a single expression inside interpolation, detected multiple.") :> ParseError |> Error
+                
+            // constructing the text spans
+            let baseTextSpan = rawInterpolation.TextSpan
+            return
+                { OpenBraceToken = Token(SyntaxKind.OpenBraceToken, text="{", value="{", textSpan=TextSpan(baseTextSpan.Start, 1))
+                  Expression = expression
+                  CloseBraceToken = Token(SyntaxKind.CloseBraceToken, text="}", value="}", textSpan=TextSpan(baseTextSpan.End - 1, 1)) }
+        }
+        
 
         
     let rec getPrefixParseFunc (parserState: MonkeyAstParserState) : Result<MonkeyAstParserState -> Result<ExpressionSyntax, ParseError>, ParseError> =
@@ -889,7 +983,9 @@ module internal PrefixExpressions =
                 >> (Result.bind (tryParseInvocationExpressionIfPrecedesCallExpr parserState)) |> Ok
                 
             | SyntaxKind.DollarToken, _ ->
-                tryParseListArrayInitializationExpression |> Ok
+                tryParseInterpolatedStringExpression
+                >> (Result.map ExpressionSyntax.InterpolatedStringExpressionSyntax)
+                |> Ok
             | SyntaxKind.OpenBracketToken, _ ->  
                 tryParseListArrayInitializationExpression |> Ok
             | SyntaxKind.StringLiteralToken, _ ->  

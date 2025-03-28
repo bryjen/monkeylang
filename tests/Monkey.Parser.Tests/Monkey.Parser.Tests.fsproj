@@ -6,11 +6,11 @@
         <GenerateProgramFile>false</GenerateProgramFile>
         <IsTestProject>true</IsTestProject>
         
-        <AssemblyName>Monkey.Frontend.CLR.Tests</AssemblyName>
+        <AssemblyName>Monkey.Parser.Tests</AssemblyName>
     </PropertyGroup>
 
     <ItemGroup>
-        <Compile Include="Tokenizer\AstEquivalenceTests.fs" />
+        <Compile Include="AstEquivalenceTests.fs" />
         <Compile Include="Tokenizer\TokenizerTests.fs" />
         <Compile Include="Tokenizer\RoundtrippableTests.fs" />
         <Compile Include="Parser\Helpers.fs" />

@@ -8,7 +8,7 @@ open Microsoft.CodeAnalysis.Text
 
 
 [<AutoOpen>]
-module private Helpers =
+module internal Helpers =
     let interleave (xs: string[]) (ys: string[]) =
         let m = min xs.Length ys.Length
         let head = [| for i in 0 .. m - 1 do yield xs.[i]; yield ys.[i] |]
@@ -590,7 +590,8 @@ type InterpolatedStringExpressionSyntax =
       Contents: InterpolatedStringContent array }
 with
     override this.ToString() =
-        $"{this.InterpolatedStringStartToken.ToString()}{this.Contents.ToString()}"
+        let contentsStr = System.String.Join("", this.Contents |> Array.map _.ToString())
+        $"{this.InterpolatedStringStartToken.ToString()}{contentsStr}"
         
     member this.TextSpan () : TextSpan =
         let contentsEnd =

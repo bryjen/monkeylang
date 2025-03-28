@@ -1,4 +1,4 @@
-﻿namespace rec Monkey.Frontend.CLR.Tests.Tokenizer
+﻿namespace rec Monkey.Parser.Tests.Tokenizer.Tokenizer
 
 open System
 
@@ -97,11 +97,11 @@ module private TokenizerTestHelpers =
             if expected = actual then
                 Ok ()
             else
-                Error $"[test #{testCount}] Same types, but expected value \"{expected}\", but got \"{actual}\""
+                Error $"[test #{testCount}] Same types, but expected value `{expected}`, but got `{actual}`"
         | false ->
             Error $"[test #{testCount}] Expected type \"{expectedType}\", but got \"{actualType}\""
             
-    let processTestCase (testCase: SyntaxToken * (int * SyntaxKind * obj option)) = 
+    let processTestCase (testCase: SyntaxToken * (int * SyntaxKind * obj)) = 
         result {
             let actualToken, testInformation = testCase
             let testCount, expectedSyntaxKind, expectedValue = testInformation 
@@ -121,7 +121,7 @@ module private TokenizerTestHelpers =
             return ()
         }
             
-    let testLexer (tokens: SyntaxToken array) (testCases: (SyntaxKind * obj option) array) =
+    let testLexer (tokens: SyntaxToken array) (testCases: (SyntaxKind * obj) array) =
         let testCasesWithCounts = TuplePrepender.AddCountsToTuples testCases
         
         let testCasesWithCountsAndTokens = Array.zip tokens testCasesWithCounts
@@ -150,7 +150,7 @@ module private TokenizerTestHelpers =
         printfn $"[{count}] {token.Kind};\n\t\"{token.Text}\"\n\t{token.Value}"
         
 
-    let rec printTestCases (testCases: (SyntaxKind * obj option) array) : unit =
+    let rec printTestCases (testCases: (SyntaxKind * obj) array) : unit =
         let testCasesWithCounts = TuplePrepender.AddCountsToTuples testCases
         for (testCase, expectedKind, expectedValue) in testCasesWithCounts do
             printTestCase testCase expectedKind expectedValue
@@ -160,7 +160,7 @@ module private TokenizerTestHelpers =
         printfn $"[{testCase}] {expectedKind};\n\t{expectedValue}"
         
         
-    let printTokensAndTestCases (tokens: SyntaxToken array) (testCases: (SyntaxKind * obj option) array) : unit =
+    let printTokensAndTestCases (tokens: SyntaxToken array) (testCases: (SyntaxKind * obj) array) : unit =
         if (Array.length tokens <> Array.length testCases) then
           printfn "Expected:"
           printTestCases testCases
@@ -199,7 +199,6 @@ type TokenizerTests() =
             (SyntaxKind.SemicolonToken,         ";")
             (SyntaxKind.EndOfFileToken,         "")
         |]
-        let testCases = Array.map (fun (syntaxKind, obj) -> (syntaxKind, Some obj)) testCases
         let tokens = tokenize testInput
         printTokensAndTestCases tokens testCases
         testLexer tokens testCases
@@ -306,7 +305,6 @@ let result = add(five, ten);"""
             ( SyntaxKind.EndOfFileToken,
               "")
         |]
-        let testCases = Array.map (fun (syntaxKind, obj) -> (syntaxKind, Some obj)) testCases
         let tokens = tokenize testInput
         printTokensAndTestCases tokens testCases
         testLexer tokens testCases
@@ -544,7 +542,6 @@ if (5 < 10) {
             ( SyntaxKind.EndOfFileToken,
               "")
         |]
-        let testCases = Array.map (fun (syntaxKind, obj) -> (syntaxKind, Some obj)) testCases
         let tokens = tokenize testInput
         printTokensAndTestCases tokens testCases
         testLexer tokens testCases
@@ -572,7 +569,6 @@ if (5 < 10) {
             ( SyntaxKind.EndOfFileToken,
               "")
         |]
-        let testCases = Array.map (fun (syntaxKind, obj) -> (syntaxKind, Some obj)) testCases
         let tokens = tokenize testInput
         printTokensAndTestCases tokens testCases
         testLexer tokens testCases
@@ -612,7 +608,6 @@ if (5 < 10) {
             ( SyntaxKind.EndOfFileToken,
               "")
         |]
-        let testCases = Array.map (fun (syntaxKind, obj) -> (syntaxKind, Some obj)) testCases
         let tokens = tokenize testInput
         printTokensAndTestCases tokens testCases
         testLexer tokens testCases
@@ -652,7 +647,59 @@ if (5 < 10) {
             ( SyntaxKind.EndOfFileToken,
               "")
         |]
-        let testCases = Array.map (fun (syntaxKind, obj) -> (syntaxKind, Some obj)) testCases
+        let tokens = tokenize testInput
+        printTokensAndTestCases tokens testCases
+        testLexer tokens testCases
+        
+        
+        
+    [<Test>]
+    [<Description("Tests interpolated string.")>]
+    member this.``Tokenizer Test 7``() =
+        let testInput = @"let foobar = $""Hello, {name}!"";"
+        
+        let testCases: (SyntaxKind * obj) array = [|
+            ( SyntaxKind.LetKeyword,
+              "let")
+            ( SyntaxKind.IdentifierToken,
+              "foobar")
+            ( SyntaxKind.EqualsToken,
+              "=")
+            ( SyntaxKind.DollarToken,
+              "$")
+            ( SyntaxKind.StringLiteralToken,
+              "Hello, {name}!")
+            ( SyntaxKind.SemicolonToken,
+              ";")
+            ( SyntaxKind.EndOfFileToken,
+              "")
+        |]
+        let tokens = tokenize testInput
+        printTokensAndTestCases tokens testCases
+        testLexer tokens testCases
+        
+        
+    [<Test>]
+    [<Description("Tests interpolated string & correct parsing of double quot tokens.")>]
+    member this.``Tokenizer Test 8``() =
+        let testInput = @"let foobar = $""Hello, \""{name}!\"""";"
+        
+        let testCases: (SyntaxKind * obj) array = [|
+            ( SyntaxKind.LetKeyword,
+              "let")
+            ( SyntaxKind.IdentifierToken,
+              "foobar")
+            ( SyntaxKind.EqualsToken,
+              "=")
+            ( SyntaxKind.DollarToken,
+              "$")
+            ( SyntaxKind.StringLiteralToken,
+              "Hello, \\\"{name}!\\\"")
+            ( SyntaxKind.SemicolonToken,
+              ";")
+            ( SyntaxKind.EndOfFileToken,
+              "")
+        |]
         let tokens = tokenize testInput
         printTokensAndTestCases tokens testCases
         testLexer tokens testCases

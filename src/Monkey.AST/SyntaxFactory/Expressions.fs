@@ -400,3 +400,25 @@ type MonkeyExpressionSyntaxFactory() =
             | i when i >= 2 -> Array.create ((Array.length values) - 1) (CommaToken())
             | _ -> [| |]
         { OpenBracketToken = OpenBracketToken(); Values = values; Commas = commas; CloseBracketToken = CloseBracketToken() }
+
+    
+    
+    static member InterpolatedStringTextNoBox(textToken: SyntaxToken) : InterpolatedStringText =
+        { TextToken = textToken }
+        
+    static member InterpolatedStringText(textToken: SyntaxToken) : InterpolatedStringContent =
+        MonkeyExpressionSyntaxFactory.InterpolatedStringTextNoBox(textToken) |> InterpolatedStringContent.InterpolatedStringText
+    
+    
+    static member InterpolationNoBox(expression: ExpressionSyntax) : Interpolation =
+        { OpenBraceToken = OpenBraceToken(); Expression=expression; CloseBraceToken = CloseBraceToken() }
+        
+    static member Interpolation(expression: ExpressionSyntax) : InterpolatedStringContent =
+        MonkeyExpressionSyntaxFactory.InterpolationNoBox(expression) |> InterpolatedStringContent.Interpolation
+    
+    
+    static member InterpolatedStringNoBox(dollarToken: SyntaxToken, contents: InterpolatedStringContent array) =
+        { InterpolatedStringStartToken = dollarToken; Contents = contents }
+        
+    static member InterpolatedString(dollarToken: SyntaxToken, contents: InterpolatedStringContent array) =
+        MonkeyExpressionSyntaxFactory.InterpolatedStringNoBox(dollarToken, contents) |> ExpressionSyntax.InterpolatedStringExpressionSyntax

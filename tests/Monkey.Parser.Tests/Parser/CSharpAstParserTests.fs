@@ -1,4 +1,4 @@
-﻿namespace Monkey.Frontend.CLR.Tests.Parser.CSharpAstParserTests
+﻿namespace Monkey.Parser.Tests.Parser.CSharpAstParserTests
 
 open System
 
@@ -8,10 +8,8 @@ open Microsoft.CodeAnalysis.CSharp.Syntax
 open type Microsoft.CodeAnalysis.CSharp.SyntaxFactory
 
 open Monkey.Codegen.Dotnet.MonkeyToCSharpAstConverter
+open Monkey.Parser.Tests.Parser.Helpers
 open NUnit.Framework
-
-open Monkey.Frontend.CLR.Tests.Parser.Helpers
-
 
 
 [<TestFixture>]

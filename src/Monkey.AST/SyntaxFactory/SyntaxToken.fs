@@ -55,7 +55,7 @@ type MonkeySyntaxTokenFactory () =
     /// <remarks>
     /// Assumes that the passed string is the contents inside the double quotes
     /// </remarks>
-    static member internal StringLiteral(value: string) =
+    static member StringLiteral(value: string) =
         MonkeySyntaxTokenFactory.Token(SyntaxKind.StringLiteralToken, text=($"\"{value}\""), value=value)
         
         
@@ -98,6 +98,9 @@ type MonkeySyntaxTokenFactory () =
     static member FnKeyword() =
         MonkeySyntaxTokenFactory.Token(SyntaxKind.IdentifierToken, text="fn", value="fn")
         
+        
+    static member DollarToken() =
+        MonkeySyntaxTokenFactory.Token(SyntaxKind.DollarToken, text="$", value="$")
         
     static member DotToken() =
         MonkeySyntaxTokenFactory.Token(SyntaxKind.DotToken, text=".", value=".")
