@@ -139,6 +139,7 @@ and AbsentTokenAt =
     | UsingDirective
     | NamespaceDeclaration
     
+    | InterpolatedStringExpression
     | IfExpression
     | GenericTypeSyntax
     | ParameterList

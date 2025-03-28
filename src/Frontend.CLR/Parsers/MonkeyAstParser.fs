@@ -6,6 +6,7 @@ open Microsoft.CodeAnalysis.CSharp
 
 open FsToolkit.ErrorHandling
 
+open Monkey.Frontend.CLR.Parsers.ParsingErrors.InterpolatedStringExpressionParseError
 open Monkey.Frontend.CLR.Parsers.ParsingErrors.MisplacedSyntaxNodeErrors
 open Monkey.Frontend.CLR.Syntax.Ast
 open Monkey.Frontend.CLR.Parsers.ParsingErrors
@@ -807,6 +808,70 @@ module internal PrefixExpressions =
                 AbsentOrInvalidTokenError(expression.TextSpan(), [| SyntaxKind.CommaToken; SyntaxKind.CloseBracketToken |], AbsentTokenAt.InvocationExpression) :> ParseError |> Error
         | Error error ->
             Error error
+            
+            
+    let rec internal tryParseInterpolatedStringExpression (parserState: MonkeyAstParserState) : Result<InterpolatedStringExpressionSyntax, ParseError> =
+        result {
+            let dollarToken = parserState.PopToken()  // asserted from caller
+            
+            let stringToken = parserState.PopToken()
+            do! match stringToken.Kind with
+                | SyntaxKind.StringLiteralToken -> Ok ()
+                | _ ->
+                    parserState.RecoverFromParseError()
+                    AbsentOrInvalidTokenError(dollarToken.TextSpan, [| SyntaxKind.StringLiteralToken |], AbsentTokenAt.InterpolatedStringExpression) :> ParseError |> Error
+            
+            let! interpolatedStringContents = tryParseStringLiteralAsInterpolatedStringComponents stringToken
+            return ""
+        }
+        |> ignore
+        failwith "todo"
+        
+    and private tryParseStringLiteralAsInterpolatedStringComponents
+            (token: SyntaxToken)
+            : Result<InterpolatedStringContent array, ParseError> =
+        result {
+            let interpolatedStringTextRaw = ResizeArray<string>()
+            let interpolationRaw = ResizeArray<string>()
+            
+            let! stringContents =
+                match token.Value with
+                | :? string as value -> Ok value
+                | _ -> MissingStringLiteralExpressionError(token) |> Error
+                
+            let mutable isParsingInterpolation = false;
+            let charBuffer = ResizeArray<char>()
+            for char in stringContents.ToCharArray() do
+                if isParsingInterpolation then
+                    if char = '}' then
+                        charBuffer.Add(char)
+                        interpolationRaw.Add(charBuffer.ToArray() |> string)
+                        charBuffer.Clear()
+                        isParsingInterpolation <- false
+                    else 
+                        charBuffer.Add(char)
+                else
+                    if char = '{' then
+                        interpolatedStringTextRaw.Add(charBuffer.ToArray() |> string)
+                        charBuffer.Clear()
+                        isParsingInterpolation <- true
+                        
+                    charBuffer.Add(char)
+                    
+            match isParsingInterpolation with
+            | true -> interpolationRaw.Add(charBuffer.ToArray() |> string)
+            | false ->  interpolatedStringTextRaw.Add(charBuffer.ToArray() |> string)
+            
+            return ""
+        }
+        |> ignore
+        failwith "todo"
+        
+    and private tryParseRawInterpolatedStringTexts
+            (rawInterpolatedStringTexts: string array)
+            : Result<InterpolatedStringText array, ParseError array> =
+        
+        failwith "todo"
 
         
     let rec getPrefixParseFunc (parserState: MonkeyAstParserState) : Result<MonkeyAstParserState -> Result<ExpressionSyntax, ParseError>, ParseError> =
@@ -828,6 +893,8 @@ module internal PrefixExpressions =
                 tryParseParenthesizedExpression
                 >> (Result.bind (tryParseInvocationExpressionIfPrecedesCallExpr parserState)) |> Ok
                 
+            | SyntaxKind.DollarToken, _ ->
+                tryParseListArrayInitializationExpression |> Ok
             | SyntaxKind.OpenBracketToken, _ ->  
                 tryParseListArrayInitializationExpression |> Ok
             | SyntaxKind.StringLiteralToken, _ ->  
