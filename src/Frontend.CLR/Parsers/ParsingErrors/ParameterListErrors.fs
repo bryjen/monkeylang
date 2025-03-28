@@ -1,4 +1,4 @@
-﻿module Frontend.CLR.Parsers.ParsingErrors.ParameterListErrors
+﻿module Monkey.Frontend.CLR.Parsers.ParsingErrors.ParameterListErrors
 
 open Microsoft.CodeAnalysis.CSharp
 open Microsoft.CodeAnalysis.Text

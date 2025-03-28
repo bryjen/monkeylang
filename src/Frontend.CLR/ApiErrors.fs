@@ -11,10 +11,10 @@ type CSharpProjectGenerationError(
     inherit Exception()
     
 type MonkeyProjectFilesCompilationError(
-        ?message: string,
-        ?compilationErrors: (FileInfo * Exception list) array,
+        compilationErrors: (FileInfo * Exception array) array,
         ?innerException: Exception) =
     inherit Exception()
+    member this.compilationErrors = compilationErrors
     
 type CompilationError(
         fileErrorPairs: (FileInfo * Exception list) array,

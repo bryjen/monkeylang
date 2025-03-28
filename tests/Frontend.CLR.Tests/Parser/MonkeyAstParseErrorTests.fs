@@ -90,6 +90,18 @@ let bar = 20
                 AbsentOrInvalidTokenError(TextSpan(0, 0), [| SyntaxKind.OpenParenToken |], AbsentTokenAt.IfExpression)
             |]
         )
+        (
+            """let foobar = 5;
+            
+if (5>2) {
+    namespace Monkey;
+    using System.Collections.Generic;
+};
+""",
+            [|
+                AbsentOrInvalidTokenError(TextSpan(0, 0), [| SyntaxKind.OpenParenToken |], AbsentTokenAt.IfExpression)
+            |]
+        )
     |]
     
     [<TestCase(0)>]
@@ -104,6 +116,8 @@ let bar = 20
     [<TestCase(8)>]
     
     [<TestCase(9)>]
+    
+    [<TestCase(10)>]
     member this.``Runner``(index: int) =
         let input, expectedErrors = this.TestCases[index]
         let sourceText = SourceText.From(input)

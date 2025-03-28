@@ -2,14 +2,15 @@
 [<RequireQualifiedAccess>]
 module rec Monkey.Frontend.CLR.Parsers.MonkeyAstParser
 
-open Frontend.CLR.Parsers.ParsingErrors.ParameterListErrors
-open Microsoft.CodeAnalysis
 open Microsoft.CodeAnalysis.CSharp
 
 open FsToolkit.ErrorHandling
 
+open Monkey.Frontend.CLR.Parsers.ParsingErrors.InterpolatedStringExpressionParseError
+open Monkey.Frontend.CLR.Parsers.ParsingErrors.MisplacedSyntaxNodeErrors
 open Monkey.Frontend.CLR.Syntax.Ast
 open Monkey.Frontend.CLR.Parsers.ParsingErrors
+open Monkey.Frontend.CLR.Parsers.ParsingErrors.ParameterListErrors
 open type Monkey.Frontend.CLR.Syntax.SyntaxFactory.MonkeySyntaxTokenFactory
 open type Monkey.Frontend.CLR.Syntax.SyntaxFactory.MonkeyStatementSyntaxFactory
 open type Monkey.Frontend.CLR.Syntax.SyntaxFactory.MonkeyExpressionSyntaxFactory
@@ -17,44 +18,96 @@ open type Monkey.Frontend.CLR.Syntax.SyntaxFactory.MonkeyExpressionSyntaxFactory
 
         
 
-let parseTokens (tokens: SyntaxToken array) : StatementSyntax array * ParseError array =
+let parseTokens (tokens: SyntaxToken array) : MonkeyCompilationUnit * ParseError array =
     let parserState = MonkeyAstParserState(tokens)
-    while not (parserState.IsEof()) do
-        match tryParseStatement parserState with
-        | Ok statementSyntaxOption ->
-            if statementSyntaxOption.IsSome then
-                parserState.Statements.Add(statementSyntaxOption.Value)
-        | Error error ->
-            parserState.Errors.Add(error)
+    let stopCondition (state: MonkeyAstParserState) = state.IsEof()
+    enterNewScopeAndParseTokens stopCondition parserState
     
-    parserState.Statements.ToArray(), parserState.Errors.ToArray()
+
+
+type private ScopeParseResults =
+    { UsingDirectives: UsingDirectiveSyntax array
+      NamespaceDeclarations: NamespaceDeclarationSyntax array
+      Statements: StatementSyntax array
+      Errors: ParseError array }
     
     
-let private enterNewScopeAndParseTokens (stopCondition: MonkeyAstParserState -> bool) (parserState: MonkeyAstParserState) : StatementSyntax array * ParseError array =
-    let statements = ResizeArray<StatementSyntax>()
+let private enterNewScopeAndParseTokens
+        (stopCondition: MonkeyAstParserState -> bool)
+        (parserState: MonkeyAstParserState)
+        : MonkeyCompilationUnit * ParseError array =
+    let syntaxNodes = ResizeArray<MonkeySyntaxNode>()
     let errors = ResizeArray<ParseError>()
     
     while not (stopCondition parserState) do
-        match tryParseStatement parserState with
-        | Ok statementSyntaxOption ->
-            if statementSyntaxOption.IsSome then
-                statements.Add(statementSyntaxOption.Value)
-        | Error error ->
-            errors.Add(error)
-    
-    statements.ToArray(), errors.ToArray()
+        match parserState with
+        | UsingDirective usingDirective ->
+            syntaxNodes.Add(usingDirective |> MonkeySyntaxNode.UsingDirectiveSyntax)
+        | NamespaceDeclaration namespaceDeclaration -> 
+            syntaxNodes.Add(namespaceDeclaration |> MonkeySyntaxNode.NamespaceDeclarationSyntax)
+        | Statement statement -> 
+            syntaxNodes.Add(statement |> MonkeySyntaxNode.StatementSyntax)
+        | Nothing ->
+            ()
+        | ParseError parseError ->
+            errors.Add(parseError)
+            
+    let compilationUnit = { SyntaxNodes = syntaxNodes.ToArray() }
+    compilationUnit, errors.ToArray()
             
         
-let private tryParseStatement (parserState: MonkeyAstParserState) : Result<StatementSyntax option, ParseError> =
+let private (|UsingDirective|NamespaceDeclaration|Statement|Nothing|ParseError|) (parserState: MonkeyAstParserState) =
     let token = parserState.PeekToken()
     match token.Kind with
+    | SyntaxKind.NamespaceKeyword ->
+         match tryParseNamespaceDeclaration parserState with
+         | Ok namespaceDeclaration -> NamespaceDeclaration namespaceDeclaration
+         | Error parseError -> ParseError parseError
+    | SyntaxKind.UsingKeyword ->
+         match tryParseUsingDirective parserState with
+         | Ok usingDirective -> UsingDirective usingDirective
+         | Error parseError -> ParseError parseError
     | SyntaxKind.LetKeyword ->
-        parserState |> tryParseLetStatement |> (Result.map Some)
+         match tryParseLetStatement parserState with
+         | Ok letStatement -> Statement letStatement
+         | Error parseError -> ParseError parseError
     | SyntaxKind.SemicolonToken | SyntaxKind.EndOfFileToken ->
         parserState.PopToken() |> ignore  // we know that there is at least one element
-        Ok None  // no parsing happens, jus continue type shi
+        Nothing
     | _ ->
-        parserState |> tryParseExpressionStatement |> (Result.map Some)
+         match tryParseExpressionStatement parserState with
+         | Ok exprStatement -> Statement exprStatement
+         | Error parseError -> ParseError parseError
+         
+let private tryParseNamespaceDeclaration (parserState: MonkeyAstParserState) : Result<NamespaceDeclarationSyntax, ParseError> =
+    result {
+        let namespaceKeywordToken = parserState.PopToken()  // asserted by caller
+        let! identifierSyntax = tryParseIdentifier parserState
+        
+        let semicolonToken = parserState.PopToken()
+        do! match semicolonToken.Kind with
+            | SyntaxKind.SemicolonToken -> Ok ()
+            | _ ->
+                parserState.RecoverFromParseError()
+                AbsentOrInvalidTokenError(identifierSyntax.TextSpan(), [| SyntaxKind.SemicolonToken |], AbsentTokenAt.NamespaceDeclaration) :> ParseError |> Error
+                
+        return { NamespaceToken = namespaceKeywordToken; Name = identifierSyntax; SemicolonToken = semicolonToken }
+    }
+    
+let private tryParseUsingDirective (parserState: MonkeyAstParserState) : Result<UsingDirectiveSyntax, ParseError> =
+    result {
+        let usingKeywordToken = parserState.PopToken()  // asserted by caller
+        let! identifierSyntax = tryParseIdentifier parserState
+        
+        let semicolonToken = parserState.PopToken()
+        do! match semicolonToken.Kind with
+            | SyntaxKind.SemicolonToken -> Ok ()
+            | _ ->
+                parserState.RecoverFromParseError()
+                AbsentOrInvalidTokenError(identifierSyntax.TextSpan(), [| SyntaxKind.SemicolonToken |], AbsentTokenAt.UsingDirective) :> ParseError |> Error
+                
+        return { UsingToken = usingKeywordToken; Name = identifierSyntax; SemicolonToken = semicolonToken }
+    }
         
 
 let rec private tryParseExpression (parserState: MonkeyAstParserState) (precedence: Precedence) : Result<ExpressionSyntax, ParseError> =
@@ -155,6 +208,25 @@ module private Statements =
         }
 
 
+let private unwrapIntoStatements
+        (monkeyCompilationUnit: MonkeyCompilationUnit)
+        : StatementSyntax array * ParseError array =
+    let misplacedUsingDirectiveErrors =
+        monkeyCompilationUnit.UsingDirectives
+        |> Array.map MisplacedUsingDirectiveError
+        |> Array.map (fun err -> err :> ParseError) 
+    let misplacedNamespaceDeclarationErrors =
+        monkeyCompilationUnit.NamespaceDeclarations
+        |> Array.map MisplacedNamespaceDirectiveError
+        |> Array.map (fun err -> err :> ParseError) 
+    let allParseErrors = Array.concat [| misplacedUsingDirectiveErrors; misplacedNamespaceDeclarationErrors |]
+    monkeyCompilationUnit.Statements, allParseErrors
+    (*
+    match allParseErrors with
+    | [| |] -> monkeyCompilationUnit.Statements |> Ok
+    | errors -> errors |> Error
+    *)
+
 [<AutoOpen>]
 module internal PrefixExpressions =
     
@@ -208,12 +280,12 @@ module internal PrefixExpressions =
         
     let tryParseTrueLiteralExpression (parserState: MonkeyAstParserState) : Result<ExpressionSyntax, ParseError> =
         let currentToken = parserState.PopToken()
-        let updatedToken = { currentToken with Value = Some true }
+        let updatedToken = { currentToken with Value = true }
         { Kind = SyntaxKind.TrueLiteralExpression; Token = updatedToken } |> ExpressionSyntax.LiteralExpressionSyntax |> Ok
         
     let tryParseFalseLiteralExpression (parserState: MonkeyAstParserState) : Result<ExpressionSyntax, ParseError> =
         let currentToken = parserState.PopToken()
-        let updatedToken = { currentToken with Value = Some false }
+        let updatedToken = { currentToken with Value = false }
         { Kind = SyntaxKind.FalseLiteralExpression; Token = updatedToken } |> ExpressionSyntax.LiteralExpressionSyntax |> Ok
         
     let tryParseLogicalNotPrefixExpression (parserState: MonkeyAstParserState) : Result<ExpressionSyntax, ParseError> =
@@ -271,8 +343,9 @@ module internal PrefixExpressions =
                     AbsentOrInvalidTokenError(closeParenToken.TextSpan, [| SyntaxKind.OpenBraceToken |], AbsentTokenAt.IfExpression) :> ParseError |> Error
                        
             let stopCondition (parserState: MonkeyAstParserState) = parserState.PeekToken().Kind = SyntaxKind.CloseBraceToken || parserState.IsEof()
-            let statements, parseErrors = enterNewScopeAndParseTokens stopCondition parserState
-            do! assertNoParseErrors parseErrors
+            let resultingCompilationUnit, scopeParseErrors = enterNewScopeAndParseTokens stopCondition parserState
+            let statements, compilationUnitErrors = unwrapIntoStatements resultingCompilationUnit
+            do! assertNoParseErrors (Array.concat [| scopeParseErrors; compilationUnitErrors |])
             
             let closeBraceToken = parserState.PopToken()
             do! match closeBraceToken.Kind with
@@ -317,8 +390,9 @@ module internal PrefixExpressions =
                     AbsentOrInvalidTokenError(elseKeywordToken.TextSpan, [| SyntaxKind.OpenBraceToken |], AbsentTokenAt.IfExpression) :> ParseError |> Error
                        
             let stopCondition (parserState: MonkeyAstParserState) = parserState.PeekToken().Kind = SyntaxKind.CloseBraceToken || parserState.IsEof()
-            let statements, parseErrors = enterNewScopeAndParseTokens stopCondition parserState
-            do! assertNoParseErrors parseErrors
+            let resultingCompilationUnit, scopeParseErrors = enterNewScopeAndParseTokens stopCondition parserState
+            let statements, compilationUnitErrors = unwrapIntoStatements resultingCompilationUnit
+            do! assertNoParseErrors (Array.concat [| scopeParseErrors; compilationUnitErrors |])
             
             let closeBraceToken = parserState.PopToken()
             do! match closeBraceToken.Kind with
@@ -544,8 +618,9 @@ module internal PrefixExpressions =
                     FunctionExpressionErrors.UnexpectedTokenError(colonToken, "{") :> ParseError |> Error
             
             let stopCondition (parserState: MonkeyAstParserState) = parserState.PeekToken().Kind = SyntaxKind.CloseBraceToken || parserState.IsEof()
-            let statements, parseErrors = enterNewScopeAndParseTokens stopCondition parserState
-            do! assertNoParseErrors parseErrors
+            let resultingCompilationUnit, scopeParseErrors = enterNewScopeAndParseTokens stopCondition parserState
+            let statements, compilationUnitErrors = unwrapIntoStatements resultingCompilationUnit
+            do! assertNoParseErrors (Array.concat [| scopeParseErrors; compilationUnitErrors |])
             
             let closeBraceToken = parserState.PopToken()
             do! match closeBraceToken.Kind with
@@ -581,7 +656,8 @@ module internal PrefixExpressions =
             let currentToken = parserState.PopToken()
             let! parameterNameToken = 
                 match currentToken.Kind with
-                | SyntaxKind.IdentifierToken -> IdentifierNameNoBox(currentToken) |> Ok
+                | SyntaxKind.IdentifierToken ->
+                    SimpleIdentifierNoBox(currentToken) |> Ok
                 | _ ->
                     parserState.RecoverFromParseError()
                     InvalidParameterNameError(currentToken) :> ParseError |> Error
@@ -732,6 +808,70 @@ module internal PrefixExpressions =
                 AbsentOrInvalidTokenError(expression.TextSpan(), [| SyntaxKind.CommaToken; SyntaxKind.CloseBracketToken |], AbsentTokenAt.InvocationExpression) :> ParseError |> Error
         | Error error ->
             Error error
+            
+            
+    let rec internal tryParseInterpolatedStringExpression (parserState: MonkeyAstParserState) : Result<InterpolatedStringExpressionSyntax, ParseError> =
+        result {
+            let dollarToken = parserState.PopToken()  // asserted from caller
+            
+            let stringToken = parserState.PopToken()
+            do! match stringToken.Kind with
+                | SyntaxKind.StringLiteralToken -> Ok ()
+                | _ ->
+                    parserState.RecoverFromParseError()
+                    AbsentOrInvalidTokenError(dollarToken.TextSpan, [| SyntaxKind.StringLiteralToken |], AbsentTokenAt.InterpolatedStringExpression) :> ParseError |> Error
+            
+            let! interpolatedStringContents = tryParseStringLiteralAsInterpolatedStringComponents stringToken
+            return ""
+        }
+        |> ignore
+        failwith "todo"
+        
+    and private tryParseStringLiteralAsInterpolatedStringComponents
+            (token: SyntaxToken)
+            : Result<InterpolatedStringContent array, ParseError> =
+        result {
+            let interpolatedStringTextRaw = ResizeArray<string>()
+            let interpolationRaw = ResizeArray<string>()
+            
+            let! stringContents =
+                match token.Value with
+                | :? string as value -> Ok value
+                | _ -> MissingStringLiteralExpressionError(token) |> Error
+                
+            let mutable isParsingInterpolation = false;
+            let charBuffer = ResizeArray<char>()
+            for char in stringContents.ToCharArray() do
+                if isParsingInterpolation then
+                    if char = '}' then
+                        charBuffer.Add(char)
+                        interpolationRaw.Add(charBuffer.ToArray() |> string)
+                        charBuffer.Clear()
+                        isParsingInterpolation <- false
+                    else 
+                        charBuffer.Add(char)
+                else
+                    if char = '{' then
+                        interpolatedStringTextRaw.Add(charBuffer.ToArray() |> string)
+                        charBuffer.Clear()
+                        isParsingInterpolation <- true
+                        
+                    charBuffer.Add(char)
+                    
+            match isParsingInterpolation with
+            | true -> interpolationRaw.Add(charBuffer.ToArray() |> string)
+            | false ->  interpolatedStringTextRaw.Add(charBuffer.ToArray() |> string)
+            
+            return ""
+        }
+        |> ignore
+        failwith "todo"
+        
+    and private tryParseRawInterpolatedStringTexts
+            (rawInterpolatedStringTexts: string array)
+            : Result<InterpolatedStringText array, ParseError array> =
+        
+        failwith "todo"
 
         
     let rec getPrefixParseFunc (parserState: MonkeyAstParserState) : Result<MonkeyAstParserState -> Result<ExpressionSyntax, ParseError>, ParseError> =
@@ -753,6 +893,8 @@ module internal PrefixExpressions =
                 tryParseParenthesizedExpression
                 >> (Result.bind (tryParseInvocationExpressionIfPrecedesCallExpr parserState)) |> Ok
                 
+            | SyntaxKind.DollarToken, _ ->
+                tryParseListArrayInitializationExpression |> Ok
             | SyntaxKind.OpenBracketToken, _ ->  
                 tryParseListArrayInitializationExpression |> Ok
             | SyntaxKind.StringLiteralToken, _ ->  
@@ -775,13 +917,10 @@ module internal PrefixExpressions =
                 // failwith "todo"
                 PlaceholderError() :> ParseError |> Error
                 
-    and private isFnKeyword (value: obj option) : bool =
+    and private isFnKeyword (value: obj) : bool =
         match value with
-        | Some value ->
-            match value with
-            | :? string as str when str = "fn" -> true
-            | _ -> false
-        | None -> false
+        | :? string as str when str = "fn" -> true
+        | _ -> false
         
     and private tryParseInvocationExpressionIfPrecedesCallExpr
             (parserState: MonkeyAstParserState)

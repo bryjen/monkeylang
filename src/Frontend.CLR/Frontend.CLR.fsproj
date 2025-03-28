@@ -16,18 +16,25 @@
         <Compile Include="Syntax\SyntaxFactory\SyntaxToken.fs" />
         <Compile Include="Syntax\SyntaxFactory\Expressions.fs" />
         <Compile Include="Syntax\SyntaxFactory\Statements.fs" />
+        <Compile Include="Syntax\SyntaxFactory\Other.fs" />
         <Compile Include="Syntax\Tokenizer.fs" />
         <Compile Include="Parsers\ParsingErrors\ParseError.fs" />
         <Compile Include="Parsers\ParsingErrors\FunctionExpressionErrors.fs" />
         <Compile Include="Parsers\ParsingErrors\VariableAssignmentStatementErrors.fs" />
         <Compile Include="Parsers\ParsingErrors\ParameterListErrors.fs" />
+        <Compile Include="Parsers\ParsingErrors\MisplacedSyntaxNodeErrors.fs" />
+        <Compile Include="Parsers\ParsingErrors\InterpolatedStringExpressionParseErrors.fs" />
         <Compile Include="Parsers\CSharpAstErrors.fs" />
         <Compile Include="Parsers\ParserHelpers.fs" />
         <Compile Include="Parsers\DirectCSharpAstParser.fs" />
         <Compile Include="Parsers\MonkeyAstParser.fs" />
-        <Compile Include="Parsers\MonkeyToCSharpAstConverter.fs" />
+        
         <Compile Include="Binding\Binder.fs" />
         <Compile Include="Binding\Optimizer.fs" />
+
+        <Compile Include="Converter\ConverterErrors\ConverterError.fs" />
+        <Compile Include="Converter\AstConverter.fs" />
+        
         <Compile Include="HostStubGenerator.fs" />
         <Compile Include="ApiErrors.fs" />
         <Compile Include="Api.fs" />

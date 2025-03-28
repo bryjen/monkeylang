@@ -35,6 +35,7 @@ with
             | New _ -> "Create a new Monkey project."
             | Run _ -> "Run Monkey files."
             | Version -> "Display toolchain and language versions."
+            | Test -> ""
 
 
 /// <summary>

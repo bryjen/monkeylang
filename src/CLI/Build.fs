@@ -8,8 +8,11 @@ open Argu
 
 open FsToolkit.ErrorHandling
 
+open Microsoft.CodeAnalysis.Text
 open Monkey.CLI
 open Monkey.Frontend.CLR.Api
+open Monkey.Frontend.CLR.Api.Errors
+open Monkey.Frontend.CLR.Parsers.ParsingErrors
 
 type BuildError(
         ?message: string,
@@ -34,7 +37,7 @@ let rec performDotnetBuildAlt (buildArguments: ParseResults<BuildArguments>) : i
     |> function
         | Ok _ -> 0
         | Error error ->
-            printfn $"Build Failed:\n{error.ToString()}"
+            formatError error
             -1
     
 and tryGetProjectFile (buildArguments: ParseResults<BuildArguments>) : Result<FileInfo, Exception> =
@@ -61,3 +64,25 @@ and tryGetProjectFile (buildArguments: ParseResults<BuildArguments>) : Result<Fi
         | _ -> 
             let errorMsg = $"Multiple \"*.mkproj\" files ({projectFiles.Length}) were found in the directory. Please specify which project file to build."
             BuildError(message=errorMsg) :> Exception |> Error
+            
+            
+and formatError (ex: Exception) =
+    match ex with
+    | :? MonkeyProjectFilesCompilationError as e ->
+        printfn "Build failed with errors:\n"
+        for fileInfo, errors in e.compilationErrors do
+            let parseErrors = filterParseErrors errors
+            let sourceText = SourceText.From(File.ReadAllText(fileInfo.FullName))
+            for (parseError: ParseError) in parseErrors do
+                printfn $"{parseError.GetFormattedMessage(sourceText, Some fileInfo.FullName)}\n"
+    | _ ->
+        printfn $"An unknown error occurred:\n{ex.Message}"
+        
+and private filterParseErrors (exceptions: Exception array) =
+    let parseErrors = ResizeArray<ParseError>()
+    for ex in exceptions do
+        match ex with
+        | :? ParseError as parseError -> parseErrors.Add(parseError)
+        | _ -> ()
+        
+    parseErrors.ToArray()
