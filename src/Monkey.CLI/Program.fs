@@ -1,19 +1,25 @@
-﻿open Argu
+﻿open System.Diagnostics
+open Argu
 
 open Monkey.CLI.Build
 open Monkey.CLI.New
 open Monkey.CLI.Run
 open Monkey.CLI
 
+
+
 [<EntryPoint>]
 let rec main argv =
+#if DEBUG
+    printfn "DEBUG (NON-RELEASE) BUILD\n"
+#endif
+    
     let parser = ArgumentParser.Create<ProgramArguments>(programName = "monkey")
     
     if argv.Length = 0 then
         printfn $"{parser.PrintUsage()}"
         System.Environment.Exit(0)
     
-    // parse cli args
     let mutable programArgumentsNullable: ParseResults<ProgramArguments> option = None
     try
         programArgumentsNullable <- Some (parser.ParseCommandLine(inputs=argv, raiseOnUsage=true))
@@ -24,26 +30,16 @@ let rec main argv =
         
     let programArguments = Option.get programArgumentsNullable  // doesn't error because it raises instead of returning 'None'
     
-    
-    // perform action
     match programArguments with
     | _ when programArguments.Contains Build ->
-        let buildParseResults = programArguments.GetResult Build
-        
-        // performDotnetBuild buildParseResults
-        performDotnetBuildAlt buildParseResults
-        
+        performDotnetBuild (programArguments.GetResult Build)
     | _ when programArguments.Contains New ->
         performNew (programArguments.GetResult New)
-        
     | _ when programArguments.Contains Run ->
-        let runParseResults = programArguments.GetResult Run
-        performRun runParseResults
-        
+        performRun (programArguments.GetResult Run)
     | _ when programArguments.Contains Version ->
         printfn "Version"
         0
-        
     | _ ->
         printfn "An unexpected error occurred."
         -1

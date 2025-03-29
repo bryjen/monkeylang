@@ -20,7 +20,7 @@ type BuildError(
         ?innerException: Exception) =
     inherit Exception()
 
-let rec performDotnetBuildAlt (buildArguments: ParseResults<BuildArguments>) : int =
+let rec performDotnetBuild (buildArguments: ParseResults<BuildArguments>) : int =
     result {
         let! projectFile = tryGetProjectFile buildArguments
         let compileTarget = buildArguments.GetResult (BuildArguments.Target, CompileTarget.Integrated)

@@ -1,4 +1,6 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003"
+         Sdk="Microsoft.NET.Sdk"
+         InitialTargets="ValidateVersions">
 
     <PropertyGroup>
         <OutputType>Exe</OutputType>
@@ -12,10 +14,13 @@
     <PropertyGroup>
         <PackAsTool>true</PackAsTool>
         <PackageOutputPath>./nupkg</PackageOutputPath>
+
+        <Version>0.1.0</Version>
+        <PackageVersion>0.1.0</PackageVersion>
+        <AssemblyVersion>0.1.0</AssemblyVersion>
         
         <PackageId>bryjen.monkey</PackageId>
         <ToolCommandName>dotnet-monkey</ToolCommandName>
-        <PackageVersion>0.1.0</PackageVersion>
         <Authors>bryjen</Authors>
         <Description>CLI tool for the Monkey programming language on dotnet.</Description>
         <PackageTags>monkey;monkeylang;CLI</PackageTags>
@@ -25,16 +30,16 @@
         <PackageProjectUrl>https://github.com/bryjen/monkeylang</PackageProjectUrl>
         
         <PackageLicenseFile>LICENSE</PackageLicenseFile>
-        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <PackageReadmeFile>Nuget_README.md</PackageReadmeFile>
     </PropertyGroup>
 
     
     <ItemGroup>
-        <Content Include="README.md" />
+        <Content Include="resources\Nuget_README.md" />
         
-        <None Include="resources/monkey-logo.png" Pack="true" PackagePath="resources" />
-        <None Include="../../LICENSE" Pack="true" PackagePath="" />
-        <None Include="../../README.md" Pack="true" PackagePath="" />
+        <None Include="resources\monkey-logo.png" Pack="true" PackagePath="resources" />
+        <None Include="resources\Nuget_README.md" Pack="true" PackagePath="" />
+        <None Include="..\..\LICENSE" Pack="true" PackagePath="" />
         
         <Compile Include="Helpers.fs" />
         <Compile Include="Arguments.fs" />
@@ -57,5 +62,22 @@
       <ProjectReference Include="..\Monkey.Parser\Monkey.Parser.fsproj" />
       <ProjectReference Include="..\Monkey.Semantics\Monkey.Semantics.fsproj" />
     </ItemGroup>
+
+    
+    <!-- Ensure that all versions specified are equal to prevent inconsistencies. -->
+    <Target Name="ValidateVersions">
+        <PropertyGroup>
+            <NormalizedVersion>$([System.Version]::Parse($(Version)).ToString())</NormalizedVersion>
+            <NormalizedPackageVersion>$([System.Version]::Parse($(PackageVersion)).ToString())</NormalizedPackageVersion>
+            <NormalizedAssemblyVersion>$([System.Version]::Parse($(AssemblyVersion)).ToString())</NormalizedAssemblyVersion>
+        </PropertyGroup>
+
+        <Message Text="Version: $(NormalizedVersion)" Importance="normal" />
+        <Message Text="Package Version: $(NormalizedPackageVersion)" Importance="normal" />
+        <Message Text="Assembly Version: $(NormalizedAssemblyVersion)" Importance="normal" />
+
+        <Error Condition="'$(NormalizedVersion)' != '$(NormalizedAssemblyVersion)' OR '$(NormalizedVersion)' != '$(NormalizedPackageVersion)'" 
+               Text="Version ($(NormalizedVersion)), AssemblyVersion ($(NormalizedAssemblyVersion)), PackageVersion ($(NormalizedPackageVersion)) should all be equal. Check project file and ensure that they are all equal."/>
+    </Target>
 
 </Project>
