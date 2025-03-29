@@ -1632,7 +1632,6 @@ type StringInterpolationParsingTests() =
                 InterpolatedString(
                     DollarToken(),
                     [|
-                        Interpolatedstri
                     |]
                     )
                 )

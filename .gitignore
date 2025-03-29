@@ -5,3 +5,6 @@ obj/
 riderModule.iml
 /_ReSharper.Caches/
 *.user
+
+# output for packaged .nuget tools/libraries
+nupkg/

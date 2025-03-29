@@ -3,16 +3,17 @@
 
 open System
 open System.IO
+open Microsoft.CodeAnalysis.Text
 
 open Argu
 
 open FsToolkit.ErrorHandling
 
-open Microsoft.CodeAnalysis.Text
 open Monkey.CLI
-open Monkey.Frontend.CLR.Api
-open Monkey.Frontend.CLR.Api.Errors
-open Monkey.Frontend.CLR.Parsers.ParsingErrors
+open Monkey.Parser.Errors
+open Monkey.Codegen.Dotnet.CSharpProjectGenerator
+open Monkey.Codegen.Dotnet.CSharpProjectGeneratorErrors
+
 
 type BuildError(
         ?message: string,
@@ -30,9 +31,9 @@ let rec performDotnetBuildAlt (buildArguments: ParseResults<BuildArguments>) : i
         let outputDirInfo = DirectoryInfo(outputDirPath)
         
         let csOutput = Path.Join(outputDirInfo.FullName, "g-cs")
-        let! scanResults = CsharpProjectConverter.scanMonkeyProject projectFile.Directory.FullName
-        let! tempCsprojFileInfo = CsharpProjectConverter.generateTempCSharpProject csOutput scanResults
-        do! CsharpProjectConverter.runMsBuild outputDirInfo.FullName tempCsprojFileInfo.FullName
+        let! scanResults = scanMonkeyProject projectFile.Directory.FullName
+        let! tempCsprojFileInfo = generateTempCSharpProject csOutput scanResults
+        do! runMsBuild outputDirInfo.FullName tempCsprojFileInfo.FullName
     }
     |> function
         | Ok _ -> 0

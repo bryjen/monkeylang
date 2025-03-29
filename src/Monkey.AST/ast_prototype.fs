@@ -34,8 +34,11 @@ type internal CompilationUnitEnv =
     { temp: obj }
 
 
+// commented out to definition collision
+(*
 type MonkeyCompilationUnit =
     { temp: obj }
+*)
     
 
 

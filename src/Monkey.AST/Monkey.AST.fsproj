@@ -16,7 +16,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <Compile Include="ast_prototype.fs" />
+        <Content Include="ast_prototype.fs" />
         
         <Compile Include="Ast.fs" />
         <Compile Include="AstTraverser.fs" />
