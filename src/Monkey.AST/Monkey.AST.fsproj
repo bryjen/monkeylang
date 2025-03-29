@@ -12,9 +12,12 @@
     
     <ItemGroup>
         <Content Include="README.md" />
+        
     </ItemGroup>
 
     <ItemGroup>
+        <Compile Include="ast_prototype.fs" />
+        
         <Compile Include="Ast.fs" />
         <Compile Include="AstTraverser.fs" />
 
