@@ -43,7 +43,16 @@ type MonkeyCompilationUnit =
 
 
 [<Sealed>]
-type SyntaxToken() =
+type SyntaxToken internal
+    (
+        kind: SyntaxKind,
+        text: string,
+        value: obj,
+        textSpan: TextSpan,
+        fullTextSpan: TextSpan,
+        leadingTrivia: SyntaxTriviaList,
+        trailingTrivia: SyntaxTriviaList
+    ) =
     member val Kind: SyntaxKind
     member val Text: string
     member val Value: obj
@@ -53,6 +62,10 @@ type SyntaxToken() =
     
     member val LeadingTrivia: SyntaxTriviaList
     member val TrailingTrivia: SyntaxTriviaList
+    
+    
+type IUnionBase =
+    abstract member ToString: unit -> string
     
     
 [<AbstractClass>]
@@ -70,6 +83,14 @@ and SyntaxNodeType =
     | NamespaceDeclaration   of  NamespaceDeclaration
     | Expression             of  Expression
     | Statement              of  StatementType
+with
+    interface IUnionBase with
+        member this.ToString() =
+            match this with
+            | UsingDirective usingDirective -> failwith "todo"
+            | NamespaceDeclaration namespaceDeclaration -> failwith "todo"
+            | Expression expression -> failwith "todo"
+            | Statement statementType -> failwith "todo"
     
     
 /// Represents a using directive in a monkey compilation unit.
@@ -241,9 +262,71 @@ and PrefixOperator =
     
 and [<Sealed>] IdentifierNameExpr internal () =
     inherit Expression()
+with
+    member val IdentifierNameType: IdentifierNameType
+
+and IdentifierNameType =
+    | SimpleIdentifier of SimpleIdentifier
+    | QualifiedIdentifier of QualifiedIdentifier
+    
+and [<Sealed>] SimpleIdentifier internal () =
+    inherit SyntaxNodeBase()
+with
+    member val IdentifierToken: SyntaxToken
+    
+and [<Sealed>] QualifiedIdentifier internal () =
+    inherit SyntaxNodeBase()
+with
+    member val Tokens: SyntaxToken
+    member val Dots: SyntaxToken
+    
     
 and [<Sealed>] TypeExpr internal () =
     inherit Expression()
+with
+    member val Type: Type
+and Type =
+    | NameSyntax    of NameSyntax
+    | BuiltinType   of BuiltinType
+    | FunctionType  of FunctionType
+    | ArrayType     of ArrayType
+    | GenericType   of GenericType
+    
+and [<Sealed>] NameSyntax internal () =
+    inherit SyntaxNodeBase()
+with
+    member val NameToken: IdentifierNameExpr 
+    
+and [<Sealed>] BuiltinType internal () =
+    inherit SyntaxNodeBase()
+with
+    member val TypeToken: SyntaxToken
+    
+and [<Sealed>] FunctionType internal () =
+    inherit SyntaxNodeBase()
+with
+    member val OpenBracketToken: SyntaxToken
+    member val Types: TypeExpr array
+    member val ArrowTokens: SyntaxToken array
+    member val CloseBracketToken: SyntaxToken
+    
+and [<Sealed>] ArrayType internal () =
+    inherit SyntaxNodeBase()
+with
+    member val Type: TypeExpr
+    member val OpenBracketToken: SyntaxToken
+    member val CloseBracketToken: SyntaxToken
+    
+and [<Sealed>] GenericType internal () =
+    inherit SyntaxNodeBase()
+with
+    member val Type: TypeExpr
+    member val LessThanToken: SyntaxToken
+    member val GenericTypes: TypeExpr array
+    member val Commas: SyntaxToken array
+    member val GreaterThanToken: SyntaxToken
+    
+    
     
 and [<Sealed>] IfExpr internal () =
     inherit Expression()

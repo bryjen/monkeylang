@@ -15,9 +15,9 @@
         <PackAsTool>true</PackAsTool>
         <PackageOutputPath>./nupkg</PackageOutputPath>
 
-        <Version>0.1.0</Version>
-        <PackageVersion>0.1.0</PackageVersion>
-        <AssemblyVersion>0.1.0</AssemblyVersion>
+        <Version>0.1.1</Version>
+        <PackageVersion>0.1.1</PackageVersion>
+        <AssemblyVersion>0.1.1</AssemblyVersion>
         
         <PackageId>bryjen.monkey</PackageId>
         <ToolCommandName>dotnet-monkey</ToolCommandName>

@@ -16,7 +16,10 @@
     </ItemGroup>
 
     <ItemGroup>
-        <Content Include="ast_prototype.fs" />
+        <Compile Include="ast_prototype.fs" />
+        <Compile Include="SyntaxFactory\Tokens.fs" />
+        <Compile Include="SyntaxFactory\Exprs.fs" />
+        <Compile Include="SyntaxFactory\test.fs" />
         
         <Compile Include="Ast.fs" />
         <Compile Include="AstTraverser.fs" />
