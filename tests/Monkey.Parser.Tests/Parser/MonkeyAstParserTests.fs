@@ -4,7 +4,8 @@
 open Microsoft.CodeAnalysis.Text
 open Microsoft.CodeAnalysis.CSharp
 
-open Monkey.AST.AstTraverser
+open Monkey.AST.AstPrinter
+open Monkey.AST.AstToString
 open Monkey.Parser.Errors
 open Monkey.Parser.Tests.Parser.Helpers
 open Monkey.Parser.Tokenizer
@@ -17,8 +18,6 @@ open type Monkey.AST.SyntaxFactory.MonkeySyntaxTokenFactory
 open type Monkey.AST.SyntaxFactory.MonkeyExpressionSyntaxFactory
 open type Monkey.AST.SyntaxFactory.MonkeyStatementSyntaxFactory
 open type Monkey.AST.SyntaxFactory.MonkeyOtherSyntaxFactory
-
-
 
 [<AutoOpen>]
 module private MonkeyAstParserTestsHelpers =
@@ -47,14 +46,22 @@ module private MonkeyAstParserTestsHelpers =
         printfn "\n\nSyntax Tree Visualization"
         printfn "---------------------------------------------------------"
         printfn "```csharp (expected)"
+(*
         for expected in expectedSyntaxNodes do
             printMonkeySyntaxNodeTree expected
+*)
+        for expected in expectedSyntaxNodes do
+            printfn $"{nodeToString expected}"
         printfn "```"
         printfn ""
         
         printfn "```csharp (actual)"
+(*
         for actual in actualSyntaxNodes do
             printMonkeySyntaxNodeTree actual
+*)
+        for actual in actualSyntaxNodes do
+            printfn $"{nodeToString actual}"
         printfn "```"
         printfn "---------------------------------------------------------"
         

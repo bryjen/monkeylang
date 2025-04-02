@@ -16,18 +16,16 @@
     </ItemGroup>
 
     <ItemGroup>
-        <Compile Include="ast_prototype.fs" />
-        <Compile Include="SyntaxFactory\Tokens.fs" />
-        <Compile Include="SyntaxFactory\Exprs.fs" />
-        <Compile Include="SyntaxFactory\test.fs" />
+        <Content Include="ast_prototype.fs" />
         
         <Compile Include="Ast.fs" />
+        <Compile Include="AstPrinter.fs" />
         <Compile Include="AstTraverser.fs" />
-
+        <Compile Include="AstToString.fs" />
         <Compile Include="SyntaxFactory\SyntaxToken.fs" />
         <Compile Include="SyntaxFactory\Expressions.fs" />
-        <Compile Include="SyntaxFactory\Other.fs" />
         <Compile Include="SyntaxFactory\Statements.fs" />
+        <Compile Include="SyntaxFactory\Other.fs" />
     </ItemGroup>
 
     <ItemGroup>

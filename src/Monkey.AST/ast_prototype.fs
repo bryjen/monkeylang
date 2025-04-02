@@ -330,27 +330,54 @@ with
     
 and [<Sealed>] IfExpr internal () =
     inherit Expression()
+with
+    member val IfKeyword: SyntaxToken
+    member val OpenParenToken: SyntaxToken
+    member val Condition: Expression
+    member val CloseParenToken: SyntaxToken
+    member val Clause: BlockStatement
+    member val ElseIfClauses: ElseIfClause array
+    member val ElseClause: ElseClause option
+    
+and [<Sealed>] ElseIfClause internal () =
+    inherit SyntaxNodeBase()
+with
+    member val ElseKeyword: SyntaxToken
+    member val IfKeyword: SyntaxToken
+    member val Condition: Expression
+    member val Clause: BlockStatement
+    
+and [<Sealed>] ElseClause internal () =
+    inherit SyntaxNodeBase()
+with
+    member val ElseKeyword: SyntaxToken
+    member val ElseClause: BlockStatement
+    
     
 and [<Sealed>] ArrayExpr internal () =
     inherit Expression()
     
     
 
+    
+and Statement internal () =
+    inherit SyntaxNodeBase()
+with
+    member val StatementType: StatementType
+    
 and StatementType =
     | BlockStatement of BlockStatement 
     | ExpressionStatement of ExpressionStatement
     | VariableDeclarationStatement of VariableDeclarationStatement
     
-and StatementBase internal () =
-    inherit SyntaxNodeBase()
 
 and [<Sealed>] BlockStatement internal () =
-    inherit StatementBase()
+    inherit Statement()
     
 and [<Sealed>] ExpressionStatement internal () =
-    inherit StatementBase()
+    inherit Statement()
     
 and [<Sealed>] VariableDeclarationStatement internal() =
-    inherit StatementBase()
+    inherit Statement()
     
 

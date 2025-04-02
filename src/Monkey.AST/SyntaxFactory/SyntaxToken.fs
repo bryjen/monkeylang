@@ -1,7 +1,5 @@
 ﻿namespace Monkey.AST.SyntaxFactory
 
-open System
-open System.Runtime.CompilerServices
 open Microsoft.CodeAnalysis
 open Microsoft.CodeAnalysis.CSharp
 open Microsoft.CodeAnalysis.Text
