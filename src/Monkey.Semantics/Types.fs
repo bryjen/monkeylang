@@ -5,14 +5,12 @@
 type BuiltinType =
     | Boolean
     | String
-    | Array
     | Int32
 with
     override this.ToString() =
         match this with
         | Boolean -> "System.Boolean"
         | String -> "System.String"
-        | Array -> "System.Array"
         | Int32 -> "System.Int32"
 
 

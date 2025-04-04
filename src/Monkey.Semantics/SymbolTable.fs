@@ -3,6 +3,12 @@
 open Monkey.Semantics.Symbols
 
 
+let private replaceFirst newVal lst =
+    match lst with
+    | [] -> []
+    | _::tail -> newVal :: tail
+    
+
 type Scope = Map<string, Symbol list>
 
 type SymbolTable() =
@@ -32,3 +38,15 @@ with
                 None
                 
         searchCore scopeStack
+        
+    member this.AddSymbol(name: string, symbol: Symbol) =
+        let currentScope = List.head scopeStack
+        
+        let symbolList =
+            match Map.tryFind name currentScope with
+            | Some value -> value
+            | None -> []
+        let updatedSymbolList = symbol :: symbolList
+        let updatedScope = Map.add name updatedSymbolList currentScope
+        scopeStack <- replaceFirst updatedScope scopeStack
+        ()

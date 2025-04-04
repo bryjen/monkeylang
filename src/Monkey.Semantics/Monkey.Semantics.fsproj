@@ -12,6 +12,8 @@
         <Compile Include="Diagnostics\Errors\InvalidPreambleSyntax.fs" />
         <Compile Include="Diagnostics\Errors\ExpressionTypeErrors.fs" />
         <Compile Include="Diagnostics\Errors\IdentifierErrors.fs" />
+        <Compile Include="Diagnostics\Errors\InvocationExpressionErrors.fs" />
+        <Compile Include="Diagnostics\Errors\VariableAssignmentErrors.fs" />
         <Compile Include="Diagnostics\Warnings\WarningBase.fs" />
         <Compile Include="SymbolTable.fs" />
         <Compile Include="Substitution.fs" />
