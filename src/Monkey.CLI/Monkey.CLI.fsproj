@@ -1,0 +1,83 @@
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003"
+         Sdk="Microsoft.NET.Sdk"
+         InitialTargets="ValidateVersions">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net9.0</TargetFramework>
+        <AssemblyName>monkey</AssemblyName>
+        <RootNamespace>CLI</RootNamespace> 
+    </PropertyGroup>
+    
+    
+    <!-- Package related configs and metadata -->
+    <PropertyGroup>
+        <PackAsTool>true</PackAsTool>
+        <PackageOutputPath>./nupkg</PackageOutputPath>
+
+        <Version>0.1.1</Version>
+        <PackageVersion>0.1.1</PackageVersion>
+        <AssemblyVersion>0.1.1</AssemblyVersion>
+        
+        <PackageId>bryjen.monkey</PackageId>
+        <ToolCommandName>dotnet-monkey</ToolCommandName>
+        <Authors>bryjen</Authors>
+        <Description>CLI tool for the Monkey programming language on dotnet.</Description>
+        <PackageTags>monkey;monkeylang;CLI</PackageTags>
+        <PackageIcon>resources/monkey-logo.png</PackageIcon>
+
+        <RepositoryType>git</RepositoryType>
+        <PackageProjectUrl>https://github.com/bryjen/monkeylang</PackageProjectUrl>
+        
+        <PackageLicenseFile>LICENSE</PackageLicenseFile>
+        <PackageReadmeFile>Nuget_README.md</PackageReadmeFile>
+    </PropertyGroup>
+
+    
+    <ItemGroup>
+        <Content Include="resources\Nuget_README.md" />
+        
+        <None Include="resources\monkey-logo.png" Pack="true" PackagePath="resources" />
+        <None Include="resources\Nuget_README.md" Pack="true" PackagePath="" />
+        <None Include="..\..\LICENSE" Pack="true" PackagePath="" />
+        
+        <Compile Include="Helpers.fs" />
+        <Compile Include="Arguments.fs" />
+        <Compile Include="Build.fs" />
+        <Compile Include="Run.fs" />
+        <Compile Include="New.fs" />
+        <Compile Include="Program.fs"/>
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Argu" Version="6.2.5" />
+      <PackageReference Include="CommandLineParser" Version="2.9.1" />
+      <PackageReference Include="FSharp.SystemTextJson" Version="1.3.13" />
+      <PackageReference Include="FsToolkit.ErrorHandling" Version="4.15.2" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\Monkey.AST\Monkey.AST.fsproj" />
+      <ProjectReference Include="..\Monkey.Codegen.Dotnet\Monkey.Codegen.Dotnet.fsproj" />
+      <ProjectReference Include="..\Monkey.Parser\Monkey.Parser.fsproj" />
+      <ProjectReference Include="..\Monkey.Semantics\Monkey.Semantics.fsproj" />
+    </ItemGroup>
+
+    
+    <!-- Ensure that all versions specified are equal to prevent inconsistencies. -->
+    <Target Name="ValidateVersions">
+        <PropertyGroup>
+            <NormalizedVersion>$([System.Version]::Parse($(Version)).ToString())</NormalizedVersion>
+            <NormalizedPackageVersion>$([System.Version]::Parse($(PackageVersion)).ToString())</NormalizedPackageVersion>
+            <NormalizedAssemblyVersion>$([System.Version]::Parse($(AssemblyVersion)).ToString())</NormalizedAssemblyVersion>
+        </PropertyGroup>
+
+        <Message Text="Version: $(NormalizedVersion)" Importance="normal" />
+        <Message Text="Package Version: $(NormalizedPackageVersion)" Importance="normal" />
+        <Message Text="Assembly Version: $(NormalizedAssemblyVersion)" Importance="normal" />
+
+        <Error Condition="'$(NormalizedVersion)' != '$(NormalizedAssemblyVersion)' OR '$(NormalizedVersion)' != '$(NormalizedPackageVersion)'" 
+               Text="Version ($(NormalizedVersion)), AssemblyVersion ($(NormalizedAssemblyVersion)), PackageVersion ($(NormalizedPackageVersion)) should all be equal. Check project file and ensure that they are all equal."/>
+    </Target>
+
+</Project>

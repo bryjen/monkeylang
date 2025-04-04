@@ -1,25 +1,14 @@
-<div align="center">
-    <p align="center">
-        <h1 align="center"><b>MonkeyLang</b></h1>
-        <br/>
-	<img src="https://github.com/user-attachments/assets/c3c25f7d-e5d4-4f26-b939-0b980157e352"/>
-        <br/>
-	A toolchain for the <a href="https://monkeylang.org/" target="_blank">Monkey</a> programming language on the .NET platform.
-	<br/>
-	<b>Note that this project is still under active developement.</b>
-    </p>
-</div>
+﻿# Monkey.CLI
 
+**THIS PROJECT IS STILL A WIP**
 
-&nbsp;
-A CLI tool for the Monkey programming language that runs on .NET.
+A CLI tool for the [Monkey programming language](https://monkeylang.org/) that runs on .NET.
 Monkey is a general-purpose, minimal, procedural language with first-class functions.
 With a robust toolchain and tight .NET integration, it offers a feature rich platform with an emphasis on rapid prototyping.
 
 
 &nbsp;
 #### Easy to install
-
 ```
 dotnet tool install --global bryjen.monkey
 ```

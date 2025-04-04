@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net9.0</TargetFramework>
+        <IsPackable>false</IsPackable>
+        <GenerateProgramFile>false</GenerateProgramFile>
+        <IsTestProject>true</IsTestProject>
+        
+        <AssemblyName>Monkey.Parser.Tests</AssemblyName>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <Compile Include="AstEquivalenceTests.fs" />
+        <Compile Include="Tokenizer\TokenizerTests.fs" />
+        <Compile Include="Tokenizer\RoundtrippableTests.fs" />
+        <Compile Include="Parser\Helpers.fs" />
+        <Compile Include="Parser\CSharpAstParserTests.fs" />
+        <Compile Include="Parser\MonkeyAstParserTests.fs" />
+        <Compile Include="Parser\MonkeyAstParseErrorTests.fs" />
+        <Compile Include="Program.fs"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="coverlet.collector" Version="6.0.0"/>
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0"/>
+        <PackageReference Include="NUnit" Version="3.14.0"/>
+        <PackageReference Include="NUnit.Analyzers" Version="3.9.0"/>
+        <PackageReference Include="NUnit3TestAdapter" Version="4.5.0"/>
+        
+        <PackageReference Include="FsToolkit.ErrorHandling" Version="4.15.2" />
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.13.0" />
+    </ItemGroup>
+    
+    <ItemGroup>
+        <!-- Retained just for legacy sakes.
+        <ProjectReference Include="..\..\src\Frontend.CLR\Frontend.CLR.fsproj" />
+         -->
+        
+        <ProjectReference Include="..\..\src\Monkey.AST\Monkey.AST.fsproj" />
+        <ProjectReference Include="..\..\src\Monkey.Parser\Monkey.Parser.fsproj" />
+        <ProjectReference Include="..\..\src\Monkey.Codegen.Dotnet\Monkey.Codegen.Dotnet.fsproj" />
+    </ItemGroup>
+
+</Project>

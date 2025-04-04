@@ -1,0 +1,35 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net9.0</TargetFramework>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    </PropertyGroup>
+    
+    <ItemGroup>
+        <InternalsVisibleTo Include="Monkey.Frontend.CLR.Tests" /> <!-- Retained just for legacy sakes. -->
+        <InternalsVisibleTo Include="Monkey.Parser.Tests" />
+    </ItemGroup>
+    
+    <ItemGroup>
+        <Content Include="README.md" />
+        
+    </ItemGroup>
+
+    <ItemGroup>
+        <Content Include="ast_prototype.fs" />
+        
+        <Compile Include="Ast.fs" />
+        <Compile Include="AstPrinter.fs" />
+        <Compile Include="AstTraverser.fs" />
+        <Compile Include="AstToString.fs" />
+        <Compile Include="SyntaxFactory\SyntaxToken.fs" />
+        <Compile Include="SyntaxFactory\Expressions.fs" />
+        <Compile Include="SyntaxFactory\Statements.fs" />
+        <Compile Include="SyntaxFactory\Other.fs" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Build.Locator" Version="1.7.8" />
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.13.0" />
+    </ItemGroup>
+</Project>
