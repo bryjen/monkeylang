@@ -23,6 +23,12 @@ type Diagnostic =
     | Error of SemanticErrorBase
     
     
+type internal AnalyzerState() =
+    /// The 'preamble' can be thought as the 'header' of a compilation unit. Monkey files start with using/import and
+    /// namespace declaration statements, and can't be defined when a statement or expression has been declared.
+    /// After that, then any such declarations are invalid.
+    member val FinishedPreamble: bool = false with get, set
+    
     
 type SemanticModel() =
     member val internal ExpressionToInferredTypeMap: Map<int, TypeSymbol>
@@ -36,20 +42,17 @@ type SemanticModel() =
         
     member val internal NamespaceDeclarations: ResizeArray<NamespaceDeclarationSyntax> = ResizeArray<NamespaceDeclarationSyntax>()
         with get, set
+        
+        
+    // During testing, we would like to query types for specific syntax in the AST.
+    // APIs below require the analyzer state, so it's useful to retain analyzer state even after building the symbol table.
+    // Internal so it can be encapsulated by member methods + so we can easily query during tests.
+    member val internal AnalyzerState: AnalyzerState = Unchecked.defaultof<AnalyzerState> with get, set
 with
     member internal this.NsDeclared() = this.NamespaceDeclarations.Count >= 1
 
 
-
-type private AnalyzerState() =
-    /// The 'preamble' can be thought as the 'header' of a compilation unit. Monkey files start with using/import and
-    /// namespace declaration statements, and can't be defined when a statement or expression has been declared.
-    /// After that, then any such declarations are invalid.
-    member val FinishedPreamble: bool = false with get, set
-    
-
-
-let rec private createSymbolTable (monkeyCompilationUnit: MonkeyCompilationUnit) =
+let rec createSymbolTable (monkeyCompilationUnit: MonkeyCompilationUnit) =
     let mutable analyzerState = AnalyzerState()
     let mutable semanticModel = SemanticModel()
     for node in monkeyCompilationUnit.SyntaxNodes do
@@ -57,6 +60,7 @@ let rec private createSymbolTable (monkeyCompilationUnit: MonkeyCompilationUnit)
         analyzerState <- newState
         semanticModel <- newSemanticModel
         
+    semanticModel.AnalyzerState <- analyzerState
     semanticModel
     
     
@@ -102,14 +106,14 @@ and private onNamespaceDeclaration state semanticModel namespaceDeclaration =
     state, semanticModel
     
     
-and private misplacedNamespaceErr namespaceDeclarationSyntax =
+and internal misplacedNamespaceErr namespaceDeclarationSyntax =
     MisplacedNamespaceDeclaration(namespaceDeclarationSyntax) :> SemanticErrorBase |> Diagnostic.Error
     
-and private multipleNamespaceErr namespaceDeclarationSyntax =
+and internal multipleNamespaceErr namespaceDeclarationSyntax =
     MultipleNamespaceDeclarations(namespaceDeclarationSyntax) :> SemanticErrorBase |> Diagnostic.Error
     
     
-and private tryInferExpressionType
+and internal tryInferExpressionType
         (state: AnalyzerState)
         (semanticModel: SemanticModel)
         (expression: ExpressionSyntax)
@@ -546,7 +550,8 @@ and private onVariableDeclaration state semanticModel variableDeclaration =
                     None
             | None -> Some ()
         
-        semanticModel.SymbolTable.AddSymbol(variableDeclaration.Name.Text.Trim(), expressionTypeSymbol |> Symbol.TypeSymbol)
+        let localSymbol = LocalSymbol(variableDeclaration.Name.Text.Trim(), expressionTypeSymbol)
+        semanticModel.SymbolTable.AddSymbol(localSymbol.Name, localSymbol |> Symbol.LocalSymbol)
         return ()
     }
     |> ignore

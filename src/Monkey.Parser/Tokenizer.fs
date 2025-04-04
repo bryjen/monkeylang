@@ -144,6 +144,9 @@ and private parseToken (tokenizerState: TokenizerState) (chars: char array) : Mo
         
         let continueReadingWhen prev curr = not (curr = '"' && prev <> '\\')
         let startIndex, endIndex = readCharacterSequenceWithLookback chars continueReadingWhen tokenizerState
+        
+        let endIndex = System.Math.Min(endIndex, tokenizerState.SourceText.Length - 1)
+        
         let textSpan = TextSpan(startIndex - 1, endIndex - startIndex + 2)  // to include the quotation marks
         let fullTextSpan = TextSpan(triviaTextSpan.Start, triviaTextSpan.Length + textSpan.Length)
         let valueSpan = TextSpan(startIndex, endIndex - startIndex)

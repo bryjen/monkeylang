@@ -1,10 +1,11 @@
 ﻿module Monkey.Semantics.Symbols
 
-open Microsoft.CodeAnalysis
+open FsToolkit.ErrorHandling
+
 open Monkey.Semantics.Types
 
 type SymbolBase() =
-    member val Name: string
+    class end
     
 
 type Symbol =
@@ -13,10 +14,15 @@ type Symbol =
     | ParameterSymbol of ParameterSymbol
     | TypeSymbol      of TypeSymbol
     
-and LocalSymbol() =
+and LocalSymbol
+    (
+        name: string,
+        _type: TypeSymbol
+    ) =
     inherit SymbolBase()
 with
-    member val Type: TypeSymbol
+    member val Name: string = name
+    member val Type: TypeSymbol = _type
     
 and NamespaceSymbol() =
     inherit SymbolBase()
@@ -65,7 +71,10 @@ and NamedTypeSymbol
 with
     member val Type: Type = _type
     
-    override this.Equals(obj) = base.Equals(obj)
+    override this.Equals(obj) =
+        match obj with
+        | :? NamedTypeSymbol as other -> other.Type.Equals(this.Type)
+        | _ -> false
     
     override this.GetHashCode() = base.GetHashCode()
     
@@ -81,7 +90,26 @@ with
     member val ParameterTypes: TypeSymbol array = parameterTypes
     member val ReturnType: TypeSymbol = returnType
     
-    override this.Equals(obj) = base.Equals(obj)
+    override this.Equals(obj) =
+        option {
+            let! otherFunctionTypeSymbol =
+                match obj with
+                | :? FunctionTypeSymbol as other -> Some other
+                | _ -> None
+                
+            let! paramTypesPaired =
+                match this.ParameterTypes.Length, otherFunctionTypeSymbol.ParameterTypes.Length with
+                | l1, l2 when l1 = l2 -> Array.zip this.ParameterTypes otherFunctionTypeSymbol.ParameterTypes |> Some
+                | _ -> None
+                
+            let parameterTypesMatch =
+                paramTypesPaired
+                |> Array.map (fun (ts1, ts2) -> ts1.Equals(ts2))
+                |> Array.forall id
+                
+            return parameterTypesMatch && this.ReturnType.Equals(otherFunctionTypeSymbol.ReturnType)
+        }
+        |> Option.isSome
     
     override this.GetHashCode() = base.GetHashCode()
     
