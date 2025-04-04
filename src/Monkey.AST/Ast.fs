@@ -125,6 +125,15 @@ with
         | ExpressionSyntax es -> es.ToString()
         | StatementSyntax ss -> ss.ToString()
         
+    member this.TextSpan () : TextSpan =
+        match this with
+        | UsingDirectiveSyntax usingDirectiveSyntax -> usingDirectiveSyntax.TextSpan()
+        | NamespaceDeclarationSyntax namespaceDeclarationSyntax -> namespaceDeclarationSyntax.TextSpan()
+        | ArgumentListSyntax argumentListSyntax -> argumentListSyntax.TextSpan()
+        | ParameterListSyntax parameterListSyntax -> parameterListSyntax.TextSpan()
+        | ExpressionSyntax expressionSyntax -> expressionSyntax.TextSpan()
+        | StatementSyntax statementSyntax -> statementSyntax.TextSpan()
+        
     static member AreEquivalent(msn1: MonkeySyntaxNode, msn2: MonkeySyntaxNode) =
         match msn1, msn2 with
         | UsingDirectiveSyntax uds1, UsingDirectiveSyntax uds2 ->
@@ -207,6 +216,18 @@ with
         | TypeSyntax typeSyntax -> typeSyntax.ToString()
         | IfExpressionSyntax ifExpressionSyntax -> ifExpressionSyntax.ToString()
         | ArrayExpressionSyntax arrayExpressionSyntax -> arrayExpressionSyntax.ToString()
+       
+(*
+    override this.GetHashCode() =
+        failwith "todo"
+        
+    override this.Equals(obj) =
+        match obj with
+        | :? ExpressionSyntax as expressionSyntax ->
+            ExpressionSyntax.AreEquivalent(this, expressionSyntax)
+        | _ ->
+            false
+*) 
         
     member this.TextSpan() =
         match this with

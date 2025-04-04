@@ -6,12 +6,25 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <Compile Include="Types.fs" />
-      <Compile Include="TypeEnv.fs" />
-      <Compile Include="Substitution.fs" />
-      <Compile Include="Inference.fs" />
-      <Compile Include="InferMonad.fs" />
-      <Compile Include="Interface.fs" />
+        <Compile Include="Types.fs" />
+        <Compile Include="Symbols.fs" />
+        <Compile Include="Diagnostics\Errors\SemanticErrorBase.fs" />
+        <Compile Include="Diagnostics\Errors\InvalidPreambleSyntax.fs" />
+        <Compile Include="Diagnostics\Errors\ExpressionTypeErrors.fs" />
+        <Compile Include="Diagnostics\Errors\IdentifierErrors.fs" />
+        <Compile Include="Diagnostics\Warnings\WarningBase.fs" />
+        <Compile Include="SymbolTable.fs" />
+        <Compile Include="Substitution.fs" />
+        <Compile Include="Inference.fs" />
+        <Compile Include="Interface.fs" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="FsToolkit.ErrorHandling" Version="4.15.2" />
+    </ItemGroup>
+    
+    <ItemGroup>
+      <ProjectReference Include="..\Monkey.AST\Monkey.AST.fsproj" />
     </ItemGroup>
 
 </Project>
