@@ -1,4 +1,5 @@
-﻿module Monkey.Codegen.Dotnet.CSharpProjectGenerator
+﻿[<RequireQualifiedAccess>]
+module Monkey.Codegen.Dotnet.CSharpProjectGenerator
 
 open System
 open System.IO
@@ -8,7 +9,10 @@ open System.IO
 /// <summary>
 /// Contains the results of scanning a directory for project related files (.mk, .mkproj files, for example).
 /// </summary>
-type ScanResults
+type ScanResults =
+    { MkprojFileInfo: FileInfo
+      SourceFileInfos: FileInfo array
+      SourceDirInfo: DirectoryInfo }
     
 /// <summary>
 /// Scans a specified directory for project files (.mk, .mkproj files, for example).

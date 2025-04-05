@@ -17,8 +17,12 @@
     <ItemGroup>
         <Compile Include="MonkeyToCSharpAstConverter.fs" />
         <Compile Include="CSharpProjectGeneratorErrors.fs" />
+        <Compile Include="ProjectFile.fs" />
+        <Compile Include="CSharpCompilationGenerator.fs" />
         <Compile Include="CSharpProjectGenerator.fsi" />
         <Compile Include="CSharpProjectGenerator.fs" />
+        <Compile Include="DynamicExecution.fsi" />
+        <Compile Include="DynamicExecution.fs" />
     </ItemGroup>
 
     <ItemGroup>
@@ -26,6 +30,7 @@
         <PackageReference Include="Microsoft.Build.Locator" Version="1.7.8" />
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.13.0" />
         <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="4.13.0" />
+        <PackageReference Include="YamlDotNet" Version="16.3.0" />
     </ItemGroup>
 
     <ItemGroup>

@@ -1,20 +1,13 @@
 ﻿namespace Monkey.Semantics.Tests.TypeResolution.BasicTypeResolutionTests
 
 open Microsoft.CodeAnalysis.Text
-open Microsoft.CodeAnalysis.CSharp
 
-open FsToolkit.ErrorHandling
-open Monkey.AST
-open Monkey.Semantics.Interface
-open Monkey.Semantics.Tests.TypeResolution.Helpers
 open NUnit.Framework
 
 open Monkey.Parser.Errors
-open Monkey.Parser.Parser
-open Monkey.Parser.Tokenizer
-
-open Monkey.Semantics.Symbols
 open Monkey.Semantics.Types
+open Monkey.Semantics.Symbols
+open Monkey.Semantics.Tests.TypeResolution.Helpers
 
 open type Monkey.AST.SyntaxFactory.MonkeySyntaxTokenFactory
 open type Monkey.AST.SyntaxFactory.MonkeyExpressionSyntaxFactory

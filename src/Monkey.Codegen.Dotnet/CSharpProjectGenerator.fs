@@ -1,4 +1,5 @@
-﻿module Monkey.Codegen.Dotnet.CSharpProjectGenerator
+﻿[<RequireQualifiedAccess>]
+module Monkey.Codegen.Dotnet.CSharpProjectGenerator
 
 open System
 open System.IO
