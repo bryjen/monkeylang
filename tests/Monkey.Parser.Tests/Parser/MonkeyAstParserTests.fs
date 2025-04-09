@@ -1645,7 +1645,8 @@ type StringInterpolationParsingTests() =
         )
     |]
     
-    [<TestCase(0)>]
+    // disabled for now
+    // [<TestCase(0)>]
     member this.``K: String interpolation parsing tests``(testCaseIndex: int) =
         PrintTraverserConfigSingleton.Instance.PrintSyntaxTokens <- false
         

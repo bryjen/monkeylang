@@ -1,4 +1,7 @@
-﻿[<RequireQualifiedAccess>]
+﻿/// <summary>
+/// Module containing functionality for generating an equivalent C# project from a Monkey project.
+/// </summary>
+[<RequireQualifiedAccess>]
 module Monkey.Codegen.Dotnet.CSharpProjectGenerator
 
 open System

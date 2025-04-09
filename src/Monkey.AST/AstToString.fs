@@ -24,8 +24,8 @@ module private rec SyntaxWalkerFunctions =
     
     let onMonkeySyntaxNode (indentation: int) (monkeySyntaxNode: MonkeySyntaxNode) =
         match monkeySyntaxNode with
-        | UsingDirectiveSyntax usingDirectiveSyntax -> failwith "todo"
-        | NamespaceDeclarationSyntax namespaceDeclarationSyntax -> failwith "todo"
+        | UsingDirectiveSyntax usingDirectiveSyntax -> onUsingDirectiveSyntax indentation usingDirectiveSyntax
+        | NamespaceDeclarationSyntax namespaceDeclarationSyntax -> onNamespaceDeclarationSyntax indentation namespaceDeclarationSyntax
         | ArgumentListSyntax argumentListSyntax -> failwith "todo"
         | ParameterListSyntax parameterListSyntax -> failwith "todo"
         | ExpressionSyntax expressionSyntax -> onExpressionSyntax indentation expressionSyntax

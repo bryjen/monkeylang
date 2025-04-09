@@ -1,4 +1,7 @@
-﻿module Monkey.Codegen.Dotnet.ProjectFile
+﻿/// <summary>
+/// Module containing functionality for parsing and processing project file (.mkproj) information.
+/// </summary>
+module Monkey.Codegen.Dotnet.ProjectFile
 
 open System.IO
 open YamlDotNet.Serialization

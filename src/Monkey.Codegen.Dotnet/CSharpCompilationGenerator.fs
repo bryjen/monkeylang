@@ -1,4 +1,7 @@
-﻿module Monkey.Codegen.Dotnet.CSharpCompilationGenerator
+﻿/// <summary>
+/// Module containing functionality for creating a C# compilation unit from monkey source code files.
+/// </summary>
+module Monkey.Codegen.Dotnet.CSharpCompilationGenerator
 
 open System
 open System.IO

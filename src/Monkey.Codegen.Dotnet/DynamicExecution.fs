@@ -16,17 +16,8 @@ let dynamicallyRunCompilation (compilation: CSharpCompilation) =
     if emitResult.Success then
         ms.Seek(0L, SeekOrigin.Begin) |> ignore
         let asm = Assembly.Load(ms.ToArray())
-        let entry = asm.EntryPoint
-        (*
-        let args: obj array | null =
-            if entry.GetParameters().Length = 0 then
-                null
-            else
-                [| [||] :> obj |]
-        *)
-        let args: string array = [|  |]
-        let boxedArr: obj array = Array.map box args
-        entry.Invoke(null, boxedArr) |> ignore
+        let args : string[] = [||]
+        asm.EntryPoint.Invoke(null, [| box args |]) |> ignore
     else
         emitResult.Diagnostics
         |> Seq.iter (fun diag -> Console.WriteLine(diag.ToString()))
