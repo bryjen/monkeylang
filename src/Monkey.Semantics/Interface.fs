@@ -23,6 +23,12 @@ type Diagnostic =
     | Error of SemanticErrorBase
     
     
+type internal AnalyzerState() =
+    /// The 'preamble' can be thought as the 'header' of a compilation unit. Monkey files start with using/import and
+    /// namespace declaration statements, and can't be defined when a statement or expression has been declared.
+    /// After that, then any such declarations are invalid.
+    member val FinishedPreamble: bool = false with get, set
+    
     
 type SemanticModel() =
     member val internal ExpressionToInferredTypeMap: Map<int, TypeSymbol>
@@ -36,27 +42,27 @@ type SemanticModel() =
         
     member val internal NamespaceDeclarations: ResizeArray<NamespaceDeclarationSyntax> = ResizeArray<NamespaceDeclarationSyntax>()
         with get, set
+        
+        
+    // During testing, we would like to query types for specific syntax in the AST.
+    // APIs below require the analyzer state, so it's useful to retain analyzer state even after building the symbol table.
+    // Internal so it can be encapsulated by member methods + so we can easily query during tests.
+    member val internal AnalyzerState: AnalyzerState = Unchecked.defaultof<AnalyzerState> with get, set
 with
     member internal this.NsDeclared() = this.NamespaceDeclarations.Count >= 1
 
 
-
-type private AnalyzerState() =
-    /// The 'preamble' can be thought as the 'header' of a compilation unit. Monkey files start with using/import and
-    /// namespace declaration statements, and can't be defined when a statement or expression has been declared.
-    /// After that, then any such declarations are invalid.
-    member val FinishedPreamble: bool = false with get, set
-    
-
-
-let rec private createSymbolTable (monkeyCompilationUnit: MonkeyCompilationUnit) =
+let rec createSymbolTable (monkeyCompilationUnit: MonkeyCompilationUnit) =
     let mutable analyzerState = AnalyzerState()
     let mutable semanticModel = SemanticModel()
     for node in monkeyCompilationUnit.SyntaxNodes do
         let newState, newSemanticModel = onMonkeySyntaxNode analyzerState semanticModel node
         analyzerState <- newState
         semanticModel <- newSemanticModel
-    failwith "todo"
+        
+    semanticModel.AnalyzerState <- analyzerState
+    semanticModel
+    
     
 and private onMonkeySyntaxNode
         (state: AnalyzerState)
@@ -65,33 +71,49 @@ and private onMonkeySyntaxNode
         : AnalyzerState * SemanticModel =
     match monkeySyntaxNode with
     | UsingDirectiveSyntax usingDirectiveSyntax ->
-        match state.FinishedPreamble with
-        | true ->
-            let error = MisplacedUsingDirective(usingDirectiveSyntax) :> SemanticErrorBase |> Diagnostic.Error
-            semanticModel.Diagnostics.Add(error)
-        | false ->
-            semanticModel.Usings.Add(usingDirectiveSyntax)
-        state, semanticModel
+        onUsingDirective state semanticModel usingDirectiveSyntax
     | NamespaceDeclarationSyntax namespaceDeclarationSyntax ->
-        match state.FinishedPreamble, semanticModel.NsDeclared() with
-        | true, true ->
-            semanticModel.Diagnostics.Add(multipleNamespaceErr namespaceDeclarationSyntax)
-        | true, false -> 
-            semanticModel.Diagnostics.Add(misplacedNamespaceErr namespaceDeclarationSyntax)
-        | false, true -> 
-            semanticModel.Diagnostics.Add(multipleNamespaceErr namespaceDeclarationSyntax)
-        | false, false ->
-            semanticModel.NamespaceDeclarations.Add(namespaceDeclarationSyntax)
-        state, semanticModel
-    | ArgumentListSyntax argumentListSyntax -> failwith "todo"
-    | ParameterListSyntax parameterListSyntax -> failwith "todo"
+        onNamespaceDeclaration state semanticModel namespaceDeclarationSyntax
+    | ArgumentListSyntax argumentListSyntax ->
+        failwith "todo"
+    | ParameterListSyntax parameterListSyntax ->
+        failwith "todo"
     | ExpressionSyntax expressionSyntax ->
         tryInferExpressionType state semanticModel expressionSyntax |> ignore
         state, semanticModel
     | StatementSyntax statementSyntax ->
         onStatement state semanticModel statementSyntax
+       
+and private onUsingDirective state semanticModel usingDirective =  
+    match state.FinishedPreamble with
+    | true ->
+        let error = MisplacedUsingDirective(usingDirective) :> SemanticErrorBase |> Diagnostic.Error
+        semanticModel.Diagnostics.Add(error)
+    | false ->
+        semanticModel.Usings.Add(usingDirective)
+    state, semanticModel
+        
+and private onNamespaceDeclaration state semanticModel namespaceDeclaration = 
+    match state.FinishedPreamble, semanticModel.NsDeclared() with
+    | true, true ->
+        semanticModel.Diagnostics.Add(multipleNamespaceErr namespaceDeclaration)
+    | true, false -> 
+        semanticModel.Diagnostics.Add(misplacedNamespaceErr namespaceDeclaration)
+    | false, true -> 
+        semanticModel.Diagnostics.Add(multipleNamespaceErr namespaceDeclaration)
+    | false, false ->
+        semanticModel.NamespaceDeclarations.Add(namespaceDeclaration)
+    state, semanticModel
     
-and private tryInferExpressionType
+    
+and internal misplacedNamespaceErr namespaceDeclarationSyntax =
+    MisplacedNamespaceDeclaration(namespaceDeclarationSyntax) :> SemanticErrorBase |> Diagnostic.Error
+    
+and internal multipleNamespaceErr namespaceDeclarationSyntax =
+    MultipleNamespaceDeclarations(namespaceDeclarationSyntax) :> SemanticErrorBase |> Diagnostic.Error
+    
+    
+and internal tryInferExpressionType
         (state: AnalyzerState)
         (semanticModel: SemanticModel)
         (expression: ExpressionSyntax)
@@ -101,11 +123,15 @@ and private tryInferExpressionType
     match expression with
     | ParenthesizedExpressionSyntax parenthesizedExpressionSyntax ->
         tryInferExpressionType state semanticModel parenthesizedExpressionSyntax.Expression
-    | ExpressionSyntax.FunctionExpressionSyntax functionExpressionSyntax -> failwith "todo"
+    | ExpressionSyntax.FunctionExpressionSyntax functionExpressionSyntax ->
+        tryInferFunctionExpressionType semanticModel functionExpressionSyntax
+        |> Option.map TypeSymbol.FunctionTypeSymbol
     | BinaryExpressionSyntax binaryExpressionSyntax ->
         tryInferBinaryExpressionType state semanticModel binaryExpressionSyntax
-    | InterpolatedStringExpressionSyntax interpolatedStringExpressionSyntax -> failwith "todo"
-    | InvocationExpressionSyntax invocationExpressionSyntax -> failwith "todo"
+    | InterpolatedStringExpressionSyntax interpolatedStringExpressionSyntax ->
+        failwith "todo"
+    | InvocationExpressionSyntax invocationExpressionSyntax ->
+        tryInferInvocationExpressionType state semanticModel invocationExpressionSyntax
     | LiteralExpressionSyntax literalExpressionSyntax ->
         tryInferLiteralExpressionType state semanticModel literalExpressionSyntax
     | PostfixExpressionSyntax postfixExpressionSyntax ->
@@ -114,9 +140,95 @@ and private tryInferExpressionType
         tryInferPrefixExpressionType state semanticModel prefixExpressionSyntax
     | ExpressionSyntax.IdentifierSyntax identifierSyntax ->
         tryInferIdentifierType state semanticModel identifierSyntax
-    | TypeSyntax typeSyntax -> failwith "todo"
-    | IfExpressionSyntax ifExpressionSyntax -> failwith "todo"
-    | ArrayExpressionSyntax arrayExpressionSyntax -> failwith "todo"
+    | TypeSyntax typeSyntax ->
+        tryConvertTypeSyntax semanticModel typeSyntax
+    | IfExpressionSyntax ifExpressionSyntax ->
+        tryInferIfExpressionType state semanticModel ifExpressionSyntax
+    | ArrayExpressionSyntax arrayExpressionSyntax ->
+        failwith "todo"
+        
+and private tryConvertTypeSyntax semanticModel typeSyntax =
+    match typeSyntax with
+    | NameSyntax nameSyntax ->
+        tryConvertNameSyntax nameSyntax
+    | BuiltinTypeSyntax builtinTypeSyntax ->
+        tryConvertBuiltinTypeSyntax semanticModel builtinTypeSyntax 
+    | FunctionTypeSyntax functionTypeSyntax ->
+        tryConvertFunctionTypeSyntax semanticModel functionTypeSyntax
+    | ArrayTypeSyntax arrayTypeSyntax ->
+        tryConvertArrayTypeSyntax semanticModel arrayTypeSyntax
+    | GenericTypeSyntax genericTypeSyntax ->
+        tryConvertGenericTypeSyntax semanticModel genericTypeSyntax
+        
+and private tryConvertNameSyntax nameSyntax =
+    match nameSyntax.Identifier with
+    | SimpleIdentifier simpleIdentifier ->
+        // parser guarantees that we return a 'IdentifierToken' kind
+        { Name = simpleIdentifier.Token.Text.Trim(); Namespace = "" } |> Type.UserDefinedType
+    | QualifiedIdentifier qualifiedIdentifier ->
+        let fullName = System.String.Join(".", Array.map (_.ToString().Trim()) qualifiedIdentifier.Tokens)
+        { Name = fullName; Namespace = "" } |> Type.UserDefinedType
+    |> NamedTypeSymbol
+    |> TypeSymbol.NamedTypeSymbol
+    |> Some
+    
+and private tryConvertBuiltinTypeSyntax semanticModel builtinSyntax =
+    match builtinSyntax.Token with
+    | token when token.Kind = SyntaxKind.IntKeyword ->
+        BuiltinType.Int32 |> Some
+    | token when token.Kind = SyntaxKind.BoolKeyword ->
+        BuiltinType.Boolean |> Some
+    | token when token.Kind = SyntaxKind.StringKeyword ->
+        BuiltinType.String |> Some
+    | _ ->
+        let error = InternalError(builtinSyntax |> TypeSyntax.BuiltinTypeSyntax |> Expression.TypeSyntax |> Node.ExpressionSyntax)
+        semanticModel.Diagnostics.Add(error :> SemanticErrorBase |> Diagnostic.Error)
+        None
+    |> Option.map Type.BuiltinType
+    |> Option.map NamedTypeSymbol
+    |> Option.map TypeSymbol.NamedTypeSymbol
+    
+and private tryConvertFunctionTypeSyntax semanticModel functionTypeSyntax =
+    let typeSymbolOptions = functionTypeSyntax.ParameterTypes |> Array.map (tryConvertTypeSyntax semanticModel)
+    match Array.contains None typeSymbolOptions with
+    | true ->
+        None  // no diag since it's assumed that it's done by the caller
+    | false ->
+        let types = Array.map Option.get typeSymbolOptions
+        if Array.isEmpty types then
+            let error = InternalError(functionTypeSyntax |> TypeSyntax.FunctionTypeSyntax |> Expression.TypeSyntax |> Node.ExpressionSyntax)
+            semanticModel.Diagnostics.Add(error :> SemanticErrorBase |> Diagnostic.Error)
+            None
+        else
+            let last = Array.last types
+            let rest = types[.. types.Length - 2]
+            FunctionTypeSymbol(rest, last) |> TypeSymbol.FunctionTypeSymbol |> Some
+            
+and private tryConvertArrayTypeSyntax semanticModel arrayTypeSyntax =
+    match tryConvertTypeSyntax semanticModel arrayTypeSyntax.Type with
+    | Some _type ->
+        ArrayTypeSymbol(_type) |> TypeSymbol.ArrayTypeSymbol |> Some
+    | None ->
+        None  // no diag since it's assumed that it's done by the caller
+        
+and private tryConvertGenericTypeSyntax semanticModel genericTypeSyntax =
+    option {
+        let! typeSymbol = tryConvertTypeSyntax semanticModel genericTypeSyntax.Type
+        let genericTypeSymbolOptions = genericTypeSyntax.GenericTypes |> Array.map (tryConvertTypeSyntax semanticModel)
+        let! genericTypeSymbols =
+            match Array.contains None genericTypeSymbolOptions with
+            | true -> 
+                let error = InternalError(genericTypeSyntax |> TypeSyntax.GenericTypeSyntax |> Expression.TypeSyntax |> Node.ExpressionSyntax)
+                semanticModel.Diagnostics.Add(error :> SemanticErrorBase |> Diagnostic.Error)
+                None
+            | false ->
+                genericTypeSymbolOptions |> Array.map Option.get |> Some
+                
+        return GenericTypeSymbol(typeSymbol, genericTypeSymbols) |> TypeSymbol.GenericTypeSymbol
+    }
+            
+    
+    
     
 and private tryInferLiteralExpressionType state semanticModel literalExpression =
     let namedTypeInfoOption =
@@ -160,13 +272,7 @@ and private tryInferBinaryExpressionType state semanticModel binaryExpression =
             | UserDefinedType userDefinedType ->
                 semanticModel.Diagnostics.Add(uudt expression userDefinedType)
                 None
-        | ArrayTypeSymbol _ ->
-            semanticModel.Diagnostics.Add(ubt expression BuiltinType.Array)
-            None
-        | FunctionTypeSymbol _ ->
-            semanticModel.Diagnostics.Add(ierr expression)
-            None
-        | TypeParameterSymbol _ ->
+        | _ ->
             semanticModel.Diagnostics.Add(ierr expression)
             None
             
@@ -255,8 +361,8 @@ and private tryInferIdentifierType state semanticModel identifierSyntax =
     match identifierSyntax with
     | SimpleIdentifier simpleIdentifier ->
         tryInferSimpleIdentifierType semanticModel identifierSyntax simpleIdentifier
-    | QualifiedIdentifier qualifiedIdentifier ->  // can only be a type
-        failwith "todo"
+    | QualifiedIdentifier qualifiedIdentifier ->
+        tryInferQualifiedIdentifierType state semanticModel identifierSyntax qualifiedIdentifier
     
 and private tryInferSimpleIdentifierType semanticModel identifierSyntax simpleIdentifier = 
     // could be variable or a type
@@ -281,13 +387,127 @@ and private tryInferSimpleIdentifierType semanticModel identifierSyntax simpleId
             | LocalSymbol localSymbol -> Some localSymbol.Type
             | ParameterSymbol parameterSymbol -> Some parameterSymbol.Type
             | TypeSymbol typeSymbol -> Some typeSymbol
-            | FunctionSymbol _ -> failwith "todo"  // omitted because i'm still not sure what to do with it
             | NamespaceSymbol _ ->
                 // use generic error, otherwise we use internal error
                 let err = UnresolvedIdentifier(identifierSyntax) :> SemanticErrorBase |> Diagnostic.Error
                 semanticModel.Diagnostics.Add(err)
                 None
     }
+    
+and private tryInferQualifiedIdentifierType state semanticModel identifierSyntax qualifiedIdentifier =
+    // variable names can't be qualified, so can only be type
+    option {
+        let lastSymbol =
+            qualifiedIdentifier.Tokens
+            |> (fun tokens -> System.String.Join(".", tokens))
+            |> semanticModel.SymbolTable.SearchForSymbol
+            |> Option.bind List.tryHead
+            
+        let! symbol =
+            match lastSymbol with
+            | None ->
+                let err = UnresolvedIdentifier(identifierSyntax) :> SemanticErrorBase |> Diagnostic.Error
+                semanticModel.Diagnostics.Add(err)
+                None
+            | Some value ->
+                Some value
+        
+        return!         
+            match symbol with
+            | LocalSymbol localSymbol -> Some localSymbol.Type
+            | ParameterSymbol parameterSymbol -> Some parameterSymbol.Type
+            | TypeSymbol typeSymbol -> Some typeSymbol
+            | NamespaceSymbol _ ->
+                // use generic error, otherwise we use internal error
+                let err = UnresolvedIdentifier(identifierSyntax) :> SemanticErrorBase |> Diagnostic.Error
+                semanticModel.Diagnostics.Add(err)
+                None
+    }
+    
+and private tryInferFunctionExpressionType semanticModel functionExpression =
+    option {
+        let parameterTypeOptions =
+            functionExpression.ParameterList.Parameters
+            |> Array.map _.Type
+            |> Array.map (tryConvertTypeSyntax semanticModel)
+            
+        let! parameterTypes =
+            match Array.contains None parameterTypeOptions with
+            | true -> None  // no diag since it's assumed that it's done by the caller
+            | false ->
+                parameterTypeOptions |> Array.map Option.get |> Some
+                
+        let! returnTypeSymbol = tryConvertTypeSyntax semanticModel functionExpression.ReturnType
+        return FunctionTypeSymbol(parameterTypes, returnTypeSymbol) 
+    }
+    
+and private tryInferInvocationExpressionType state semanticModel invocationExpression =
+    option {
+        let leftExprTypeSymbolOption: FunctionTypeSymbol option = tryInferInvocationExpressionLeftExpressionType semanticModel invocationExpression.Expression
+        let! leftExprTypeSymbol = leftExprTypeSymbolOption  // BUG: Above statement errors out; can't infer the option for some reason ?
+        
+        let arguments = invocationExpression.Arguments.Arguments
+        let typeSymbolOptions = arguments |> Array.map (tryInferExpressionType state semanticModel)
+        let! argumentTypes =
+            match Array.contains None typeSymbolOptions with
+            | true -> None  // no diag since it's assumed that it's done by the caller
+            | false -> typeSymbolOptions |> Array.map Option.get |> Some
+            
+        let parameterTypes = leftExprTypeSymbol.ParameterTypes
+        
+        let paramAndArgTypes = Array.zip parameterTypes argumentTypes
+        let typeMatches = paramAndArgTypes |> Array.map (fun (paramType, argType) -> paramType.Equals(argType))
+            
+        let mismatches =
+            typeMatches
+            |> Array.zip3 paramAndArgTypes arguments
+            |> Array.filter (fun (_, _, matches) -> not matches)
+            |> Array.map (fun (typeSymbols, argument, _) -> (fst typeSymbols, snd typeSymbols, argument))
+            
+        if mismatches |> Array.isEmpty |> not then
+            let errors = mismatches |> Array.map InvalidArgumentType |> Array.map (fun err -> err :> SemanticErrorBase |> Diagnostic.Error)
+            semanticModel.Diagnostics.AddRange(errors)
+            ()
+            
+        // we validated that the parameter and argument types match, we return the function type anyways irrespective
+        // of any errors so that the type can still be resolved even if the invocation expression itself is invalid.
+        return leftExprTypeSymbol.ReturnType
+    }
+    
+and private tryInferInvocationExpressionLeftExpressionType semanticModel leftExpr =
+    match leftExpr with
+    | ParenthesizedFunctionExpressionSyntax invocationParenthesizedExpressionSyntax ->
+        tryInferInvocationExpressionLeftExpressionType semanticModel invocationParenthesizedExpressionSyntax.Expression
+    | FunctionExpressionSyntax functionExpressionSyntax ->
+        tryInferFunctionExpressionType semanticModel functionExpressionSyntax
+    | IdentifierSyntax identifierSyntax ->
+        match semanticModel.SymbolTable.SearchForSymbol(identifierSyntax.ToString().Trim()) with
+        | None ->
+            let err = UnresolvedIdentifier(identifierSyntax) :> SemanticErrorBase |> Diagnostic.Error
+            semanticModel.Diagnostics.Add(err)
+            None
+        | Some declaredSymbols ->
+            tryGetLeftExprTypeFromSymbol semanticModel leftExpr (List.head declaredSymbols)
+            
+and private tryGetLeftExprTypeFromSymbol semanticModel invocationExpression symbol =
+    let onInvalid () =
+        let err = InvalidInvocationLeftExpression(invocationExpression) :> SemanticErrorBase |> Diagnostic.Error
+        semanticModel.Diagnostics.Add(err)
+        None
+    
+    match symbol with
+    | LocalSymbol localSymbol ->
+        match localSymbol.Type with
+        | FunctionTypeSymbol functionTypeSymbol -> functionTypeSymbol |> Some
+        | _ -> onInvalid ()
+    | _ ->
+        onInvalid ()
+    
+and private tryInferIfExpressionType state semanticModel ifExpression =
+    option {
+    }
+    |> ignore
+    failwith "todo"
     
     
 and private onStatement
@@ -296,13 +516,44 @@ and private onStatement
         (statement: StatementSyntax)
         : AnalyzerState * SemanticModel =
     match statement with
-    | BlockSyntax blockSyntax -> failwith "todo"
-    | ExpressionStatementSyntax expressionStatementSyntax -> failwith "todo"
-    | VariableDeclarationStatementSyntax variableDeclarationStatementSyntax -> failwith "todo"
+    | BlockSyntax blockSyntax -> onBlockStatement state semanticModel blockSyntax
+    | ExpressionStatementSyntax expressionStatementSyntax -> onExpressionStatement state semanticModel expressionStatementSyntax
+    | VariableDeclarationStatementSyntax variableDeclarationStatementSyntax -> onVariableDeclaration state semanticModel variableDeclarationStatementSyntax
     
+and private onBlockStatement state semanticModel block =
+    for statement in block.Statements do
+        onStatement state semanticModel statement |> ignore
+    state, semanticModel
     
-and private misplacedNamespaceErr namespaceDeclarationSyntax =
-    MisplacedNamespaceDeclaration(namespaceDeclarationSyntax) :> SemanticErrorBase |> Diagnostic.Error
+and private onExpressionStatement state semanticModel expressionStatement =
+    tryInferExpressionType state semanticModel expressionStatement.Expression |> ignore  // ignored just to collect diagnostics, we can't really use it here
+    state, semanticModel
+   
+// TODO: Refactor, created late at night, tired ash 
+and private onVariableDeclaration state semanticModel variableDeclaration =
+    option {
+        let! expressionTypeSymbol = tryInferExpressionType state semanticModel variableDeclaration.Expression
+        
+        // validating annotation type with expression type
+        do! match variableDeclaration.TypeAnnotation with
+            | Some varAnnot ->
+                match tryConvertTypeSyntax semanticModel varAnnot.Type with
+                | None ->
+                    let err = InvalidVariableAnnotation(varAnnot) :> SemanticErrorBase |> Diagnostic.Error
+                    semanticModel.Diagnostics.Add(err)
+                    None
+                | Some varAnnotTypeSymbol when varAnnotTypeSymbol.Equals(expressionTypeSymbol)  ->
+                    Some ()
+                | Some varAnnotTypeSymbol ->
+                    let err = VariableAnnotationMismatch(variableDeclaration.Expression, varAnnotTypeSymbol, expressionTypeSymbol) :> SemanticErrorBase |> Diagnostic.Error
+                    semanticModel.Diagnostics.Add(err)
+                    None
+            | None -> Some ()
+        
+        let localSymbol = LocalSymbol(variableDeclaration.Name.Text.Trim(), expressionTypeSymbol)
+        semanticModel.SymbolTable.AddSymbol(localSymbol.Name, localSymbol |> Symbol.LocalSymbol)
+        return ()
+    }
+    |> ignore
     
-and private multipleNamespaceErr namespaceDeclarationSyntax =
-    MultipleNamespaceDeclarations(namespaceDeclarationSyntax) :> SemanticErrorBase |> Diagnostic.Error
+    state, semanticModel

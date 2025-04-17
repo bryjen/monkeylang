@@ -5,22 +5,28 @@
 type BuiltinType =
     | Boolean
     | String
-    | Array
     | Int32
 with
     override this.ToString() =
         match this with
         | Boolean -> "System.Boolean"
         | String -> "System.String"
-        | Array -> "System.Array"
         | Int32 -> "System.Int32"
 
 
 type UserDefinedType =
     { Name: string
       Namespace: string }
+with
+    override this.ToString() =
+        $"{this.Name}"
     
     
 type Type =
     | BuiltinType of BuiltinType
     | UserDefinedType of UserDefinedType
+with
+    override this.ToString() =
+        match this with
+        | BuiltinType builtinType -> builtinType.ToString()
+        | UserDefinedType userDefinedType -> userDefinedType.ToString()

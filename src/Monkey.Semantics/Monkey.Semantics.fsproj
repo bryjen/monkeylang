@@ -4,14 +4,21 @@
         <TargetFramework>net9.0</TargetFramework>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
     </PropertyGroup>
+    
+    <ItemGroup>
+        <InternalsVisibleTo Include="Monkey.Semantics.Tests" />
+    </ItemGroup>
 
     <ItemGroup>
         <Compile Include="Types.fs" />
         <Compile Include="Symbols.fs" />
+        <Compile Include="SymbolsExtensions.fs" />
         <Compile Include="Diagnostics\Errors\SemanticErrorBase.fs" />
         <Compile Include="Diagnostics\Errors\InvalidPreambleSyntax.fs" />
         <Compile Include="Diagnostics\Errors\ExpressionTypeErrors.fs" />
         <Compile Include="Diagnostics\Errors\IdentifierErrors.fs" />
+        <Compile Include="Diagnostics\Errors\InvocationExpressionErrors.fs" />
+        <Compile Include="Diagnostics\Errors\VariableAssignmentErrors.fs" />
         <Compile Include="Diagnostics\Warnings\WarningBase.fs" />
         <Compile Include="SymbolTable.fs" />
         <Compile Include="Substitution.fs" />

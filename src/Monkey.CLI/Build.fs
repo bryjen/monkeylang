@@ -10,8 +10,8 @@ open Argu
 open FsToolkit.ErrorHandling
 
 open Monkey.CLI
+open Monkey.Codegen.Dotnet
 open Monkey.Parser.Errors
-open Monkey.Codegen.Dotnet.CSharpProjectGenerator
 open Monkey.Codegen.Dotnet.CSharpProjectGeneratorErrors
 
 
@@ -31,9 +31,9 @@ let rec performDotnetBuild (buildArguments: ParseResults<BuildArguments>) : int 
         let outputDirInfo = DirectoryInfo(outputDirPath)
         
         let csOutput = Path.Join(outputDirInfo.FullName, "g-cs")
-        let! scanResults = scanMonkeyProject projectFile.Directory.FullName
-        let! tempCsprojFileInfo = generateTempCSharpProject csOutput scanResults
-        do! runMsBuild outputDirInfo.FullName tempCsprojFileInfo.FullName
+        let! scanResults = CSharpProjectGenerator.scanMonkeyProject projectFile.Directory.FullName
+        let! tempCsprojFileInfo = CSharpProjectGenerator.generateTempCSharpProject csOutput scanResults
+        do! CSharpProjectGenerator.runMsBuild outputDirInfo.FullName tempCsprojFileInfo.FullName
     }
     |> function
         | Ok _ -> 0

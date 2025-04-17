@@ -10,7 +10,7 @@ open FsToolkit.ErrorHandling
 
 open Monkey.CLI
 open Monkey.CLI.Build
-open Monkey.Codegen.Dotnet.CSharpProjectGenerator
+open Monkey.Codegen.Dotnet
 
 
     
@@ -38,32 +38,10 @@ let rec performRun (runParseResults: ParseResults<RunArguments>) : int =
         let outputDirPath = runParseResults.GetResult (BuildOutputDir, defaultValue="./bin")
         let outputDirInfo = DirectoryInfo(outputDirPath)
         
-        let csOutput = Path.Join(outputDirInfo.FullName, "g-cs")
-        let! scanResults = scanMonkeyProject projectFile.Directory.FullName
-        let! tempCsprojFileInfo = generateTempCSharpProject csOutput scanResults
-        do! runMsBuild outputDirInfo.FullName tempCsprojFileInfo.FullName
-        
-        // finding and running the built executables
-        let assemblyName = Path.GetFileNameWithoutExtension(projectFile.Name)
-        let targetFile = $"{assemblyName}.dll"
-        let! targetFileInfo =
-            match outputDirInfo.GetFiles(targetFile) with
-            | [||] ->
-                ExecutableNotFoundError(targetFile=targetFile,searchedDirectories=[| outputDirInfo.FullName |]) :> Exception |> Error
-            | [| executableFileInfo |] ->
-                Ok executableFileInfo
-            | fileInfos ->
-                MultipleExecutablesError(targetFile=targetFile,duplicateFileInfos=fileInfos) :> Exception |> Error
-                
-        // TODO: Add support for argument parsing
-        let args: string array = [| |]
-        let asm = Assembly.LoadFrom targetFileInfo.FullName
-        let entryPoint = asm.EntryPoint
-        let parameters = entryPoint.GetParameters()
-        if parameters.Length = 0 then
-            entryPoint.Invoke(null, [||]) |> ignore
-        else
-            entryPoint.Invoke(null, [| args |]) |> ignore
+        let! scanResults = CSharpProjectGenerator.scanMonkeyProject projectFile.Directory.FullName
+        let! csharpCompilation = DynamicExecution.compileFiles scanResults.SourceFileInfos scanResults.MkprojFileInfo
+        DynamicExecution.dynamicallyRunCompilation csharpCompilation
+        return 0
     }
     |> function
         | Ok _ -> 0
