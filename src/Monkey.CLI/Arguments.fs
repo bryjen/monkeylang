@@ -103,8 +103,10 @@ and RunArguments =
         Target of CompileTarget
     | [<Unique; AltCommandLine("-strict")>]
         WarningsAsErrors
+    (*
     | [<Unique; Last; AltCommandLine("-a")>]
         Args of string array
+    *)
 with
     interface IArgParserTemplate with
         member this.Usage =
@@ -114,7 +116,9 @@ with
             | BuildOutputDir _ -> "The output directory to place built artifacts in."
             | Target _ -> "The platform to target."
             | WarningsAsErrors -> "Flag. Emits warnings as errors."
+            (*
             | Args _ -> "Arguments to pass into the program."
+            *)
             
             
 /// <summary>

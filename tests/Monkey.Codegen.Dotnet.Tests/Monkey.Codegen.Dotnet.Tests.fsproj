@@ -7,11 +7,27 @@
         <GenerateProgramFile>false</GenerateProgramFile>
         <IsTestProject>true</IsTestProject>
     </PropertyGroup>
+    
+    <ItemGroup>
+        <!-- Sample 0 -->
+        <Content Include="samples\0\input\Main.mk">
+          <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </Content>
+        <Content Include="samples\0\input\Sample.mkproj">
+          <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </Content>
+        <Content Include="samples\0\expected\Main.cs">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </Content>
+        <Content Include="samples\0\expected\Sample.csproj" >
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </Content>
+    </ItemGroup>
 
     <ItemGroup>
-        <Compile Include="UnitTest1.fs"/>
+        <Compile Include="CodegenTestsHelpers.fs" />
+        <Compile Include="Codegen.fs" />
         <Compile Include="Program.fs"/>
-        <Content Include="samples\0\TestFile.msproj" />
     </ItemGroup>
 
     <ItemGroup>
@@ -20,6 +36,18 @@
         <PackageReference Include="NUnit" Version="3.14.0"/>
         <PackageReference Include="NUnit.Analyzers" Version="3.9.0"/>
         <PackageReference Include="NUnit3TestAdapter" Version="4.5.0"/>
+        
+        <PackageReference Include="FsToolkit.ErrorHandling" Version="4.15.2" />
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.13.0" />
     </ItemGroup>
 
+    <ItemGroup>
+        <!-- Retained just for legacy sakes.
+        <ProjectReference Include="..\..\src\Frontend.CLR\Frontend.CLR.fsproj" />
+         -->
+
+        <ProjectReference Include="..\..\src\Monkey.AST\Monkey.AST.fsproj" />
+        <ProjectReference Include="..\..\src\Monkey.Parser\Monkey.Parser.fsproj" />
+        <ProjectReference Include="..\..\src\Monkey.Codegen.Dotnet\Monkey.Codegen.Dotnet.fsproj" />
+    </ItemGroup>
 </Project>

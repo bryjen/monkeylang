@@ -17,13 +17,15 @@
     <ItemGroup>
         <Compile Include="Tokenizer.fsi" />
         <Compile Include="Tokenizer.fs" />
-        
+
+        <Compile Include="Errors\ErrorDumper.fs" />
         <Compile Include="Errors\ParseError.fs" />
         <Compile Include="Errors\FunctionExpressionErrors.fs" />
         <Compile Include="Errors\VariableAssignmentStatementErrors.fs" />
         <Compile Include="Errors\ParameterListErrors.fs" />
         <Compile Include="Errors\MisplacedSyntaxNodeErrors.fs" />
         <Compile Include="Errors\InterpolatedStringExpressionParseErrors.fs" />
+        <Compile Include="Errors\InternalError.fs" />
 
         <Compile Include="Precedence.fs" />
         <Compile Include="Parser.fsi" />

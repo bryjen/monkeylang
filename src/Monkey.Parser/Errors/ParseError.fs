@@ -34,7 +34,6 @@ type ParseError () =
     
     abstract member DetailedHelpMessage : unit -> string option
     
-    
     member internal this.Format(sourceText: SourceText, textSpan: TextSpan, filePath: string option) =
         let line = sourceText.Lines.GetLineFromPosition(textSpan.Start)
         let lineNumber = line.LineNumber;
@@ -70,9 +69,10 @@ type ParseError () =
         
 
 
-/// <summary>
-/// 
-/// </summary>
+type AbsentSemicolonAt =
+    | LetStatement
+    | ExpressionStatement
+
 type AbsentSemicolonError(textSpan: TextSpan, from: AbsentSemicolonAt) =
     inherit ParseError()
 with
@@ -89,9 +89,6 @@ with
     
     override this.DetailedHelpMessage() = None
     
-and AbsentSemicolonAt =
-    | LetStatement
-    | ExpressionStatement
     
     
 type At =
@@ -120,9 +117,7 @@ with
         | InterpolatedStringExpression -> "Invalid interpolated string."
     
 
-/// <summary>
-/// 
-/// </summary>
+
 type AbsentOrInvalidTokenError(textSpan: TextSpan, expectedKinds: SyntaxKind array, at: At) =
     inherit ParseError()
 with
@@ -153,7 +148,8 @@ with
     
     
 /// <summary>
-/// 
+/// Parse Error type to represent multiple <c>ParseError</c> objects. In the case that we can only return one parse error
+/// in a function, we can wrap it in this object.
 /// </summary>
 type CompositeParseError(parseErrors: ParseError array) =
     inherit ParseError()
@@ -169,10 +165,28 @@ with
     override this.ErrorMessage() = ""
     
     override this.DetailedHelpMessage() = None
-        
-        
-        
-type PlaceholderError () =
+    
+    
+/// <summary>
+/// Error that represents the case whenever an expression is invalid, but we don't know what type of expression it is.
+/// </summary>
+// A more generalized error in the case that we can't find a prefix function, for example.
+type CouldNotParseExprError(textSpan: TextSpan) =
+    inherit ParseError()
+with
+    override this.GetFormattedMessage(sourceText: SourceText, filePath: string option) =
+        this.Format(sourceText, textSpan, filePath)
+
+    override this.ErrorType() = "Invalid Expression."
+    
+    override this.ErrorMessage() = "Expected a valid expression here. This is not the start of a valid expression."
+    
+    override this.DetailedHelpMessage() = None
+    
+
+// Placeholder, use `obsolete` to get warnings on build; just serves as a reminder
+// [<Obsolete>]
+type PlaceholderError() =
     inherit ParseError()
 with
     override this.GetFormattedMessage(sourceText: SourceText, filePath: string option) = ""

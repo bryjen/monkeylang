@@ -25,3 +25,19 @@ with
     override this.ErrorMessage() = $"Expected a '{expected}' token"
     
     override this.DetailedHelpMessage() = detailedHelpMessage
+    
+    
+    
+type InvalidFuncReturnTypeExpr(textSpan: TextSpan) =
+    inherit ParseError()
+with
+    override this.GetFormattedMessage(sourceText: SourceText, filePath: string option) =
+        base.Format(sourceText, textSpan, filePath)
+
+    override this.ErrorType() =
+        "Invalid function definition."
+    
+    override this.ErrorMessage() =
+        "Could not parse the following type."
+    
+    override this.DetailedHelpMessage() = None
