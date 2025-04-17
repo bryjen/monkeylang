@@ -3,6 +3,7 @@
 
 open System
 open System.IO
+open System.Threading
 open Microsoft.CodeAnalysis.Text
 
 open Argu
@@ -11,8 +12,11 @@ open FsToolkit.ErrorHandling
 
 open Monkey.CLI
 open Monkey.Codegen.Dotnet
+open Monkey.Common.CompilerTask
 open Monkey.Parser.Errors
 open Monkey.Codegen.Dotnet.CSharpProjectGeneratorErrors
+open Serilog.Events
+open Spectre.Console
 
 
 type BuildError(
@@ -29,6 +33,17 @@ let rec performDotnetBuild (buildArguments: ParseResults<BuildArguments>) : int 
         
         let outputDirPath = buildArguments.GetResult (OutputDir, defaultValue="./bin")
         let outputDirInfo = DirectoryInfo(outputDirPath)
+        
+        // TODO: Remove & refactor
+        CompilerProgression.StartProgress()
+        for i in 1 .. 5 do
+            let compTask =
+                { Msg = $"Doing task {i}"
+                  LogLevel = LogEventLevel.Information }
+            CompilerProgression.AddTask(compTask) 
+            Thread.Sleep(1000)
+        Thread.Sleep(5000)
+        CompilerProgression.EndProgress()
         
         let csOutput = Path.Join(outputDirInfo.FullName, "g-cs")
         let! scanResults = CSharpProjectGenerator.scanMonkeyProject projectFile.Directory.FullName

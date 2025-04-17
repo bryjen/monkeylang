@@ -10,18 +10,18 @@
     
     <ItemGroup>
         <!-- Sample 0 -->
-        <Content Include="samples\0\input\Main.mk">
+        <None Include="samples\0\input\Main.mk">
           <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </Content>
-        <Content Include="samples\0\input\Sample.mkproj">
+        </None>
+        <None Include="samples\0\input\Sample.mkproj">
           <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </Content>
-        <Content Include="samples\0\expected\Main.cs">
+        </None>
+        <None Include="samples\0\expected\Main.cs">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </Content>
-        <Content Include="samples\0\expected\Sample.csproj" >
+        </None>
+        <None Include="samples\0\expected\Sample.csproj" >
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </Content>
+        </None>
     </ItemGroup>
 
     <ItemGroup>
