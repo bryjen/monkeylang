@@ -12,7 +12,7 @@ open FsToolkit.ErrorHandling
 
 open Monkey.CLI
 open Monkey.Codegen.Dotnet
-open Monkey.Common.CompilerTask
+open Monkey.Common
 open Monkey.Parser.Errors
 open Monkey.Codegen.Dotnet.CSharpProjectGeneratorErrors
 open Serilog.Events
@@ -26,6 +26,8 @@ type BuildError(
 
 let rec performDotnetBuild (buildArguments: ParseResults<BuildArguments>) : int =
     result {
+        ProgressTracker.changeStatus("Building Project")
+        
         let! projectFile = tryGetProjectFile buildArguments
         let compileTarget = buildArguments.GetResult (BuildArguments.Target, CompileTarget.Integrated)
         let verbosity = buildArguments.GetResult (BuildArguments.Verbosity, defaultValue=Verbosity.Normal)
@@ -33,17 +35,6 @@ let rec performDotnetBuild (buildArguments: ParseResults<BuildArguments>) : int 
         
         let outputDirPath = buildArguments.GetResult (OutputDir, defaultValue="./bin")
         let outputDirInfo = DirectoryInfo(outputDirPath)
-        
-        // TODO: Remove & refactor
-        CompilerProgression.StartProgress()
-        for i in 1 .. 5 do
-            let compTask =
-                { Msg = $"Doing task {i}"
-                  LogLevel = LogEventLevel.Information }
-            CompilerProgression.AddTask(compTask) 
-            Thread.Sleep(1000)
-        Thread.Sleep(5000)
-        CompilerProgression.EndProgress()
         
         let csOutput = Path.Join(outputDirInfo.FullName, "g-cs")
         let! scanResults = CSharpProjectGenerator.scanMonkeyProject projectFile.Directory.FullName

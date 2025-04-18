@@ -12,6 +12,7 @@ open type Microsoft.CodeAnalysis.CSharp.SyntaxFactory
 
 open FsToolkit.ErrorHandling
 
+open Monkey.Common
 open Monkey.Parser.Tokenizer
 open Monkey.Parser.Parser
 open Monkey.Codegen.Dotnet.MonkeyToCSharpAstConverter
