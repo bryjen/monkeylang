@@ -32,7 +32,12 @@
         <PackageLicenseFile>LICENSE</PackageLicenseFile>
         <PackageReadmeFile>Nuget_README.md</PackageReadmeFile>
     </PropertyGroup>
-
+    
+    <PropertyGroup>
+        <CreateHardLinksForCopyLocalIfPossible>true</CreateHardLinksForCopyLocalIfPossible>
+        <AccelerateBuildsInVisualStudio>true</AccelerateBuildsInVisualStudio>
+        <BuildInParallel>true</BuildInParallel>
+    </PropertyGroup>
 
     <!-- Compile constants values -->
     <PropertyGroup>

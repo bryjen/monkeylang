@@ -8,6 +8,12 @@
         <IsTestProject>true</IsTestProject>
     </PropertyGroup>
     
+    <PropertyGroup>
+        <CreateHardLinksForCopyLocalIfPossible>true</CreateHardLinksForCopyLocalIfPossible>
+        <AccelerateBuildsInVisualStudio>true</AccelerateBuildsInVisualStudio>
+        <BuildInParallel>true</BuildInParallel>
+    </PropertyGroup>
+    
     <ItemGroup>
         <!-- Sample 0 -->
         <None Include="samples\0\input\Main.mk">
