@@ -56,20 +56,3 @@ app.Run();
 ```
 With first-class .NET support, Monkey can seamlessly use countless C#/F#/VB.NET libraries.
 Monkey can also transpile into C#, allowing you to see how your Monkey code translates to C#.
-
-
-&nbsp;
-#### Functional concepts
-```fsharp
-type Verbosity =
-    | Normal
-    | Debug
-    | Diagnostic
-    
-let performAction = fn([object -> object] action, Verbosity verbosity) : Result<unit, Exception> {
-    ...
-}
-
-performAction(...)
-```
-Inspired by the simplicity of traditional procedural programming languages and the expressive and rigid structures of functional programming languages, Monkey aims to find a middle-ground and present the best of both worlds.
