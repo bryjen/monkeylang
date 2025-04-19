@@ -6,8 +6,8 @@ open System.IO
 open System.Reflection
 open Microsoft.CodeAnalysis.CSharp
 
-let compileFiles (fileInfos: FileInfo array) (projectFilePath: FileInfo) : Result<CSharpCompilation, Exception> =
-    CSharpCompilationGenerator.compileFiles fileInfos projectFilePath
+let compileFiles (monkeySourceFileInfos: FileInfo array) (projectFileInfo: FileInfo) : Result<CSharpCompilation, Exception> =
+    CSharpCompilationGenerator.compileFiles monkeySourceFileInfos projectFileInfo
 
 let dynamicallyRunCompilation (compilation: CSharpCompilation) =
     use ms = new MemoryStream()

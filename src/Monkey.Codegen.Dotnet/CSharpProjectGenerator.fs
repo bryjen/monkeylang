@@ -5,6 +5,7 @@ open System
 open System.IO
 open System.Diagnostics
 
+open System.Threading
 open Microsoft.Build.Locator
 open Microsoft.CodeAnalysis
 open Microsoft.CodeAnalysis.CSharp.Syntax
@@ -12,6 +13,8 @@ open type Microsoft.CodeAnalysis.CSharp.SyntaxFactory
 
 open FsToolkit.ErrorHandling
 
+open Monkey.AST
+open Monkey.Common
 open Monkey.Parser.Tokenizer
 open Monkey.Parser.Parser
 open Monkey.Codegen.Dotnet.MonkeyToCSharpAstConverter
@@ -84,12 +87,21 @@ let rec generateTempCSharpProject (outputDir: string) (scanResults: ScanResults)
         let projFileContents = File.ReadAllText(scanResults.MkprojFileInfo.FullName)
         File.WriteAllText(outputCsprojFileInfo.FullName, projFileContents)
         
+        use logHandle = ProgressTracker.addTasks [|
+            $"[{scanResults.SourceFileInfos.Length}] Parsing Files"
+            $"[{scanResults.SourceFileInfos.Length}] Semantic Analysis"
+            $"[{scanResults.SourceFileInfos.Length}] Transpiling into C#"
+        |]
+        
+        use parsingFilesLogHandle = scanResults.SourceFileInfos |> Array.map _.Name |> ProgressTracker.addTasks
         
         // generate .cs files
+        
+        // 1- Setup and parsing
         let sourceAndOutputFileInfoPairs = getSourceAndOutputFilePathPairs outputDir scanResults
         let parseResultsAndOutputFileInfoPairs =
             sourceAndOutputFileInfoPairs 
-            |> Array.map (fun (sourceFileInfo, outputFileInfo) -> (compileFile sourceFileInfo, outputFileInfo))
+            |> Array.map (fun (sourceFileInfo, outputFileInfo) -> (compileFile parsingFilesLogHandle sourceFileInfo, outputFileInfo))
         
         let sourceFileInfoAndParseResultsPairs =
             sourceAndOutputFileInfoPairs
@@ -105,16 +117,51 @@ let rec generateTempCSharpProject (outputDir: string) (scanResults: ScanResults)
                    
         do! match justErrors with
             | [| |] -> Ok ()
-            | _ -> 
-                MonkeyProjectFilesCompilationError(compilationErrors=justErrors) :> Exception |> Error
+            | _ -> MonkeyProjectFilesCompilationError(compilationErrors=justErrors) :> Exception |> Error
         
-        let compilationResultsAndOutputFileInfoPairs =
+        let monkeyCompilationUnitAndOutputFileInfoPairs =
             parseResultsAndOutputFileInfoPairs
             |> Array.choose
                    (function
                     | Ok compilationUnit, outputFileInfo -> Some (compilationUnit, outputFileInfo)
                     | Error _, _ -> None)
+#if ADD_ARTIFICIAL_DELAY
+        Thread.Sleep(1000)
+#endif
+        logHandle.PopTask()
+        
+        // 2- Semantic Analysis
+        // TODO: Add semantic analysis here
+#if ADD_ARTIFICIAL_DELAY
+        Thread.Sleep(1000)
+#endif
+        logHandle.PopTask()
                    
+                   
+        // 3- C# AST Transpiling
+        let csharpCompilationUnitResultAndOutputFileInfoPair =
+            monkeyCompilationUnitAndOutputFileInfoPairs
+            |> Array.map (fun (mcu, fileInfo) -> (toCSharpCompilationUnit mcu.Statements, fileInfo))
+            
+        let justErrors =
+            csharpCompilationUnitResultAndOutputFileInfoPair
+            |> Array.choose (function | Ok _, _ -> None | Error errors, fileInfo -> Some (fileInfo, errors))
+            |> Array.map (fun (fi, errArr) -> (fi, errArr |> Array.map (fun err -> err :> Exception)))
+            
+        do! match justErrors with
+            | [| |] -> Ok ()
+            | _ -> MonkeyProjectFilesCompilationError(compilationErrors=justErrors) :> Exception |> Error
+            
+        let compilationResultsAndOutputFileInfoPairs =
+            csharpCompilationUnitResultAndOutputFileInfoPair
+            |> Array.choose (function | Ok compilationUnit, outputFileInfo -> Some (compilationUnit, outputFileInfo) | Error _, _ -> None)
+#if ADD_ARTIFICIAL_DELAY
+        Thread.Sleep(1000)
+#endif
+        logHandle.PopTask()
+
+            
+        // emitting
         compilationResultsAndOutputFileInfoPairs
         |> Array.map (fun (compilationUnit, outputFileInfo) -> emitAsCsFile compilationUnit outputFileInfo)
         |> ignore
@@ -133,22 +180,30 @@ and private getSourceAndOutputFilePathPairs (outputDir: string) (scanResults: Sc
         
     Array.zip scanResults.SourceFileInfos correspondingOutputCsPath
     
-and private compileFile (fileInfo: FileInfo) : Result<CompilationUnitSyntax, Exception array> =
+and private compileFile (taskHandle: ProgressTracker.TaskHandle) (fileInfo: FileInfo) : Result<MonkeyCompilationUnit, Exception array> =
     result {
         let monkeySourceCode = File.ReadAllText(fileInfo.FullName)
         let tokens = tokenize monkeySourceCode
-        let statements, parseErrors = parseTokens tokens
+        let monkeyCompilationUnit, parseErrors = parseTokens tokens
         
         do! match parseErrors with
             | [||] -> Ok ()
             | _ -> parseErrors |> Array.map (fun error -> error :> Exception) |> Error
             
+        (*
         let conversionResults =
             toCSharpCompilationUnit statements.Statements  // TODO: FIX    
             |> Result.mapError (Array.map (fun err -> err :> Exception))
             
+        
         let! compilationUnit = conversionResults
-        return compilationUnit
+        *)
+#if ADD_ARTIFICIAL_DELAY
+        Thread.Sleep(1000)
+#endif
+        taskHandle.PopTask()
+        // return compilationUnit
+        return monkeyCompilationUnit
     }
     
 and private emitAsCsFile (compilationUnit: CompilationUnitSyntax) (outputFileInfo: FileInfo) =

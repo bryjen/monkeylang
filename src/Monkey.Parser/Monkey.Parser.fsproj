@@ -5,6 +5,12 @@
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
     </PropertyGroup>
     
+    <PropertyGroup>
+        <CreateHardLinksForCopyLocalIfPossible>true</CreateHardLinksForCopyLocalIfPossible>
+        <AccelerateBuildsInVisualStudio>true</AccelerateBuildsInVisualStudio>
+        <BuildInParallel>true</BuildInParallel>
+    </PropertyGroup>
+    
     <ItemGroup>
         <InternalsVisibleTo Include="Monkey.Frontend.CLR.Tests" /> <!-- Retained just for legacy sakes. -->
         <InternalsVisibleTo Include="Monkey.Parser.Tests" />
@@ -17,13 +23,15 @@
     <ItemGroup>
         <Compile Include="Tokenizer.fsi" />
         <Compile Include="Tokenizer.fs" />
-        
+
+        <Compile Include="Errors\ErrorDumper.fs" />
         <Compile Include="Errors\ParseError.fs" />
         <Compile Include="Errors\FunctionExpressionErrors.fs" />
         <Compile Include="Errors\VariableAssignmentStatementErrors.fs" />
         <Compile Include="Errors\ParameterListErrors.fs" />
         <Compile Include="Errors\MisplacedSyntaxNodeErrors.fs" />
         <Compile Include="Errors\InterpolatedStringExpressionParseErrors.fs" />
+        <Compile Include="Errors\InternalError.fs" />
 
         <Compile Include="Precedence.fs" />
         <Compile Include="Parser.fsi" />

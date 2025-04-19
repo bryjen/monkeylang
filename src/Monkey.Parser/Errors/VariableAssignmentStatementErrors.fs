@@ -1,5 +1,6 @@
 ﻿namespace Monkey.Parser.Errors
 
+open System.Xml.Serialization
 open Microsoft.CodeAnalysis.Text
 open Microsoft.CodeAnalysis.CSharp
 
@@ -46,5 +47,21 @@ with
             "Variable names cannot start with a digit."
         | _ ->
             "An unknown error occurred."
+    
+    override this.DetailedHelpMessage() = None
+    
+    
+    
+type InvalidVarTypeAnnotError(textSpan: TextSpan) =
+    inherit ParseError()
+with
+    override this.GetFormattedMessage(sourceText: SourceText, filePath: string option) =
+        base.Format(sourceText, textSpan, filePath)
+
+    override this.ErrorType() =
+        "Invalid variable type annotation."
+    
+    override this.ErrorMessage() =
+        "Could not parse the following type."
     
     override this.DetailedHelpMessage() = None

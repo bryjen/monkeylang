@@ -38,7 +38,16 @@ let rec performRun (runParseResults: ParseResults<RunArguments>) : int =
         let outputDirPath = runParseResults.GetResult (BuildOutputDir, defaultValue="./bin")
         let outputDirInfo = DirectoryInfo(outputDirPath)
         
+        // TODO: Both of the below blocks take in the files, then build them independently of each other.
+        // Maybe find a way to share the build results with each other so we only compile once.
+        
+        // Generate output files, same as `build`
+        let csOutput = Path.Join(outputDirInfo.FullName, "g-cs")
         let! scanResults = CSharpProjectGenerator.scanMonkeyProject projectFile.Directory.FullName
+        let! tempCsprojFileInfo = CSharpProjectGenerator.generateTempCSharpProject csOutput scanResults
+        do! CSharpProjectGenerator.runMsBuild outputDirInfo.FullName tempCsprojFileInfo.FullName
+        
+        // Create assembly information in-memory, then run it
         let! csharpCompilation = DynamicExecution.compileFiles scanResults.SourceFileInfos scanResults.MkprojFileInfo
         DynamicExecution.dynamicallyRunCompilation csharpCompilation
         return 0

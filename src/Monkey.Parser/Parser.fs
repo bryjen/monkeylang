@@ -173,7 +173,8 @@ module private Statements =
                 match parserState.PeekToken() with
                 | token when token.Kind = SyntaxKind.ColonToken ->
                     let colonToken = parserState.PopToken()
-                    let explicitTypeSyntaxResult = tryParseTypeSyntax (PlaceholderError()) parserState
+                    let onInvalidError = InvalidVarTypeAnnotError(parserState.PeekToken().TextSpan)
+                    let explicitTypeSyntaxResult = tryParseTypeSyntax onInvalidError parserState
                     
                     explicitTypeSyntaxResult
                     |> Result.map (fun typeSyntax -> { ColonToken = colonToken; Type = typeSyntax })
@@ -609,8 +610,8 @@ module internal PrefixExpressions =
                     parserState.RecoverFromParseError()
                     UnexpectedTokenError(closeParenToken, ":", detailedHelpMessage=onNoReturnTypeDefined) :> ParseError |> Error
             
-            
-            let! returnTypeSyntax = tryParseTypeSyntax (PlaceholderError()) parserState
+            let onInvalidError = InvalidFuncReturnTypeExpr(parserState.PeekToken().TextSpan)
+            let! returnTypeSyntax = tryParseTypeSyntax onInvalidError parserState
             
             
             // #3. parse function block
@@ -655,7 +656,8 @@ module internal PrefixExpressions =
         (parserState: MonkeyAstParserState)
         : Result<(ParameterSyntax array) * (SyntaxToken array), ParseError> =
         result {
-            let! typeSyntax = tryParseTypeSyntax (PlaceholderError()) parserState
+            let onInvalidError = InvalidParameterTypeError(parserState.PeekToken().TextSpan)
+            let! typeSyntax = tryParseTypeSyntax onInvalidError parserState
             
             let currentToken = parserState.PopToken()
             let! parameterNameToken = 
@@ -966,8 +968,12 @@ module internal PrefixExpressions =
     let rec getPrefixParseFunc (parserState: MonkeyAstParserState) : Result<MonkeyAstParserState -> Result<ExpressionSyntax, ParseError>, ParseError> =
         match parserState.IsEof() with
         | true ->
-            let message = "FATAL. Tokens queue empty. This indicates a logical error in the parsing process."
-            failwith message
+            let reason = Some "FATAL. Tokens queue empty. This indicates a logical error in the parsing process."
+            let tokens = parserState.Tokens
+            let tokensAsStrings = Array.map _.ToString() tokens
+            let sourceTextRaw = System.String.Join("", tokensAsStrings)
+            let lastCharSpan = TextSpan(sourceTextRaw.Length - 1, 1);
+            InternalParseError.InitAndDump(reason, tokens, lastCharSpan) :> ParseError |> Error
         | false ->
             let token = parserState.PeekToken()
             match token.Kind, token.Value with
@@ -1003,10 +1009,8 @@ module internal PrefixExpressions =
             | SyntaxKind.IfKeyword, _ ->  
                 tryParseIfExpression |> Ok
             | _ -> 
-                consumeUntilTokenType isSemicolon parserState |> ignore  // pass by reference, properties change 'in-place'
-                // Error (ParseError($"Could not find a prefix parse function for the token type \"{token.Kind}\""))
-                // failwith "todo"
-                PlaceholderError() :> ParseError |> Error
+                parserState.RecoverFromParseError()
+                CouldNotParseExprError(token.TextSpan) :> ParseError |> Error
                 
     and private isFnKeyword (value: obj) : bool =
         match value with
@@ -1099,17 +1103,21 @@ module internal InfixExpressions =
                 
         match parserState.IsEof() with
         | true ->
-            let message = "FATAL. Tokens queue empty. This indicates a logical error in the parsing process."
-            failwith message  // TODO
+            let reason = Some "FATAL. Tokens queue empty. This indicates a logical error in the parsing process."
+            let tokens = parserState.Tokens
+            let tokensAsStrings = Array.map _.ToString() tokens
+            let sourceTextRaw = System.String.Join("", tokensAsStrings)
+            let lastCharSpan = TextSpan(sourceTextRaw.Length - 1, 1);
+            InternalParseError.InitAndDump(reason, tokens, lastCharSpan) :> ParseError |> Error
         | false ->
-            let onMissingValue parserState =  // i.e. basically go to the next statement
-                consumeUntilTokenType isSemicolon parserState |> ignore  // pass by reference, properties change 'in-place'
-                PlaceholderError()
+            let onMissingValue (token: SyntaxToken) (_parserState: MonkeyAstParserState) =  // i.e. basically go to the next statement
+                _parserState.RecoverFromParseError()
+                CouldNotParseExprError(token.TextSpan)
                 
             let token = parserState.PeekToken()
             match Map.tryFind token.Kind infixParseFuncMap with
             | Some value -> Ok value
-            | None -> Error (onMissingValue parserState)
+            | None -> Error (onMissingValue token parserState)
 
 
 

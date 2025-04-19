@@ -24,3 +24,18 @@ with
             "The token is an invalid parameter name."
     
     override this.DetailedHelpMessage() = None
+    
+    
+type InvalidParameterTypeError(textSpan: TextSpan) =
+    inherit ParseError()
+with
+    override this.GetFormattedMessage(sourceText: SourceText, filePath: string option) =
+        base.Format(sourceText, textSpan, filePath)
+
+    override this.ErrorType() =
+        "Invalid parameter type."
+    
+    override this.ErrorMessage() =
+        "Could not parse the following type."
+    
+    override this.DetailedHelpMessage() = None
