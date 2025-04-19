@@ -33,6 +33,13 @@
         <PackageReadmeFile>Nuget_README.md</PackageReadmeFile>
     </PropertyGroup>
 
+
+    <!-- Compile constants values -->
+    <PropertyGroup>
+        <!-- Adds a delay for most tasks. Makes the progression display easier to imagine. 'Debug' only. -->
+        <AddArtificialDelay>false</AddArtificialDelay>
+    </PropertyGroup>
+
     
     <ItemGroup>
         <Content Include="resources\Nuget_README.md" />
@@ -55,14 +62,40 @@
       <PackageReference Include="FSharp.SystemTextJson" Version="1.3.13" />
       <PackageReference Include="FsToolkit.ErrorHandling" Version="4.15.2" />
     </ItemGroup>
+    
 
+    
+    <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+        <DefineConstants Condition="'$(AddArtificialDelay)' == 'true'">ADD_ARTIFICIAL_DELAY</DefineConstants>
+    </PropertyGroup>
+    
     <ItemGroup>
-      <ProjectReference Include="..\Monkey.AST\Monkey.AST.fsproj" />
-      <ProjectReference Include="..\Monkey.Codegen.Dotnet\Monkey.Codegen.Dotnet.fsproj" />
-      <ProjectReference Include="..\Monkey.Parser\Monkey.Parser.fsproj" />
-      <ProjectReference Include="..\Monkey.Semantics\Monkey.Semantics.fsproj" />
+      <ProjectReference Include="..\Monkey.AST\Monkey.AST.fsproj">
+          <Properties Condition="'$(AddArtificialDelay)'=='true' And '$(Configuration)' == 'Debug'">
+              DefineConstants=ADD_ARTIFICIAL_DELAY
+          </Properties>
+      </ProjectReference>
+        
+      <ProjectReference Include="..\Monkey.Codegen.Dotnet\Monkey.Codegen.Dotnet.fsproj">
+          <Properties Condition="'$(AddArtificialDelay)'=='true' And '$(Configuration)' == 'Debug'">
+              DefineConstants=ADD_ARTIFICIAL_DELAY
+          </Properties>
+      </ProjectReference>
+        
+      <ProjectReference Include="..\Monkey.Parser\Monkey.Parser.fsproj">
+          <Properties Condition="'$(AddArtificialDelay)'=='true' And '$(Configuration)' == 'Debug'">
+              DefineConstants=ADD_ARTIFICIAL_DELAY
+          </Properties>
+      </ProjectReference>
+        
+      <ProjectReference Include="..\Monkey.Semantics\Monkey.Semantics.fsproj">
+          <Properties Condition="'$(AddArtificialDelay)'=='true' And '$(Configuration)' == 'Debug'">
+              DefineConstants=ADD_ARTIFICIAL_DELAY
+          </Properties>
+      </ProjectReference>
     </ItemGroup>
-
+    
+    
     
     <!-- Ensure that all versions specified are equal to prevent inconsistencies. -->
     <Target Name="ValidateVersions">
@@ -79,5 +112,4 @@
         <Error Condition="'$(NormalizedVersion)' != '$(NormalizedAssemblyVersion)' OR '$(NormalizedVersion)' != '$(NormalizedPackageVersion)'" 
                Text="Version ($(NormalizedVersion)), AssemblyVersion ($(NormalizedAssemblyVersion)), PackageVersion ($(NormalizedPackageVersion)) should all be equal. Check project file and ensure that they are all equal."/>
     </Target>
-
 </Project>

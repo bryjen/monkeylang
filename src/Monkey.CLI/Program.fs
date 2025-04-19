@@ -49,8 +49,17 @@ let rec main argv =
     
 and setup () =
 #if DEBUG
-    printfn "DEBUG (NON-RELEASE) BUILD\n"
+    printfn "DEBUG (NON-RELEASE) BUILD"
 #endif
+
+#if ADD_ARTIFICIAL_DELAY
+    printfn "\t- 'ADD_ARTIFICIAL_DELAY' defined. Adds an artificial delay for each task. Disable in 'Monkey.CLI/Monkey.CLI.fsproj'"
+#endif
+
+#if DEBUG
+    printfn ""
+#endif
+
     Console.OutputEncoding <- System.Text.Encoding.UTF8
     ()
     

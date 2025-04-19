@@ -15,7 +15,6 @@ open Monkey.Codegen.Dotnet
 open Monkey.Common
 open Monkey.Parser.Errors
 open Monkey.Codegen.Dotnet.CSharpProjectGeneratorErrors
-open Serilog.Events
 
 
 type BuildError(
@@ -25,7 +24,12 @@ type BuildError(
 
 let rec performDotnetBuild (buildArguments: ParseResults<BuildArguments>) : int =
     result {
-        use logHandle = ProgressTracker.addTasks [| "Scanning project files"; "Compiling Files"; "Generating C# files" |]
+        use logHandle = ProgressTracker.addTasks [|
+            "Scanning project files"
+            "Compiling Files"
+            "Generating C# project"
+            "Running MsBuild"
+        |]
         
         let! projectFile = tryGetProjectFile buildArguments
         let compileTarget = buildArguments.GetResult (BuildArguments.Target, CompileTarget.Integrated)
@@ -36,17 +40,19 @@ let rec performDotnetBuild (buildArguments: ParseResults<BuildArguments>) : int 
         let outputDirInfo = DirectoryInfo(outputDirPath)
         
         let csOutput = Path.Join(outputDirInfo.FullName, "g-cs")
-        Thread.Sleep(2500)
+        // Thread.Sleep(2500)
         logHandle.PopTask()
         
         let! scanResults = CSharpProjectGenerator.scanMonkeyProject projectFile.Directory.FullName
-        Thread.Sleep(2500)
+        // Thread.Sleep(2500)
         logHandle.PopTask()
         
         let! tempCsprojFileInfo = CSharpProjectGenerator.generateTempCSharpProject csOutput scanResults
-        Thread.Sleep(2500)
+        // Thread.Sleep(2500)
+        logHandle.PopTask()
         
         do! CSharpProjectGenerator.runMsBuild outputDirInfo.FullName tempCsprojFileInfo.FullName
+        logHandle.PopTask()
     }
     |> function
         | Ok _ -> 0

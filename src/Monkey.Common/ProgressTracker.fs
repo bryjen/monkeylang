@@ -117,7 +117,7 @@ type TaskHandle private () =
         
         
     member this.PopTask() =
-        newStatusTree <- newStatusTree.ModifyParent(addCountCallback)
+        // newStatusTree <- newStatusTree.ModifyParent(addCountCallback)
         newStatusTree <- newStatusTree.PopNode()
         newStatusTree |> Msg.SetStatusTree |> mailbox.Value.Post
         ()
@@ -140,27 +140,3 @@ type TaskHandle private () =
         
         
 let addTasks (tasks: string array) = TaskHandle.Init(statusTree, tasks)
-
-
-(*
-let myTree =
-    Node("Root",
-        [ Node("Child 1", 
-            [ Leaf("Grandchild 1")
-              Leaf("Grandchild 2") ])
-          Node("Child 2", 
-            [ Leaf("Grandchild 3") ])
-        ])
-
-printfn ""
-printfn ""
-printfn ""
-printfn ""
-printfn ""
-printTree myTree true "" true
-printfn ""
-printfn ""
-printfn ""
-printfn ""
-printfn ""
-*)
