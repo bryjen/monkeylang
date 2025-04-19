@@ -6,19 +6,15 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <Compile Include="SpectreConsole\Spinner.fs" />
-        <Compile Include="ProgressTracker.fs" />
+        <Compile Include="Spinner.fs" />
         <Compile Include="UserLocalStorage.fs" />
+        <Compile Include="StringTree.fs" />
+        <Compile Include="ProgressTracker.fs" />
     </ItemGroup>
 
     <ItemGroup>
       <PackageReference Include="Serilog" Version="4.2.0" />
       <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
-      <PackageReference Include="Spectre.Console" Version="0.50.0" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <ProjectReference Include="..\Spectre.Console.Prompts.Extensions\Spectre.Console.Prompts.Extensions.csproj" />
     </ItemGroup>
 
 </Project>

@@ -16,7 +16,6 @@ open Monkey.Common
 open Monkey.Parser.Errors
 open Monkey.Codegen.Dotnet.CSharpProjectGeneratorErrors
 open Serilog.Events
-open Spectre.Console
 
 
 type BuildError(
@@ -26,7 +25,7 @@ type BuildError(
 
 let rec performDotnetBuild (buildArguments: ParseResults<BuildArguments>) : int =
     result {
-        ProgressTracker.changeStatus("Building Project")
+        use logHandle = ProgressTracker.addTasks [| "Scanning project files"; "Compiling Files"; "Generating C# files" |]
         
         let! projectFile = tryGetProjectFile buildArguments
         let compileTarget = buildArguments.GetResult (BuildArguments.Target, CompileTarget.Integrated)
@@ -37,8 +36,16 @@ let rec performDotnetBuild (buildArguments: ParseResults<BuildArguments>) : int 
         let outputDirInfo = DirectoryInfo(outputDirPath)
         
         let csOutput = Path.Join(outputDirInfo.FullName, "g-cs")
+        Thread.Sleep(2500)
+        logHandle.PopTask()
+        
         let! scanResults = CSharpProjectGenerator.scanMonkeyProject projectFile.Directory.FullName
+        Thread.Sleep(2500)
+        logHandle.PopTask()
+        
         let! tempCsprojFileInfo = CSharpProjectGenerator.generateTempCSharpProject csOutput scanResults
+        Thread.Sleep(2500)
+        
         do! CSharpProjectGenerator.runMsBuild outputDirInfo.FullName tempCsprojFileInfo.FullName
     }
     |> function

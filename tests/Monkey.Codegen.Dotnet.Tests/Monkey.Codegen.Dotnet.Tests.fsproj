@@ -19,9 +19,6 @@
         <None Include="samples\0\expected\Main.cs">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
-        <None Include="samples\0\expected\Sample.csproj" >
-            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
     </ItemGroup>
 
     <ItemGroup>
