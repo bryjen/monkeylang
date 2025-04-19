@@ -8,7 +8,6 @@ open Monkey.Common.Spinner
 open Monkey.Common.StringTree
 
 
-Console.OutputEncoding <- System.Text.Encoding.UTF8
 
 
 [<AutoOpen>]
@@ -33,11 +32,24 @@ let mutable private statusTree = Leaf "Building Project Files"
 let spinner = DotsSpinner() :> ISpinner
 let updateDelay = TimeSpan.FromSeconds(0.1)
 
-let startPrinterTask () =
-    let modifyCallback (str: string) =
+
+let private ignoreChars = [| ' '; '└'; '├' |]
+let mutable private count = 0
+
+let private addCountCallback (str: string) =
+    let indentationLen = 1 |> StringTree.identStr |> _.Length
+    let mutable currentIdx = 0
+    while Array.contains str[currentIdx] ignoreChars do
+        currentIdx <- currentIdx  + indentationLen
+        
+    count <- count + 1
+    $"{str[0..currentIdx - 1]}[{count}] {str[currentIdx..]}"
+
+let private startPrinterTask () =
+    let addSpinnerCallback (str: string) =
         let indentationLen = 1 |> StringTree.identStr |> _.Length
         let mutable currentIdx = 0
-        while str[currentIdx] = ' ' do
+        while Array.contains str[currentIdx] ignoreChars do
             currentIdx <- currentIdx  + indentationLen
             
         $"{str[0..currentIdx - 1]}\u001b[38;2;186;225;255m{spinner.NextFrame()}\u001b[0m {str[currentIdx..]}"
@@ -48,7 +60,7 @@ let startPrinterTask () =
             Thread.Sleep(updateDelay)
             clearTree oldStatusTree
             
-            let newStatusTree = statusTree.ModifyCurrent(modifyCallback)
+            let newStatusTree = statusTree.ModifyCurrent(addSpinnerCallback)
             printfn $"{newStatusTree.ToString()}"
             ()
         ())
@@ -84,20 +96,28 @@ let stop () =
         mailbox.Value.PostAndReply(Stop)
 
 
+/// <summary>
+/// Represents a set of tasks relative to the whole program process. Provides methods for managing these tasks. Strongly
+/// coupled to the progression display.
+/// <br/>
+/// <br/>
+/// Ideally, all tasks should be done as soon as the caller exits scope, hence the <c>IDisposable</c> implementation.
+/// </summary>
 type TaskHandle private () =
     let mutable oldStatusTree: StringTree = Unchecked.defaultof<StringTree>
     let mutable newStatusTree: StringTree = Unchecked.defaultof<StringTree>
     
     member this.OldStatusTree
-        with get() = oldStatusTree
-        and set value = oldStatusTree <- value
+        with private get() = oldStatusTree
+        and private set value = oldStatusTree <- value
         
     member this.NewStatusTree
-        with get() = newStatusTree
-        and set value = newStatusTree <- value
+        with private get() = newStatusTree
+        and private set value = newStatusTree <- value
         
         
     member this.PopTask() =
+        newStatusTree <- newStatusTree.ModifyParent(addCountCallback)
         newStatusTree <- newStatusTree.PopNode()
         newStatusTree |> Msg.SetStatusTree |> mailbox.Value.Post
         ()
@@ -120,3 +140,27 @@ type TaskHandle private () =
         
         
 let addTasks (tasks: string array) = TaskHandle.Init(statusTree, tasks)
+
+
+(*
+let myTree =
+    Node("Root",
+        [ Node("Child 1", 
+            [ Leaf("Grandchild 1")
+              Leaf("Grandchild 2") ])
+          Node("Child 2", 
+            [ Leaf("Grandchild 3") ])
+        ])
+
+printfn ""
+printfn ""
+printfn ""
+printfn ""
+printfn ""
+printTree myTree true "" true
+printfn ""
+printfn ""
+printfn ""
+printfn ""
+printfn ""
+*)

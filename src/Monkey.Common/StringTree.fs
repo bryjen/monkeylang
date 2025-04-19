@@ -69,23 +69,47 @@ with
             match children with
             | [] ->
                 Leaf(callback value)
-                
             | head :: tail ->
                 let newHead = head.ModifyCurrent(callback)
                 Node(value, newHead :: tail)
-                    
         | Leaf value ->
             Leaf(callback value)
             
-    override this.ToString() =
-        let lines: ResizeArray<string> = ResizeArray<string>()
-        let rec toStringHelper (indentation: int) (tree: StringTree) =
-            match tree with
+    member this.ModifyParent(callback: string -> string) =
+        let rec modifyParentCore current =
+            match current with
             | Node(value, children) ->
-                lines.Add((identStr indentation) + value)
-                List.iter (toStringHelper (indentation + 1)) children
+                match children.Head with  // todo: error handling/with no head?
+                | Node(_, children) ->
+                    modifyParentCore children.Head
+                | Leaf _ -> 
+                    Node(callback value, children)
             | Leaf value ->
-                lines.Add((identStr indentation) + value)
-            
-        toStringHelper 0 this
-        System.String.Join("\n", lines.ToArray())
+                Leaf(callback value)
+        
+        modifyParentCore this
+             
+    override this.ToString() =
+        // credit: 😅
+        // "Microsoft Copilot, response to user query, accessed April 19, 2025."
+        let rec toStringCore (resizeArr: ResizeArray<string>) tree isRoot prefix isLast =
+            match tree with
+            | Node (value, children) ->
+                let totalChildren = List.length children
+                if isRoot then
+                    resizeArr.Add(value)
+                    for i in 0 .. totalChildren - 1 do
+                        toStringCore resizeArr children[i] false "" (i = totalChildren - 1)
+                else
+                    let line = sprintf "%s%s%s" prefix (if isLast then "└── " else "├── ") value
+                    resizeArr.Add(line)
+                    let childPrefix = prefix + (if isLast then "    " else "│   ")
+                    for i in 0 .. totalChildren - 1 do
+                        toStringCore resizeArr children[i] false childPrefix (i = totalChildren - 1)
+            | Leaf value ->
+                let line = sprintf "%s%s%s" prefix (if isLast then "└── " else "├── ") value
+                resizeArr.Add(line)
+
+        let resizeArr = ResizeArray<string>()
+        toStringCore resizeArr this true "" true
+        System.String.Join("\n", resizeArr.ToArray())

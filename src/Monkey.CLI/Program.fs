@@ -1,4 +1,5 @@
-﻿open System.Diagnostics
+﻿open System
+open System.Diagnostics
 open System.Threading
 open Argu
 
@@ -11,23 +12,18 @@ open Monkey.Common
 
 [<EntryPoint>]
 let rec main argv =
-#if DEBUG
-    printfn "DEBUG (NON-RELEASE) BUILD\n"
-#endif
+    setup ()
     
     let parser = ArgumentParser.Create<ProgramArguments>(programName = "monkey")
-    
     if argv.Length = 0 then
         printfn $"{parser.PrintUsage()}"
-        System.Environment.Exit(0)
+        Environment.Exit(0)
     
     let mutable programArgumentsNullable: ParseResults<ProgramArguments> option = None
-    try
-        programArgumentsNullable <- Some (parser.ParseCommandLine(inputs=argv, raiseOnUsage=true))
-    with
-    | ex ->
-        printfn $"{ex.Message}"
-        System.Environment.Exit(-1)
+    try programArgumentsNullable <- Some (parser.ParseCommandLine(inputs=argv, raiseOnUsage=true))
+    with | ex ->
+             printfn $"{ex.Message}"
+             Environment.Exit(-1)
         
     let programArguments = Option.get programArgumentsNullable  // doesn't error because it raises instead of returning 'None'
     
@@ -48,6 +44,15 @@ let rec main argv =
         
     cleanup()
     exitCode
+    
+    
+    
+and setup () =
+#if DEBUG
+    printfn "DEBUG (NON-RELEASE) BUILD\n"
+#endif
+    Console.OutputEncoding <- System.Text.Encoding.UTF8
+    ()
     
 
 and cleanup () =
