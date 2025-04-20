@@ -19,6 +19,14 @@ module private ConsoleHelpers =
         for i = 0 to numLines - 1 do
             printfn "\x1b[2K"
         printf $"\x1b[{numLines}F"
+        
+    let clearPrintArtifacts () =
+        let numLines = 1
+        printf $"\x1b[{numLines}F"
+        for i = 0 to numLines - 1 do
+            printfn "\x1b[2K"
+        printf $"\x1b[{numLines}F"
+        
 
 type Msg private =
     | SetStatusTree of StringTree
@@ -78,6 +86,7 @@ let private mailbox =
                 do! printerTask |> Async.AwaitTask
                 
                 clearTree statusTree
+                clearPrintArtifacts ()
                 reply.Reply()
                 
                 return()

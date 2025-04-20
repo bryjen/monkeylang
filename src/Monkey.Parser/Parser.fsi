@@ -61,7 +61,7 @@ module internal PrefixExpressions =
     
     val internal tryParseInvocationExpression : MonkeyAstParserState -> InvocationExpressionLeftExpression -> Result<ExpressionSyntax, ParseError>
     
-    val internal tryParseListArrayInitializationExpression : MonkeyAstParserState -> Result<ExpressionSyntax, ParseError>
+    val internal tryParseValueInitializedArrayExpression : MonkeyAstParserState -> Result<ExpressionSyntax, ParseError>
     
     val internal tryParseInterpolatedStringExpression : MonkeyAstParserState -> Result<InterpolatedStringExpressionSyntax, ParseError>
         

@@ -11,6 +11,7 @@ open FsToolkit.ErrorHandling
 open Monkey.CLI
 open Monkey.CLI.Build
 open Monkey.Codegen.Dotnet
+open Monkey.Common
 
 
     
@@ -29,6 +30,13 @@ type MultipleExecutablesError(
 
 let rec performRun (runParseResults: ParseResults<RunArguments>) : int =
     result {
+        use logHandle = ProgressTracker.addTasks [|
+            "Scanning project files"
+            "Compiling Files"
+            "Generating C# project"
+            "Running MsBuild"
+        |]
+        
         // building project
         let! projectFile = tryGetProjectFile runParseResults
         let compileTarget = runParseResults.GetResult (RunArguments.Target, CompileTarget.Integrated)
@@ -43,13 +51,36 @@ let rec performRun (runParseResults: ParseResults<RunArguments>) : int =
         
         // Generate output files, same as `build`
         let csOutput = Path.Join(outputDirInfo.FullName, "g-cs")
+#if ADD_ARTIFICIAL_DELAY
+        Thread.Sleep(1000)
+#endif
+        logHandle.PopTask()
+        
         let! scanResults = CSharpProjectGenerator.scanMonkeyProject projectFile.Directory.FullName
+        
+#if ADD_ARTIFICIAL_DELAY
+        Thread.Sleep(1000)
+#endif
+        logHandle.PopTask()
         let! tempCsprojFileInfo = CSharpProjectGenerator.generateTempCSharpProject csOutput scanResults
+        
+#if ADD_ARTIFICIAL_DELAY
+        Thread.Sleep(1000)
+#endif
+        logHandle.PopTask()
+        
         do! CSharpProjectGenerator.runMsBuild outputDirInfo.FullName tempCsprojFileInfo.FullName
+#if ADD_ARTIFICIAL_DELAY
+        Thread.Sleep(1000)
+#endif
+        logHandle.PopTask()
         
         // Create assembly information in-memory, then run it
         let! csharpCompilation = DynamicExecution.compileFiles scanResults.SourceFileInfos scanResults.MkprojFileInfo
+        
+        ProgressTracker.stop()
         DynamicExecution.dynamicallyRunCompilation csharpCompilation
+        
         return 0
     }
     |> function

@@ -86,12 +86,12 @@ module private rec SyntaxWalkerFunctions =
         
     and onArrayExpressionSyntax (indentation: int) (arrayExpressionSyntax: ArrayExpressionSyntax) =
         match arrayExpressionSyntax with
-        | ListInitialization listInitialization -> onArrayListInitialization indentation listInitialization
+        | ValueBasedInstantiation listInitialization -> onArrayListInitialization indentation listInitialization
         | SizeBasedInitialization sizeBasedInitialization -> onArraySizeBasedInitialization indentation sizeBasedInitialization
         
-    and onArrayListInitialization (indentation: int) (onArrayListInitialization: ListInitialization) =
+    and onArrayListInitialization (indentation: int) (onArrayListInitialization: ValueBasedInstantiation) =
         let resizeArr = ResizeArray<string>()
-        let arrayInitStr = $"%s{String.replicate indentation indentationStr}%s{nameof(ListInitialization)} : %s{onArrayListInitialization.ToString() |> normalizeString}"
+        let arrayInitStr = $"%s{String.replicate indentation indentationStr}%s{nameof(ValueBasedInstantiation)} : %s{onArrayListInitialization.ToString() |> normalizeString}"
         resizeArr.Add(arrayInitStr)
         
         if Config.Instance.PrintSyntaxTokens then
@@ -109,11 +109,9 @@ module private rec SyntaxWalkerFunctions =
     and onArraySizeBasedInitialization (indentation: int) (sizeBasedInitialization: SizeBasedInitialization) =
         let resizeArr = ResizeArray<string>()
         let arraySizeInitStr =  $"%s{String.replicate indentation indentationStr}%s{nameof(SizeBasedInitialization)} : %s{sizeBasedInitialization.ToString() |> normalizeString}"
+        resizeArr.Add(arraySizeInitStr)
         
-        if Config.Instance.PrintSyntaxTokens then
-            resizeArr.Add(onSyntaxToken (indentation + 1) sizeBasedInitialization.NewToken)
-            
-        resizeArr.Add(onSyntaxToken (indentation + 1) sizeBasedInitialization.TypeToken);  // mandatory, since key information is stored in the tokens
+        resizeArr.Add(onTypeSyntax (indentation + 1) sizeBasedInitialization.Type);  // mandatory, since key information is stored in the tokens
         
         if Config.Instance.PrintSyntaxTokens then
             resizeArr.Add(onSyntaxToken (indentation + 1) sizeBasedInitialization.OpenBracketToken);

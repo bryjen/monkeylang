@@ -1474,27 +1474,27 @@ type ArrayExpressionParsing() =
         (
             "[];",
             ExpressionStatement(
-                ArrayListInitialization(
+                ValueInitArrayExpression(
                     [|
                         
                     |]
-                    ) |> ArrayExpressionSyntax.ListInitialization |> ExpressionSyntax.ArrayExpressionSyntax
+                    ) |> ArrayExpressionSyntax.ValueBasedInstantiation |> ExpressionSyntax.ArrayExpressionSyntax
                 )
         )
         (
             "[1];",
             ExpressionStatement(
-                ArrayListInitialization(
+                ValueInitArrayExpression(
                     [|
                         NumericLiteralExpression(1)
                     |]
-                    ) |> ArrayExpressionSyntax.ListInitialization |> ExpressionSyntax.ArrayExpressionSyntax
+                    ) |> ArrayExpressionSyntax.ValueBasedInstantiation |> ExpressionSyntax.ArrayExpressionSyntax
                 )
         )
         (
             "[1, 2, 3, 4, 5];",
             ExpressionStatement(
-                ArrayListInitialization(
+                ValueInitArrayExpression(
                     [|
                         NumericLiteralExpression(1)
                         NumericLiteralExpression(2)
@@ -1502,7 +1502,59 @@ type ArrayExpressionParsing() =
                         NumericLiteralExpression(4)
                         NumericLiteralExpression(5)
                     |]
-                    ) |> ArrayExpressionSyntax.ListInitialization |> ExpressionSyntax.ArrayExpressionSyntax
+                    ) |> ArrayExpressionSyntax.ValueBasedInstantiation |> ExpressionSyntax.ArrayExpressionSyntax
+                )
+        )
+        
+        (
+            "int[5];",
+            ExpressionStatement(
+                SizeInitArrayExpression(
+                    BuiltinType(IntKeyword()),
+                    NumericLiteralExpression(5)
+                    ) |> ArrayExpressionSyntax.SizeBasedInitialization |> ExpressionSyntax.ArrayExpressionSyntax
+                )
+        )
+        (
+            "int[][5];",
+            ExpressionStatement(
+                SizeInitArrayExpression(
+                    ArrayType(BuiltinType(IntKeyword())),
+                    NumericLiteralExpression(5)
+                    ) |> ArrayExpressionSyntax.SizeBasedInitialization |> ExpressionSyntax.ArrayExpressionSyntax
+                )
+        )
+        (
+            "string[3 * 1 + 4 * 5];",
+            ExpressionStatement(
+                SizeInitArrayExpression(
+                    BuiltinType(StringKeyword()),
+                    AddExpression(
+                        MultiplicationExpression(
+                            NumericLiteralExpression(3),
+                            NumericLiteralExpression(1)
+                            ),
+                        MultiplicationExpression(
+                            NumericLiteralExpression(4),
+                            NumericLiteralExpression(5)
+                            )
+                        )
+                    ) |> ArrayExpressionSyntax.SizeBasedInitialization |> ExpressionSyntax.ArrayExpressionSyntax
+                )
+        )
+        (
+            "Map<int, string>[5];",
+            ExpressionStatement(
+                SizeInitArrayExpression(
+                    GenericType(
+                        NameType(IdentifierNameNoBox(Identifier("Map"))),
+                        [|
+                            BuiltinType(IntKeyword())
+                            BuiltinType(StringKeyword())
+                        |]
+                        ),
+                    NumericLiteralExpression(5)
+                    ) |> ArrayExpressionSyntax.SizeBasedInitialization |> ExpressionSyntax.ArrayExpressionSyntax
                 )
         )
     |]
@@ -1510,6 +1562,10 @@ type ArrayExpressionParsing() =
     [<TestCase(0)>]
     [<TestCase(1)>]
     [<TestCase(2)>]
+    [<TestCase(3)>]
+    [<TestCase(4)>]
+    [<TestCase(5)>]
+    [<TestCase(6)>]
     member this.``H: Array expression parsing test``(testCaseIndex: int) =
         let castedTestCases = this.TestCases |> Array.map (fun (input, expected) -> (input, expected |> MonkeySyntaxNode.StatementSyntax))
         let input, expectedSyntaxTree = castedTestCases[testCaseIndex]

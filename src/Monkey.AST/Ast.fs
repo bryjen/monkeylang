@@ -503,22 +503,22 @@ with
 (* #REGION Expressions *)
 
 type ArrayExpressionSyntax =
-    | ListInitialization of ListInitialization
+    | ValueBasedInstantiation of ValueBasedInstantiation
     | SizeBasedInitialization of SizeBasedInitialization
 with
     override this.ToString() =
         match this with
-        | ListInitialization listInitialization -> listInitialization.ToString()
+        | ValueBasedInstantiation listInitialization -> listInitialization.ToString()
         | SizeBasedInitialization sizeBasedInitialization -> sizeBasedInitialization.ToString()
         
     member this.TextSpan () : TextSpan =
         match this with
-        | ListInitialization listInitialization -> listInitialization.TextSpan()
+        | ValueBasedInstantiation listInitialization -> listInitialization.TextSpan()
         | SizeBasedInitialization sizeBasedInitialization -> sizeBasedInitialization.TextSpan()
         
     static member AreEquivalent(aes1: ArrayExpressionSyntax, aes2: ArrayExpressionSyntax) =
         match aes1, aes2 with
-        | ListInitialization li1, ListInitialization li2 -> ListInitialization.AreEquivalent(li1, li2)
+        | ValueBasedInstantiation li1, ValueBasedInstantiation li2 -> ValueBasedInstantiation.AreEquivalent(li1, li2)
         | SizeBasedInitialization sbi1, SizeBasedInitialization sbi2 -> SizeBasedInitialization.AreEquivalent(sbi1, sbi2)
         | _ -> false
         
@@ -526,7 +526,7 @@ with
 /// Example:
 /// <code>[EXPRESSION_1, EXPRESSION_2, ..., EXPRESSION_N]</code>
 /// </remarks>
-and ListInitialization =
+and ValueBasedInstantiation =
     { OpenBracketToken: SyntaxToken
       Values: ExpressionSyntax array
       Commas: SyntaxToken array
@@ -541,28 +541,27 @@ with
     member this.TextSpan () : TextSpan =
         TextSpan(this.OpenBracketToken.TextSpan.Start, this.CloseBracketToken.TextSpan.End - this.OpenBracketToken.TextSpan.Start)
         
-    static member AreEquivalent(li1: ListInitialization, li2: ListInitialization) =
+    static member AreEquivalent(li1: ValueBasedInstantiation, li2: ValueBasedInstantiation) =
         (Array.zip li1.Values li2.Values) |> Array.map ExpressionSyntax.AreEquivalent |> Array.forall id
+        
 /// <remarks>
 /// Example:
-/// <code>new int[]</code>
+/// <code>int[10]</code>
 /// </remarks>
 and SizeBasedInitialization =
-    { NewToken: SyntaxToken
-      TypeToken: SyntaxToken
+    { Type: TypeSyntax
       OpenBracketToken: SyntaxToken
       Size: ExpressionSyntax
       CloseBracketToken: SyntaxToken }
 with
     override this.ToString() =
-        $"{this.NewToken.ToString()}{this.TypeToken.ToString()}{this.OpenBracketToken.ToString()}{this.CloseBracketToken.ToString()}"
+        $"{this.Type.ToString()}{this.OpenBracketToken.ToString()}{this.Size.ToString()}{this.CloseBracketToken.ToString()}"
         
     member this.TextSpan () : TextSpan =
-        TextSpan(this.NewToken.TextSpan.Start, this.CloseBracketToken.TextSpan.End - this.NewToken.TextSpan.Start)
+        TextSpan(this.Type.TextSpan().Start, this.CloseBracketToken.TextSpan.End - this.Type.TextSpan().Start)
         
     static member AreEquivalent(sbi1: SizeBasedInitialization, sbi2: SizeBasedInitialization) =
-        SyntaxToken.AreEquivalent(sbi1.TypeToken, sbi2.TypeToken)
-        && ExpressionSyntax.AreEquivalent(sbi1.Size, sbi2.Size)
+        TypeSyntax.AreEquivalent(sbi1.Type, sbi2.Type) && ExpressionSyntax.AreEquivalent(sbi1.Size, sbi2.Size)
     
 
 type FunctionExpressionSyntax =

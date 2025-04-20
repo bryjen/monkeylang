@@ -388,19 +388,26 @@ type MonkeyExpressionSyntaxFactory() =
         
 
 
-    static member ArrayListInitialization(openBracketToken: SyntaxToken, values: ExpressionSyntax array, commas: SyntaxToken array, closeBracketToken: SyntaxToken) =
+    static member ValueInitArrayExpression(openBracketToken: SyntaxToken, values: ExpressionSyntax array, commas: SyntaxToken array, closeBracketToken: SyntaxToken) =
         { OpenBracketToken = openBracketToken; Values = values; Commas = commas; CloseBracketToken = closeBracketToken }
         
-    static member ArrayListInitialization(values: ExpressionSyntax array, commas: SyntaxToken array) =
+    static member ValueInitArrayExpression(values: ExpressionSyntax array, commas: SyntaxToken array) =
         { OpenBracketToken = OpenBracketToken(); Values = values; Commas = commas; CloseBracketToken = CloseBracketToken() }
         
-    static member ArrayListInitialization(values: ExpressionSyntax array) =
+    static member ValueInitArrayExpression(values: ExpressionSyntax array) =
         let commas =
             match values.Length with
             | i when i >= 2 -> Array.create ((Array.length values) - 1) (CommaToken())
             | _ -> [| |]
         { OpenBracketToken = OpenBracketToken(); Values = values; Commas = commas; CloseBracketToken = CloseBracketToken() }
-
+        
+        
+    static member SizeInitArrayExpression(typeSyntax: TypeSyntax, openBracketToken: SyntaxToken, sizeExpr: ExpressionSyntax, closeBracketToken: SyntaxToken) =
+        { Type = typeSyntax; OpenBracketToken = openBracketToken; Size = sizeExpr; CloseBracketToken = closeBracketToken }
+        
+    static member SizeInitArrayExpression(typeSyntax: TypeSyntax, sizeExpr: ExpressionSyntax) =
+        MonkeyExpressionSyntaxFactory.SizeInitArrayExpression(typeSyntax, OpenBracketToken(), sizeExpr, CloseBracketToken())
+        
     
     
     static member InterpolatedStringTextNoBox(textToken: SyntaxToken) : InterpolatedStringText =

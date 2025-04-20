@@ -437,11 +437,6 @@ module internal PrefixExpressions =
                 | token when token.Kind = SyntaxKind.IdentifierToken ->
                     tryParseIdentifier parserState
                     |> Result.map NameType
-                    
-                    (*
-                    let currentToken = parserState.PopToken()
-                    NameType(IdentifierNameNoBox(currentToken)) |> Ok
-                    *)
                 | _ ->
                     Error onInvalid
                     
@@ -455,7 +450,7 @@ module internal PrefixExpressions =
     /// Recursively calls itself to handle nested cases, ex: 'int[][][]'
     and private typeSyntaxFurtherProcessing (onInvalid: ParseError) (parserState: MonkeyAstParserState) (typeSyntax: TypeSyntax) : Result<TypeSyntax, ParseError> =
         match parserState.PeekToken() with
-        | token when token.Kind = SyntaxKind.OpenBracketToken ->  // array case
+        | token when token.Kind = SyntaxKind.OpenBracketToken && parserState.PeekToken(1).Kind = SyntaxKind.CloseBracketToken ->  // array case
             tryParseArrayType onInvalid parserState typeSyntax
             |> Result.bind (typeSyntaxFurtherProcessing onInvalid parserState)
         | token when token.Kind = SyntaxKind.LessThanToken ->  // generic case
@@ -757,7 +752,50 @@ module internal PrefixExpressions =
                Error error
                
                
-    let rec internal tryParseListArrayInitializationExpression (parserState: MonkeyAstParserState) : Result<ExpressionSyntax, ParseError> =
+    /// Parse an array expression where we initialize each expression.
+    /// <example>
+    /// example input:
+    /// <code>
+    /// TYPE[SIZE]
+    /// </code>
+    /// </example>
+    let rec internal tryParseSizeInitializedArrayExpression (typeSyntax: TypeSyntax) (parserState: MonkeyAstParserState) : Result<ExpressionSyntax, ParseError> =
+        result {
+            let openBracketToken = parserState.PopToken()
+            do! match openBracketToken.Kind with
+                | SyntaxKind.OpenBracketToken -> Ok ()
+                | _ ->
+                    parserState.RecoverFromParseError()
+                    let textSpan = parserState.PeekToken(-2).TextSpan  // we need the previous token to point to the invalid token, kinda illegal what we're doing here
+                    AbsentOrInvalidTokenError(textSpan, [| SyntaxKind.OpenBracketToken |], At.ListArrayInitialization) :> ParseError |> Error
+                    
+            let! sizeExpr = tryParseExpression parserState Precedence.LOWEST
+            
+            let closeBracketToken = parserState.PopToken()
+            do! match closeBracketToken.Kind with
+                | SyntaxKind.CloseBracketToken -> Ok ()
+                | _ ->
+                    parserState.RecoverFromParseError()
+                    let textSpan = TextSpan(sizeExpr.TextSpan().Start, 1)
+                    AbsentOrInvalidTokenError(textSpan, [| SyntaxKind.CloseBracketToken |], At.ListArrayInitialization) :> ParseError |> Error
+                    
+            let sizeInitArrExpr =
+                { Type = typeSyntax
+                  OpenBracketToken = openBracketToken
+                  Size = sizeExpr
+                  CloseBracketToken = closeBracketToken }
+            return sizeInitArrExpr |> ArrayExpressionSyntax.SizeBasedInitialization |> ExpressionSyntax.ArrayExpressionSyntax
+        }
+        
+               
+    /// Parse an array expression where we initialize each expression.
+    /// <example>
+    /// example input:
+    /// <code>
+    /// [ EXPRESSION_1, EXPRESSION_2, ..., EXPRESSION_N ]
+    /// </code>
+    /// </example>
+    let rec internal tryParseValueInitializedArrayExpression (parserState: MonkeyAstParserState) : Result<ExpressionSyntax, ParseError> =
         result {
             let openBracketToken = parserState.PopToken()
             do! match openBracketToken.Kind with
@@ -788,8 +826,8 @@ module internal PrefixExpressions =
                     AbsentOrInvalidTokenError(textSpan, [| SyntaxKind.CloseParenToken |], At.InvocationExpression) :> ParseError |> Error
                     
             return
-                ArrayListInitialization(openBracketToken, values, commas, closeBracketToken)
-                |> ArrayExpressionSyntax.ListInitialization
+                ValueInitArrayExpression(openBracketToken, values, commas, closeBracketToken)
+                |> ArrayExpressionSyntax.ValueBasedInstantiation
                 |> ExpressionSyntax.ArrayExpressionSyntax 
         }
         
@@ -983,17 +1021,23 @@ module internal PrefixExpressions =
             | SyntaxKind.IdentifierToken, _ ->
                 tryParseIdentifier
                 >> (Result.map ExpressionSyntax.IdentifierSyntax)
-                >> (Result.bind (tryParseInvocationExpressionIfPrecedesCallExpr parserState)) |> Ok
+                >> (Result.bind (tryParseInvocationExpressionIfPrecedesCallExpr parserState))
+                >> (Result.bind (tryParseSizeArrayExprIfPrecedesTypeExpr parserState))
+                |> Ok
+            | (kind , _) when SyntaxFacts.IsPredefinedType(kind) ->
+                tryParseTypeSyntax (PlaceholderError())
+                >> (Result.map ExpressionSyntax.TypeSyntax)
+                >> (Result.bind (tryParseSizeArrayExprIfPrecedesTypeExpr parserState))
+                |> Ok
             | SyntaxKind.OpenParenToken, _ ->  
                 tryParseParenthesizedExpression
                 >> (Result.bind (tryParseInvocationExpressionIfPrecedesCallExpr parserState)) |> Ok
-                
             | SyntaxKind.DollarToken, _ ->
                 tryParseInterpolatedStringExpression
                 >> (Result.map ExpressionSyntax.InterpolatedStringExpressionSyntax)
                 |> Ok
             | SyntaxKind.OpenBracketToken, _ ->  
-                tryParseListArrayInitializationExpression |> Ok
+                tryParseValueInitializedArrayExpression |> Ok
             | SyntaxKind.StringLiteralToken, _ ->  
                 tryParseStringLiteralExpression |> Ok
             | SyntaxKind.NumericLiteralToken, _ ->  
@@ -1032,9 +1076,31 @@ module internal PrefixExpressions =
             | Some value ->
                 tryParseInvocationExpression parserState (InvocationExpressionLeftExpression.ParenthesizedFunctionExpressionSyntax value)
             | None ->
-                // ERROR HERE
+                let reason = Some "FATAL. Tokens queue empty. This indicates a logical error in the parsing process."
+                let tokens = parserState.Tokens
+                let tokensAsStrings = Array.map _.ToString() tokens
+                let sourceTextRaw = System.String.Join("", tokensAsStrings)
+                let lastCharSpan = TextSpan(sourceTextRaw.Length - 1, 1);
+                InternalParseError.InitAndDump(reason, tokens, lastCharSpan) :> ParseError |> Error
+        | _ ->
+            Ok expressionSyntax
+        
+    and private tryParseSizeArrayExprIfPrecedesTypeExpr
+            (parserState: MonkeyAstParserState)
+            (expressionSyntax: ExpressionSyntax)
+            : Result<ExpressionSyntax, ParseError> =
+        let isNextTokenOpenParen = parserState.PeekToken().Kind = SyntaxKind.OpenBracketToken
+        match expressionSyntax, isNextTokenOpenParen with
+        | ExpressionSyntax.TypeSyntax typeSyntax, true ->
+            tryParseSizeInitializedArrayExpression typeSyntax parserState
+        | ExpressionSyntax.IdentifierSyntax identifierSyntax, true ->
+            match identifierSyntax with
+            | IdentifierSyntax.SimpleIdentifier simpleIdentifier ->
                 failwith "todo"
-        | _ -> Ok expressionSyntax
+            | IdentifierSyntax.QualifiedIdentifier qualifiedIdentifier ->
+                failwith "todo"
+        | _ ->
+            Ok expressionSyntax
         
         
                 

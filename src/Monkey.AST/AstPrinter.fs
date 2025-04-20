@@ -90,11 +90,11 @@ let rec private onExpressionSyntax (indentation: int) (expressionSyntax: Express
     
 and private onArrayExpressionSyntax (indentation: int) (arrayExpressionSyntax: ArrayExpressionSyntax) =
     match arrayExpressionSyntax with
-    | ListInitialization listInitialization -> onArrayListInitialization indentation listInitialization
+    | ValueBasedInstantiation listInitialization -> onArrayListInitialization indentation listInitialization
     | SizeBasedInitialization sizeBasedInitialization -> onArraySizeBasedInitialization indentation sizeBasedInitialization
     
-and private onArrayListInitialization (indentation: int) (onArrayListInitialization: ListInitialization) =
-    printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(ListInitialization)) (onArrayListInitialization.ToString() |> normalizeString)
+and private onArrayListInitialization (indentation: int) (onArrayListInitialization: ValueBasedInstantiation) =
+    printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(ValueBasedInstantiation)) (onArrayListInitialization.ToString() |> normalizeString)
     
     if Config.Instance.PrintSyntaxTokens then
         onSyntaxToken (indentation + 1) onArrayListInitialization.OpenBracketToken
@@ -106,11 +106,8 @@ and private onArrayListInitialization (indentation: int) (onArrayListInitializat
     
 and private onArraySizeBasedInitialization (indentation: int) (sizeBasedInitialization: SizeBasedInitialization) =
     printfn "%s%s : %s" (String.replicate indentation indentationStr) (nameof(SizeBasedInitialization)) (sizeBasedInitialization.ToString() |> normalizeString)
-    
-    if Config.Instance.PrintSyntaxTokens then
-        onSyntaxToken (indentation + 1) sizeBasedInitialization.NewToken
         
-    onSyntaxToken (indentation + 1) sizeBasedInitialization.TypeToken  // mandatory, since key information is stored in the tokens
+    onTypeSyntax (indentation + 1) sizeBasedInitialization.Type  // mandatory, since key information is stored in the tokens
     
     if Config.Instance.PrintSyntaxTokens then
         onSyntaxToken (indentation + 1) sizeBasedInitialization.OpenBracketToken

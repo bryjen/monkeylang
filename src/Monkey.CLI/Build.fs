@@ -40,15 +40,21 @@ let rec performDotnetBuild (buildArguments: ParseResults<BuildArguments>) : int 
         let outputDirInfo = DirectoryInfo(outputDirPath)
         
         let csOutput = Path.Join(outputDirInfo.FullName, "g-cs")
-        // Thread.Sleep(2500)
+#if ADD_ARTIFICIAL_DELAY
+        Thread.Sleep(1000)
+#endif
         logHandle.PopTask()
         
         let! scanResults = CSharpProjectGenerator.scanMonkeyProject projectFile.Directory.FullName
-        // Thread.Sleep(2500)
+#if ADD_ARTIFICIAL_DELAY
+        Thread.Sleep(1000)
+#endif
         logHandle.PopTask()
         
         let! tempCsprojFileInfo = CSharpProjectGenerator.generateTempCSharpProject csOutput scanResults
-        // Thread.Sleep(2500)
+#if ADD_ARTIFICIAL_DELAY
+        Thread.Sleep(1000)
+#endif
         logHandle.PopTask()
         
         do! CSharpProjectGenerator.runMsBuild outputDirInfo.FullName tempCsprojFileInfo.FullName
